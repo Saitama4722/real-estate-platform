@@ -1,62 +1,191 @@
 # Real Estate Platform
 
-Платформа недвижимости с публичным сайтом и внутренней CRM для сотрудников агентства.
+---
 
-## Описание
+# Русская версия
 
-Проект объединяет:
-- **Публичную часть** — каталог объектов, карточки недвижимости, поиск и фильтры, карта, статьи, SEO-страницы.
-- **Внутреннюю часть (CRM)** — управление сотрудниками и ролями, объектами недвижимости, заявками клиентов.
+## О проекте
+
+**Real Estate Platform** — это платформа для агентств недвижимости, включающая:
+
+- публичный сайт-каталог объектов недвижимости
+- внутреннюю CRM для сотрудников агентства
+
+Платформа предназначена для удобного управления объектами недвижимости и обработки заявок клиентов.
+
+Проект разрабатывается как масштабируемая PropTech-платформа с современным технологическим стеком.
+
+---
+
+## Основные возможности
+
+В платформе реализуются следующие основные возможности:
+
+- каталог объектов недвижимости
+- страница объекта недвижимости
+- поиск и фильтрация объектов
+- карта объектов
+- формы заявок и лидов
+- внутренняя CRM для сотрудников
+- управление объектами недвижимости
+
+---
+
+## Текущий статус проекта
+
+На данный момент реализован фундамент проекта:
+
+- базовая архитектура
+- документация проекта
+- правила разработки
+- инфраструктура разработки (Docker)
+
+Дальнейшая разработка ведётся поэтапно.
+
+---
+
+## Технологический стек
+
+**Backend**
+
+- Python
+- Django
+- Django REST Framework
+- PostgreSQL
+
+**Frontend**
+
+- Next.js
+- React
+- TypeScript
+- TailwindCSS
+
+**Infrastructure**
+
+- Docker
+- Docker Compose
+
+**Maps**
+
+- Yandex Maps
+
+---
 
 ## Структура проекта
 
-```
-real-estate-platform/
-├── backend/          # Backend-приложение (API, бизнес-логика)
-├── frontend/         # Frontend-приложение (публичный сайт и интерфейсы)
-├── docs/             # Документация проекта
-├── docker-compose.yml
-├── .env.example
-├── .gitignore
-└── README.md
-```
+| Каталог    | Описание              |
+|-----------|------------------------|
+| `backend/`  | Backend-сервис         |
+| `frontend/` | Frontend-приложение    |
+| `docs/`     | Документация проекта   |
 
-## Текущий статус
+Основная документация проекта находится в каталоге `docs/`.
 
-Выполнены подэтапы 1.1 и 1.2 этапа 1 «Фундамент проекта»: корневая структура репозитория и локальная инфраструктура разработки на Docker Compose (PostgreSQL и контейнеры-заглушки backend/frontend).
+---
 
-## Правила и ограничения MVP
+## Документация
 
-Текущая версия платформы — целенаправленный MVP без лишнего функционала:
+- [docs/project-rules.md](docs/project-rules.md) — правила разработки проекта
+- [docs/mvp-scope.md](docs/mvp-scope.md) — границы MVP
+- [docs/architecture.md](docs/architecture.md) — архитектура системы
 
-- **Только продажа недвижимости** — в объёме MVP реализуется только продажа; аренда не входит.
-- **Без публичной регистрации** — самостоятельная регистрация пользователей не предусмотрена; учётные записи создаёт только администратор.
-- **Без чата** — встроенный чат на текущем этапе не реализуется.
-- **Без импорта** — импорт объектов из внешних источников пока не реализуется.
-- **Без перегруженных блоков** — не добавляются лишние элементы и тяжёлые блоки, характерные для крупных маркетплейсов недвижимости (CIAN, Avito и т.п.); их можно использовать только как UX-референсы.
+---
 
-Подробные границы продукта и дисциплина разработки описаны в **docs/project-rules.md** и **docs/mvp-scope.md**.
+## Ключевые слова
 
-## Локальная инфраструктура разработки
+real estate platform · платформа недвижимости · CRM для агентства недвижимости · proptech platform · property management platform · real estate CRM · property catalog system · real estate marketplace · property listing website
 
-Запуск окружения через Docker Compose (PostgreSQL + контейнеры-заглушки backend и frontend; приложения Django и Next.js на этом шаге не развёрнуты):
+---
 
-```bash
-docker compose up --build
-```
+# English Version
 
-Остановка и удаление контейнеров:
+## About the Project
 
-```bash
-docker compose down
-```
+**Real Estate Platform** is a property platform designed for real estate agencies.
 
-Перед первым запуском скопируйте `.env.example` в `.env` и при необходимости задайте переменные (пароль БД и т.д.). Порты: **db** — 5432, **backend** — 8000, **frontend** — 3000.
+The platform includes:
 
-## План развития
+- a public real estate catalog
+- an internal CRM system for agency staff
 
-Дальнейшие этапы предусматривают:
-- **Backend** — Django + Django REST Framework, API для каталога, заявок и CRM.
-- **Frontend** — Next.js, публичные страницы, каталог, карта, SEO.
-- **База данных** — PostgreSQL.
-- **Функциональность** — CRM для сотрудников, каталог недвижимости, SEO-страницы, карта, обработка заявок клиентов.
+The system is designed to manage property listings and process client leads efficiently.
+
+The project is being developed as a scalable PropTech platform using a modern technology stack.
+
+---
+
+## Core Features
+
+The platform includes the following features:
+
+- property catalog
+- property page
+- property search and filters
+- map view
+- lead forms
+- internal CRM
+- property management
+
+---
+
+## Current Project Status
+
+The project currently includes the foundational infrastructure:
+
+- project architecture
+- development documentation
+- project rules
+- Docker development environment
+
+Further development continues in incremental stages.
+
+---
+
+## Technology Stack
+
+**Backend**
+
+- Python
+- Django
+- Django REST Framework
+- PostgreSQL
+
+**Frontend**
+
+- Next.js
+- React
+- TypeScript
+- TailwindCSS
+
+**Infrastructure**
+
+- Docker
+- Docker Compose
+
+**Maps**
+
+- Yandex Maps
+
+---
+
+## Project Structure
+
+| Directory   | Description           |
+|------------|------------------------|
+| `backend/`   | Backend service        |
+| `frontend/`  | Frontend application   |
+| `docs/`      | Project documentation  |
+
+---
+
+## Documentation
+
+- [docs/project-rules.md](docs/project-rules.md) — project rules
+- [docs/mvp-scope.md](docs/mvp-scope.md) — MVP scope
+- [docs/architecture.md](docs/architecture.md) — system architecture
+
+---
+
+## Keywords
+
+real estate platform · real estate CRM · property management platform · proptech platform · real estate listing website · property marketplace · real estate agency software · property catalog platform
