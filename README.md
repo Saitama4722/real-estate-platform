@@ -2,68 +2,92 @@
 
 **Repository:** [Saitama4722/real-estate-platform](https://github.com/Saitama4722/real-estate-platform)
 
+A modern **real estate platform** and **property management system** combining a public **property catalog** with an internal **real estate CRM** for agencies. Built with **Django backend** and **Next.js frontend** as a scalable **proptech platform**.
+
 ---
 
 ## English Overview
 
-**Real Estate Platform** is a PropTech platform for real estate agencies. It combines a **public property catalog** with a future **internal CRM** for realtors and agency staff.
+**Real Estate Platform** is a PropTech solution for real estate agencies. It provides:
 
-- **Backend:** Django + Django REST Framework, PostgreSQL  
-- **Frontend:** Next.js, TypeScript, TailwindCSS (mobile-first; Bootstrap is not used)  
-- **Infrastructure:** Docker / docker-compose for local development  
+- A **public property catalog** with SEO-optimized listing structure and location filtering
+- A future **internal CRM** for real estate agencies and staff
+- Scalable backend architecture and mobile-first responsive UI
 
-The current MVP is scoped to **Krasnodar Krai** — cities **Krasnodar** and **Gelendzhik**. Geography and project rules are documented in the `docs/` folder.
+The platform uses **Django** and **Django REST Framework** on the backend, **PostgreSQL** as the database, and **Next.js** with **TypeScript** and **TailwindCSS** on the frontend. Development runs via **Docker** and **docker-compose**. The UI is **mobile-first** and **responsive**; Bootstrap is **not** used.
+
+The MVP is limited to **Krasnodar Krai** — cities **Krasnodar** and **Gelendzhik**. The system is not designed for all of Russia in the first version.
 
 ---
 
-## Русская версия
+## Russian Overview / Русская версия
 
-**Real Estate Platform** — платформа недвижимости для агентств: публичный каталог объектов и будущая внутренняя CRM для риелторов и сотрудников.
+**Real Estate Platform** — платформа недвижимости для агентств: публичный каталог объектов с SEO-оптимизированной структурой листингов и фильтрацией по локациям, а также будущая внутренняя **CRM для риелторов** и сотрудников агентств.
 
-- **Backend:** Django + Django REST Framework, PostgreSQL  
-- **Frontend:** Next.js, TypeScript, TailwindCSS (mobile-first; Bootstrap не используется)  
-- **Инфраструктура:** Docker / docker-compose для локальной разработки  
+- **Backend:** Django, Django REST Framework, PostgreSQL  
+- **Frontend:** Next.js, TypeScript, TailwindCSS (mobile-first, без Bootstrap)  
+- **Инфраструктура:** Docker, docker-compose  
 
-Текущий MVP ограничен **Краснодарским краем** — города **Краснодар** и **Геленджик**. География и правила проекта описаны в каталоге `docs/`.
+MVP ограничен **Краснодарским краем** — города **Краснодар** и **Геленджик**. В первой версии система не рассчитана на всю Россию.
+
+---
+
+## Key Features
+
+- **Property catalog** — public real estate listings with location filtering  
+- **SEO-optimized** listing structure for better discoverability  
+- **Internal CRM** (planned) — for agency staff and realtors  
+- **Scalable architecture** — clear separation of backend apps and services  
+- **Mobile-first** responsive design  
+- **Docker-based** local development
 
 ---
 
 ## Technology Stack
 
-| Layer | Stack |
-|-------|--------|
-| **Backend** | Django, Django REST Framework, Python |
-| **Database** | PostgreSQL |
-| **Frontend** | Next.js, TypeScript, TailwindCSS |
-| **Infrastructure** | Docker, Docker Compose |
-| **Maps** | Yandex Maps (planned) |
+| Layer          | Stack |
+|----------------|--------|
+| **Backend**    | Django, Django REST Framework, Python |
+| **Database**   | PostgreSQL |
+| **Frontend**   | Next.js, TypeScript, TailwindCSS |
+| **Infrastructure** | Docker, docker-compose |
+
+---
+
+## Project Architecture
+
+- **Backend:** Django project with multiple apps (`users`, `agencies`, `locations`, `properties`, `leads`, `articles`, `seo`, `common`). Shared utilities: abstract timestamp model, validators, serializers, services layer, permissions.
+- **Frontend:** Next.js app (in repo; UI planned as mobile-first, no Bootstrap).
+- **Database:** PostgreSQL; backend connects via Docker `db` service.
+- **Docs:** Project rules, MVP scope, architecture, and git workflow live in `docs/`.
 
 ---
 
 ## Project Structure
 
 ```
-real-estate-platform/
+real-estate-platform
+│
 ├── backend/
 ├── frontend/
 ├── docs/
-├── .env.example
-├── .gitignore
 ├── docker-compose.yml
-└── README.md
+├── README.md
+├── .env.example
+└── .gitignore
 ```
 
-| Directory | Description |
-|-----------|--------------|
-| `backend/` | Django backend service |
-| `frontend/` | Next.js frontend application |
-| `docs/` | Project documentation (rules, MVP scope, architecture, git workflow) |
+| Directory   | Description |
+|------------|-------------|
+| `backend/` | Django backend (DRF, PostgreSQL, apps: users, agencies, locations, properties, leads, articles, seo, common) |
+| `frontend/`| Next.js frontend application |
+| `docs/`    | Project documentation (rules, MVP scope, architecture, git workflow) |
 
 ---
 
 ## Current Progress
 
-Development is stage-based. The following stages are **completed**. Stage 3 is **not** completed.
+Development is **stage-based**. Stages 1 and 2 are **completed**. Stage 3 is **not** started.
 
 ---
 
@@ -72,53 +96,42 @@ Development is stage-based. The following stages are **completed**. Stage 3 is *
 ### Stage 1 — Project Foundation
 
 - Repository structure (backend, frontend, docs)
-- Root README
-- Docker development infrastructure (PostgreSQL + placeholder backend/frontend containers)
-- Project rules documentation
-- Architecture documentation
+- Root README and project rules
 - MVP scope documentation
+- Architecture documentation
 - Git workflow documentation
+- Docker development infrastructure (PostgreSQL + backend/frontend containers)
 
 ### Stage 2 — Backend Foundation
 
-**2.1 — Django project**
-
-- Django project created
-- Development settings configured
-- PostgreSQL connected
-- Timezone, static, media configured
-- Basic CORS configured
+- Django project initialized
+- PostgreSQL configured and connected
 - DRF configured
-- Migrations verified inside Docker
-- Backend successfully starts
+- CORS configured
+- Backend running in Docker
 
-**2.2 — Backend apps**
+**Backend apps created:**
 
 - `users`, `agencies`, `locations`, `properties`, `leads`, `articles`, `seo`, `common`
 
-**2.3 — Common backend utilities**
+**Common backend utilities:**
 
-- Abstract timestamp base model
-- Shared choices structure
-- Shared validators structure
-- Shared serializers structure
-- Shared services structure
-- Shared permissions structure
+- Abstract timestamp model
+- Shared validators
+- Shared serializers
+- Services layer structure
+- Permissions structure
 
 ---
 
-## Current MVP Scope
+## MVP Scope
 
-The MVP focuses on:
-
-- **Property sales** (no rental in current scope)
+- **Property sales** only (no rental in current scope)
 - **Public catalog** and property card pages
 - **Future internal CRM** for staff
-- **No public self-registration** — users are created by admin
-- **Import** from external systems is not implemented
-- **Large nationwide scaling** is not part of the current MVP
-
-Geography: Krasnodar Krai — Krasnodar, Gelendzhik.
+- **No public self-registration** — users created by admin
+- **No import** from external systems in current scope
+- **Geography:** Krasnodar Krai — Krasnodar, Gelendzhik (not nationwide)
 
 ---
 
@@ -130,24 +143,24 @@ Geography: Krasnodar Krai — Krasnodar, Gelendzhik.
 
 ---
 
-## Local Run Instructions
+## How to Run Locally
 
-1. **Start services (Docker):**
-
-   ```bash
-   docker compose up -d
-   ```
-
-2. **Check containers:**
+1. From the project root, start all services:
 
    ```bash
-   docker compose ps
+   docker compose up --build
    ```
 
-3. **Backend (migrations and run):**  
-   From the project root, run migrations and start the Django dev server inside the backend container or locally with `POSTGRES_*` pointing to the `db` service. See `backend/README.md` for backend-specific commands.
+2. **Backend:** [http://localhost:8001](http://localhost:8001)  
+   (e.g. [http://localhost:8001/admin/](http://localhost:8001/admin/) for Django admin)
 
-Backend and database are configured in Docker; the backend app is in `backend/` and connects to the `db` service.
+3. **Frontend:** [http://localhost:3000](http://localhost:3000)
+
+Run migrations inside the backend container if needed:
+
+```bash
+docker compose exec backend python manage.py migrate
+```
 
 ---
 
@@ -155,7 +168,12 @@ Backend and database are configured in Docker; the backend app is in `backend/` 
 
 **Stage 3 — Users and Roles**
 
-(Not yet started.)
+- Custom user model  
+- Authentication  
+- User roles  
+- Agency users  
+
+*(Not yet started.)*
 
 ---
 
@@ -165,3 +183,9 @@ Backend and database are configured in Docker; the backend app is in `backend/` 
 - [docs/mvp-scope.md](docs/mvp-scope.md) — MVP scope  
 - [docs/architecture.md](docs/architecture.md) — system architecture  
 - [docs/git-workflow.md](docs/git-workflow.md) — Git workflow  
+
+---
+
+## License
+
+*Placeholder — to be defined.*
