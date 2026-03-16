@@ -1,5 +1,5 @@
-# Real Estate Platform — local development infrastructure (substage 1.2)
-# PostgreSQL + placeholder backend/frontend containers (no Django/Next.js yet).
+# Real Estate Platform — local development infrastructure
+# PostgreSQL + backend (Django) + frontend (Next.js). Backend/frontend run via exec or override command.
 
 services:
   db:
@@ -23,9 +23,12 @@ services:
     networks:
       - app
 
-  # Placeholder only: no Django project yet. Keeps container up for infrastructure verification.
+  # Backend: Django app in ./backend. Run migrations and dev server via exec, e.g.:
+  #   docker compose exec backend python manage.py migrate
+  #   docker compose exec backend python manage.py runserver 0.0.0.0:8000
   backend:
-    image: python:3.12-slim
+    build: ./backend
+    image: real-estate-backend:latest
     container_name: real-estate-backend
     restart: unless-stopped
     working_dir: /app
@@ -34,7 +37,7 @@ services:
     ports:
       - "8001:8000"
     environment:
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-dev-key-change-in-production}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
       POSTGRES_DB: ${POSTGRES_DB:-real_estate_db}
@@ -48,7 +51,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Placeholder: minimal HTTP server so container starts without Django (infrastructure only).
+    # Default: minimal HTTP server so container stays up. Override to run Django, e.g.:
+    # command: python manage.py runserver 0.0.0.0:8000
     command: python -m http.server 8000
     networks:
       - app

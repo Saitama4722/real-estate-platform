@@ -3,6 +3,7 @@ Django settings for the real estate platform backend.
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -12,12 +13,10 @@ SECRET_KEY = os.environ.get(
     "django-insecure-dev-key-change-in-production",
 )
 
-DEBUG = True
+DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = [
-    "127.0.0.1",
-    "localhost",
-]
+_raw_allowed = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+ALLOWED_HOSTS = [h.strip() for h in _raw_allowed.split(",") if h.strip()]
 
 INSTALLED_APPS = [
     # Django
@@ -29,6 +28,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third-party
     "rest_framework",
+    "rest_framework_simplejwt",
     "corsheaders",
     # Local apps
     "users",
@@ -86,14 +86,26 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Custom user model (email as login)
+AUTH_USER_MODEL = "users.User"
+
 # CORS — development: allow all origins
 CORS_ALLOW_ALL_ORIGINS = True
 
-# Django REST Framework
+# Django REST Framework — JWT for CRM; default require auth
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
-    ]
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
+# JWT token lifetimes (minimal config)
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }
 
 # Templates (required for admin)
