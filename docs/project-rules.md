@@ -67,6 +67,54 @@
 
 ---
 
+## Прогресс реализации (этапы)
+
+### Этап 8 — CRM
+
+**Подэтап 8.1 — Каркас CRM** (выполнено).
+
+- Разделы CRM определены.
+- `/crm/login` — исправлено.
+- `/crm/dashboard` — исправлено.
+- `/crm/properties` — исправлено.
+- `/crm/leads` — исправлено.
+- `/crm/articles` — исправлено.
+- `/crm/users` — исправлено.
+
+Реализовано: канонический перечень разделов CRM (единый источник истины); минимальный layout CRM; минимальные скелет-страницы для каждого маршрута CRM.
+
+**Подэтап 8.2 — Backend CRUD объектов в CRM** (выполнено).
+
+- Эндпоинты CRM для объектов: список, создание, получение по id, обновление (PUT/PATCH), архивация (POST `.../archive/`).
+- Отдельные CRM-сериализаторы (список, деталь, запись); публичные маршруты `api/properties/` без изменений.
+- Архив: `status=archived`, снятие с публикации, `archived_at`, очистка `published_at`; отдельного soft delete нет (не используется в базовых моделях проекта).
+
+**Подэтап 8.3 — Backend: фото объектов в CRM** (выполнено).
+
+- CRM-эндпоинты под `/api/crm/properties/<property_pk>/photos/`: список и загрузка (POST multipart в `original_file`), деталь и удаление (`GET`/`DELETE` по id фото).
+- POST `.../photos/reorder/` — тело `{"items": [{"id", "sort_order"}, ...]}`; обновление `sort_order` только для фото данного объекта.
+- POST `.../photos/set_main/` — тело `{"id": <id фото>}`; один главный кадр на объект (`is_main`), остальные сбрасываются.
+- Сериализаторы CRM для чтения и загрузки; производные `image_*` не генерируются на этом шаге; права `IsCrmUser`.
+
+**Подэтап 8.4 — Backend: видео-ссылки объектов в CRM** (выполнено).
+
+- CRM-эндпоинты под `/api/crm/properties/<property_pk>/videos/`: список (`GET`), добавление ссылки (`POST`, поля `platform`, `video_url`, `embed_url`).
+- Деталь, правка (`PUT`/`PATCH`) и удаление (`DELETE`) по `/api/crm/properties/<property_pk>/videos/<video_pk>/`.
+- Модель `PropertyVideo`; без парсинга URL, авто-платформы и генерации `embed_url`; права `IsCrmUser`.
+
+**Подэтап 8.5 — Backend: публикация объектов в CRM** (выполнено).
+
+- Явные переходы статуса: POST `.../publish/`, POST `.../to_draft/`, POST `.../archive/` (под `/api/crm/properties/`); правила в `properties.crm_publication`.
+- Черновик / опубликован / архив: `status`, `is_published`, `published_at`, `archived_at` обновляются только через эти действия; из CRM write (PUT/PATCH) поля `status` и `is_published` убраны.
+- Допускаются переходы: draft|moderation → published; published|archived|moderation → draft; draft|published|moderation → archived; из архива в published только через to_draft → publish; повтор того же действия — идемпотентно (без ошибки).
+
+**Подэтап 8.6 — CRM: права доступа к объектам** (выполнено).
+
+- Роли superadmin и admin видят и управляют всеми объектами в CRM; роль realtor — только «своими»: при заданном ``assigned_realtor`` владелец — он, иначе — ``created_by``.
+- Ограничение и в queryset (списки/вложенные ресурсы), и на уровне объекта: ``IsCrmUser`` + ``IsCrmPropertyStaffOrOwner``; вложенные фото/видео под ``/api/crm/properties/<property_pk>/...`` проверяют доступ к объекту.
+
+---
+
 ## Что явно исключено на текущем этапе
 
 - Аренда недвижимости.

@@ -11,6 +11,7 @@ urlpatterns = [
     path("api/auth/", include("users.urls")),
     path("api/locations/", include("locations.urls")),
     path("api/properties/", include("properties.urls")),
+    path("api/crm/properties/", include("properties.crm_urls")),
 ]
 
 if settings.DEBUG:

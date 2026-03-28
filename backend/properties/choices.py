@@ -29,3 +29,9 @@ class CurrencyType(models.TextChoices):
     RUB = "rub", "₽"
     USD = "usd", "$"
     EUR = "eur", "€"
+
+
+class VideoPlatform(models.TextChoices):
+    YOUTUBE = "youtube", "YouTube"
+    VK = "vk", "VK"
+    RUTUBE = "rutube", "RuTube"
