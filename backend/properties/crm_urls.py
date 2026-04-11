@@ -2,12 +2,14 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from properties.views import (
+    CrmImportJobViewSet,
     CrmPropertyPhotoViewSet,
     CrmPropertyVideoViewSet,
     CrmPropertyViewSet,
 )
 
 router = DefaultRouter()
+router.register(r"import-jobs", CrmImportJobViewSet, basename="crm-import-job")
 router.register(r"", CrmPropertyViewSet, basename="crm-property")
 
 _photo = CrmPropertyPhotoViewSet.as_view

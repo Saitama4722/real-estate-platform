@@ -2,36 +2,80 @@
 Custom user model: email as login, role-based access.
 Realtor profile: staff profile for realtors (public-facing data).
 """
+import re
+
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import IntegrityError, models
 
 from common.models import BaseTimestampedModel
 
 from .managers import UserManager
+
+_CRM_ID_PATTERN = re.compile(r"^RID(\d{6})$")
 
 
 class User(AbstractBaseUser, PermissionsMixin):
     """Custom user model with email as the unique login field."""
 
     class Role(models.TextChoices):
-        SUPERADMIN = "superadmin", "Superadmin"
-        ADMIN = "admin", "Admin"
-        REALTOR = "realtor", "Realtor"
+        """Платформенные роли сотрудника. Полный доступ к CRM API: superadmin и admin; риэлтор — ограничен выборкой/объектными правами."""
+        SUPERADMIN = "superadmin", "Суперадминистратор"
+        ADMIN = "admin", "Администратор"
+        REALTOR = "realtor", "Риэлтор"
 
-    email = models.EmailField("email", unique=True)
-    phone = models.CharField("phone", max_length=32, blank=True)
-    first_name = models.CharField("first name", max_length=150)
-    last_name = models.CharField("last name", max_length=150)
+    email = models.EmailField("Email", unique=True)
+    phone = models.CharField("Телефон", max_length=32, blank=True)
+    avatar = models.ImageField(
+        "Аватар",
+        upload_to="users/avatars/",
+        blank=True,
+        null=True,
+    )
+    crm_id = models.CharField(
+        "CRM ID",
+        max_length=10,
+        unique=True,
+        blank=False,
+        db_index=True,
+    )
+    first_name = models.CharField("Имя", max_length=150)
+    last_name = models.CharField("Фамилия", max_length=150)
     role = models.CharField(
-        "role",
+        "Роль",
         max_length=20,
         choices=Role.choices,
         default=Role.REALTOR,
     )
-    is_active = models.BooleanField("active", default=True)
-    is_staff = models.BooleanField("staff status", default=False)
-    date_joined = models.DateTimeField("date joined", auto_now_add=True)
+    is_active = models.BooleanField("Активен", default=True)
+    is_staff = models.BooleanField("Доступ в админку", default=False)
+    date_joined = models.DateTimeField("Дата регистрации", auto_now_add=True)
+
+    # Доп. права для роли «Риэлтор» в CRM (суперадмин/админ обходят через has_staff_level_access).
+    perm_create_property = models.BooleanField(
+        "CRM: создавать объекты",
+        default=False,
+    )
+    perm_edit_property = models.BooleanField(
+        "CRM: редактировать объекты",
+        default=False,
+    )
+    perm_delete_property = models.BooleanField(
+        "CRM: архивировать объекты",
+        default=False,
+    )
+    perm_view_clients = models.BooleanField(
+        "CRM: просматривать клиентов (лиды)",
+        default=False,
+    )
+    perm_delete_clients = models.BooleanField(
+        "CRM: удалять клиентов (лиды)",
+        default=False,
+    )
+    perm_change_status = models.BooleanField(
+        "CRM: менять статус лидов",
+        default=False,
+    )
 
     objects = UserManager()
 
@@ -39,11 +83,36 @@ class User(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = ["first_name", "last_name"]
 
     class Meta:
-        verbose_name = "user"
-        verbose_name_plural = "users"
+        verbose_name = "Пользователь"
+        verbose_name_plural = "Пользователи"
 
     def __str__(self):
         return self.email
+
+    @classmethod
+    def allocate_next_crm_id(cls):
+        """Next RID###### id from existing rows (best-effort; collisions retried in save)."""
+        best = 0
+        qs = cls.objects.exclude(crm_id="").values_list("crm_id", flat=True)
+        for cid in qs:
+            m = _CRM_ID_PATTERN.fullmatch(cid or "")
+            if m:
+                best = max(best, int(m.group(1)))
+        return f"RID{best + 1:06d}"
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.crm_id:
+            max_attempts = 12
+            for attempt in range(max_attempts):
+                self.crm_id = type(self).allocate_next_crm_id()
+                try:
+                    return super().save(*args, **kwargs)
+                except IntegrityError:
+                    if attempt >= max_attempts - 1:
+                        raise
+                    self.crm_id = ""
+                    continue
+        return super().save(*args, **kwargs)
 
     # --- Role helpers (foundation for role-based access control) ---
 
@@ -88,30 +157,30 @@ class RealtorProfile(BaseTimestampedModel):
         User,
         on_delete=models.CASCADE,
         related_name="realtor_profile",
-        verbose_name="user",
+        verbose_name="Пользователь",
     )
-    public_name = models.CharField("public name", max_length=255, blank=True)
-    public_phone = models.CharField("public phone", max_length=32, blank=True)
+    public_name = models.CharField("Публичное имя", max_length=255, blank=True)
+    public_phone = models.CharField("Публичный телефон", max_length=32, blank=True)
     photo = models.ImageField(
-        "photo",
+        "Фото",
         upload_to="realtors/photos/",
         blank=True,
         null=True,
     )
-    short_bio = models.TextField("short bio", blank=True)
-    is_public = models.BooleanField("is public", default=False)
+    short_bio = models.TextField("Краткая биография", blank=True)
+    is_public = models.BooleanField("Показывать на сайте", default=False)
     agency = models.ForeignKey(
         "agencies.Agency",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="realtor_profiles",
-        verbose_name="agency",
+        verbose_name="Агентство",
     )
 
     class Meta:
-        verbose_name = "realtor profile"
-        verbose_name_plural = "realtor profiles"
+        verbose_name = "Профиль риэлтора"
+        verbose_name_plural = "Профили риэлторов"
 
     def __str__(self):
         return self.public_name or self.user.email
@@ -120,5 +189,7 @@ class RealtorProfile(BaseTimestampedModel):
         super().clean()
         if self.user_id and self.user.role != User.Role.REALTOR:
             raise ValidationError(
-                {"user": "Realtor profile should be linked to a user with role Realtor."}
+                {
+                    "user": "Профиль риэлтора можно привязать только к пользователю с ролью «Риэлтор»."
+                }
             )

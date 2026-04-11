@@ -1,0 +1,56 @@
+import type { Metadata } from "next";
+import { CatalogPageTemplate } from "@/components/catalog/CatalogPageTemplate";
+import { siteOrigin } from "@/lib/articleSeo";
+import {
+  catalogViewIsMap,
+  publicPropertiesParamsFromSearchParams,
+  type CatalogPageSearchRecord,
+} from "@/lib/catalogQueryParams";
+import { fetchPublicPropertiesList } from "@/lib/publicPropertyList";
+
+const catalogSeoText =
+  "Каталог Centreal собрал предложения по продаже недвижимости в Краснодаре и Геленджике. В одном месте можно просматривать квартиры, дома, участки и коммерческие помещения, сравнивать стоимость и выбирать локацию под ваши задачи.";
+
+const catalogSeoLinks = [
+  { label: "Купить квартиру в Краснодаре", href: "/krasnodar/kupit-kvartiru" },
+  { label: "Купить дом в Краснодаре", href: "/krasnodar/kupit-dom" },
+  { label: "Купить участок в Геленджике", href: "/gelendzhik/kupit-uchastok" },
+  {
+    label: "Купить коммерческое помещение в Краснодаре",
+    href: "/krasnodar/kupit-kommercheskuyu-nedvizhimost",
+  },
+];
+
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: "Каталог недвижимости — Centreal",
+    description: catalogSeoText.slice(0, 160),
+    alternates: { canonical: `${siteOrigin()}/catalog` },
+  };
+}
+
+export default async function CatalogPage({
+  searchParams,
+}: {
+  searchParams: Promise<CatalogPageSearchRecord>;
+}) {
+  const sp = await searchParams;
+  const properties = await fetchPublicPropertiesList({
+    searchParams: publicPropertiesParamsFromSearchParams(sp),
+  });
+  return (
+    <CatalogPageTemplate
+      breadcrumbs={[
+        { label: "Главная", href: "/" },
+        { label: "Каталог" },
+      ]}
+      title="Каталог недвижимости"
+      subtitle="Продажа квартир, домов, участков и коммерческих помещений"
+      properties={properties}
+      seoText={catalogSeoText}
+      seoLinks={catalogSeoLinks}
+      catalogSearchParams={sp}
+      initialMapView={catalogViewIsMap(sp)}
+    />
+  );
+}

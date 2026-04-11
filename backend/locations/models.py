@@ -5,7 +5,7 @@ from common.models import BaseTimestampedModel
 
 class City(BaseTimestampedModel):
     name = models.CharField(max_length=100, verbose_name="Название")
-    slug = models.SlugField(unique=True)
+    slug = models.SlugField("ЧПУ (slug)", unique=True)
     region_name = models.CharField(
         max_length=150, blank=True, verbose_name="Регион"
     )
@@ -25,9 +25,10 @@ class District(BaseTimestampedModel):
         City,
         on_delete=models.CASCADE,
         related_name="districts",
+        verbose_name="Город",
     )
     name = models.CharField(max_length=150, verbose_name="Название")
-    slug = models.SlugField(verbose_name="Slug")
+    slug = models.SlugField(verbose_name="ЧПУ (slug)")
     sort_order = models.PositiveIntegerField(
         default=0, verbose_name="Порядок сортировки"
     )
@@ -47,6 +48,7 @@ class Neighborhood(BaseTimestampedModel):
         City,
         on_delete=models.CASCADE,
         related_name="neighborhoods",
+        verbose_name="Город",
     )
     district = models.ForeignKey(
         District,
@@ -54,10 +56,13 @@ class Neighborhood(BaseTimestampedModel):
         related_name="neighborhoods",
         null=True,
         blank=True,
+        verbose_name="Район",
     )
     name = models.CharField(max_length=150, verbose_name="Название")
-    slug = models.SlugField()
-    sort_order = models.PositiveIntegerField(default=0)
+    slug = models.SlugField(verbose_name="ЧПУ (slug)")
+    sort_order = models.PositiveIntegerField(
+        default=0, verbose_name="Порядок сортировки"
+    )
 
     class Meta:
         unique_together = [("city", "slug")]
@@ -74,6 +79,7 @@ class ResidentialComplex(BaseTimestampedModel):
         City,
         on_delete=models.CASCADE,
         related_name="residential_complexes",
+        verbose_name="Город",
     )
     district = models.ForeignKey(
         District,
@@ -81,6 +87,7 @@ class ResidentialComplex(BaseTimestampedModel):
         null=True,
         blank=True,
         related_name="residential_complexes",
+        verbose_name="Район",
     )
     neighborhood = models.ForeignKey(
         Neighborhood,
@@ -88,17 +95,26 @@ class ResidentialComplex(BaseTimestampedModel):
         null=True,
         blank=True,
         related_name="residential_complexes",
+        verbose_name="Микрорайон",
     )
     name = models.CharField(max_length=200, verbose_name="Название")
-    slug = models.SlugField(unique=True)
+    slug = models.SlugField("ЧПУ (slug)", unique=True)
     address_text = models.CharField(
         max_length=300, blank=True, verbose_name="Адрес"
     )
     latitude = models.DecimalField(
-        max_digits=9, decimal_places=6, null=True, blank=True
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        verbose_name="Широта",
     )
     longitude = models.DecimalField(
-        max_digits=9, decimal_places=6, null=True, blank=True
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        verbose_name="Долгота",
     )
     description = models.TextField(blank=True, verbose_name="Описание")
 

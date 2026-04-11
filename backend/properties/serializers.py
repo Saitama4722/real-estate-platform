@@ -1,6 +1,25 @@
+import json
+
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from properties.models import Property, PropertyPhoto, PropertyVideo
+from users.models import User
+
+from locations.choices import CommercialType
+from properties.choices import PropertyType
+from properties.import_choices import ImportSourceFormat
+from properties.models import (
+    ApartmentDetails,
+    CommercialDetails,
+    HouseDetails,
+    LandPlotDetails,
+    ImportItem,
+    ImportJob,
+    Property,
+    PropertyPhoto,
+    PropertyVideo,
+)
+from properties.property_photo_images import validate_property_photo_original_size
 
 
 class AgencyShortSerializer(serializers.Serializer):
@@ -37,11 +56,80 @@ class RealtorShortSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     first_name = serializers.CharField()
     last_name = serializers.CharField()
+    avatar = serializers.SerializerMethodField()
+
+    def get_avatar(self, obj):
+        from users.serializers import _absolute_media_url
+
+        return _absolute_media_url(self.context.get("request"), getattr(obj, "avatar", None))
+
+
+class ApartmentDetailsPublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ApartmentDetails
+        fields = ["rooms", "area_total", "floor", "floors_total"]
+
+
+class HouseDetailsPublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HouseDetails
+        fields = ["house_area", "land_area", "floors_total"]
+
+
+class LandPlotDetailsPublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LandPlotDetails
+        fields = ["land_area"]
+
+
+class CommercialDetailsPublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CommercialDetails
+        fields = ["commercial_type", "area_total", "floor", "floors_total"]
+
+
+class PropertyPhotoPublicSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PropertyPhoto
+        fields = ["url", "sort_order", "is_main"]
+
+    def get_url(self, obj):
+        f = obj.image_medium or obj.image_thumb or obj.original_file
+        if not f:
+            return None
+        request = self.context.get("request")
+        path = f.url
+        if request:
+            return request.build_absolute_uri(path)
+        return path
+
+
+class PropertyVideoPublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PropertyVideo
+        fields = ["video_url"]
 
 
 class PropertyListSerializer(serializers.ModelSerializer):
-    city = CityShortSerializer(read_only=True)
-    district = DistrictShortSerializer(read_only=True)
+    city = CityShortSerializer(read_only=True, allow_null=True)
+    district = DistrictShortSerializer(read_only=True, allow_null=True)
+    neighborhood = NeighborhoodShortSerializer(read_only=True, allow_null=True)
+    residential_complex = ResidentialComplexShortSerializer(
+        read_only=True, allow_null=True
+    )
+    apartment_details = ApartmentDetailsPublicSerializer(
+        read_only=True, allow_null=True
+    )
+    house_details = HouseDetailsPublicSerializer(read_only=True, allow_null=True)
+    land_plot_details = LandPlotDetailsPublicSerializer(
+        read_only=True, allow_null=True
+    )
+    commercial_details = CommercialDetailsPublicSerializer(
+        read_only=True, allow_null=True
+    )
+    preview_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Property
@@ -51,27 +139,55 @@ class PropertyListSerializer(serializers.ModelSerializer):
             "slug",
             "property_type",
             "deal_type",
-            "market_type",
-            "status",
-            "is_published",
             "price",
-            "old_price",
             "currency",
             "city",
             "district",
+            "neighborhood",
+            "residential_complex",
             "public_address_text",
-            "views_count",
-            "published_at",
-            "created_at",
+            "public_latitude",
+            "public_longitude",
+            "updated_at",
+            "apartment_details",
+            "house_details",
+            "land_plot_details",
+            "commercial_details",
+            "preview_image",
         ]
+
+    def get_preview_image(self, obj):
+        for photo in obj.photos.all()[:1]:
+            f = photo.image_medium or photo.image_thumb or photo.original_file
+            if f:
+                request = self.context.get("request")
+                path = f.url
+                if request:
+                    return request.build_absolute_uri(path)
+                return path
+        return None
 
 
 class PropertyDetailSerializer(serializers.ModelSerializer):
-    city = CityShortSerializer(read_only=True)
-    district = DistrictShortSerializer(read_only=True)
-    neighborhood = NeighborhoodShortSerializer(read_only=True)
-    residential_complex = ResidentialComplexShortSerializer(read_only=True)
-    assigned_realtor = RealtorShortSerializer(read_only=True)
+    city = CityShortSerializer(read_only=True, allow_null=True)
+    district = DistrictShortSerializer(read_only=True, allow_null=True)
+    neighborhood = NeighborhoodShortSerializer(read_only=True, allow_null=True)
+    residential_complex = ResidentialComplexShortSerializer(
+        read_only=True, allow_null=True
+    )
+    assigned_realtor = RealtorShortSerializer(read_only=True, allow_null=True)
+    apartment_details = ApartmentDetailsPublicSerializer(
+        read_only=True, allow_null=True
+    )
+    house_details = HouseDetailsPublicSerializer(read_only=True, allow_null=True)
+    land_plot_details = LandPlotDetailsPublicSerializer(
+        read_only=True, allow_null=True
+    )
+    commercial_details = CommercialDetailsPublicSerializer(
+        read_only=True, allow_null=True
+    )
+    photos = PropertyPhotoPublicSerializer(many=True, read_only=True)
+    videos = PropertyVideoPublicSerializer(many=True, read_only=True)
 
     class Meta:
         model = Property
@@ -81,29 +197,25 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
             "slug",
             "property_type",
             "deal_type",
-            "market_type",
-            "status",
-            "is_published",
             "price",
-            "old_price",
             "currency",
             "city",
             "district",
             "public_address_text",
-            "views_count",
-            "published_at",
-            "created_at",
-            # detail-only fields
             "short_description",
             "description",
             "neighborhood",
             "residential_complex",
             "public_latitude",
             "public_longitude",
-            "hide_exact_address",
-            "phone_views_count",
             "updated_at",
             "assigned_realtor",
+            "apartment_details",
+            "house_details",
+            "land_plot_details",
+            "commercial_details",
+            "photos",
+            "videos",
         ]
 
 
@@ -118,6 +230,7 @@ class CrmPropertyListSerializer(serializers.ModelSerializer):
         model = Property
         fields = [
             "id",
+            "crm_property_id",
             "title_generated",
             "slug",
             "property_type",
@@ -142,6 +255,67 @@ class CrmPropertyListSerializer(serializers.ModelSerializer):
         ]
 
 
+class CrmApartmentDetailsSerializer(serializers.ModelSerializer):
+    """CRM: полные характеристики квартиры (чтение и вложенная запись)."""
+
+    class Meta:
+        model = ApartmentDetails
+        fields = [
+            "rooms",
+            "area_total",
+            "area_living",
+            "area_kitchen",
+            "floor",
+            "floors_total",
+            "has_balcony",
+            "has_loggia",
+            "renovation_type",
+            "bathroom_type",
+        ]
+
+
+class CrmHouseDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HouseDetails
+        fields = [
+            "house_area",
+            "land_area",
+            "floors_total",
+            "heating_type",
+            "has_gas",
+            "has_water",
+            "has_sewerage",
+            "has_electricity",
+            "building_type",
+        ]
+
+
+class CrmLandPlotDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LandPlotDetails
+        fields = [
+            "land_area",
+            "land_category",
+            "permitted_use",
+            "has_gas",
+            "has_water",
+            "has_electricity",
+        ]
+
+
+class CrmCommercialDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CommercialDetails
+        fields = [
+            "commercial_type",
+            "area_total",
+            "floor",
+            "floors_total",
+            "entrance_type",
+            "parking_spaces",
+        ]
+
+
 class CrmPropertyDetailSerializer(serializers.ModelSerializer):
     city = CityShortSerializer(read_only=True, allow_null=True)
     district = DistrictShortSerializer(read_only=True, allow_null=True)
@@ -152,11 +326,22 @@ class CrmPropertyDetailSerializer(serializers.ModelSerializer):
     assigned_realtor = RealtorShortSerializer(read_only=True, allow_null=True)
     created_by = RealtorShortSerializer(read_only=True, allow_null=True)
     agency = AgencyShortSerializer(read_only=True, allow_null=True)
+    apartment_details = CrmApartmentDetailsSerializer(
+        read_only=True, allow_null=True
+    )
+    house_details = CrmHouseDetailsSerializer(read_only=True, allow_null=True)
+    land_plot_details = CrmLandPlotDetailsSerializer(
+        read_only=True, allow_null=True
+    )
+    commercial_details = CrmCommercialDetailsSerializer(
+        read_only=True, allow_null=True
+    )
 
     class Meta:
         model = Property
         fields = [
             "id",
+            "crm_property_id",
             "title_generated",
             "slug",
             "property_type",
@@ -190,15 +375,32 @@ class CrmPropertyDetailSerializer(serializers.ModelSerializer):
             "agency",
             "created_by",
             "assigned_realtor",
+            "apartment_details",
+            "house_details",
+            "land_plot_details",
+            "commercial_details",
         ]
 
 
 class CrmPropertyWriteSerializer(serializers.ModelSerializer):
     """Create / update property in CRM (no hard delete; status via workflow actions)."""
 
+    id = serializers.IntegerField(read_only=True)
+    crm_property_id = serializers.CharField(read_only=True)
+    title_generated = serializers.CharField(read_only=True)
+    slug = serializers.SlugField(read_only=True, allow_null=True)
+
+    assigned_realtor = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(role=User.Role.REALTOR).order_by("pk"),
+        required=False,
+        allow_null=False,
+    )
+
     class Meta:
         model = Property
         fields = [
+            "id",
+            "crm_property_id",
             "agency",
             "assigned_realtor",
             "deal_type",
@@ -223,17 +425,144 @@ class CrmPropertyWriteSerializer(serializers.ModelSerializer):
             "public_longitude",
             "real_latitude",
             "real_longitude",
+            "apartment_details",
+            "house_details",
+            "land_plot_details",
+            "commercial_details",
         ]
-        extra_kwargs = {
-            "slug": {"required": False, "allow_null": True, "allow_blank": True},
-            "title_generated": {"required": False, "allow_blank": True},
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        partial = bool(kwargs.get("partial", False))
+        self.fields["apartment_details"] = CrmApartmentDetailsSerializer(
+            required=False, allow_null=True, partial=partial
+        )
+        self.fields["house_details"] = CrmHouseDetailsSerializer(
+            required=False, allow_null=True, partial=partial
+        )
+        self.fields["land_plot_details"] = CrmLandPlotDetailsSerializer(
+            required=False, allow_null=True, partial=partial
+        )
+        self.fields["commercial_details"] = CrmCommercialDetailsSerializer(
+            required=False, allow_null=True, partial=partial
+        )
+
+    def _pop_detail_payloads(self, validated_data: dict) -> dict:
+        return {
+            "apartment": validated_data.pop("apartment_details", None),
+            "house": validated_data.pop("house_details", None),
+            "land": validated_data.pop("land_plot_details", None),
+            "commercial": validated_data.pop("commercial_details", None),
         }
 
+    def _validate_nested_matches_type(self, attrs: dict) -> None:
+        pt = attrs.get("property_type") or (
+            self.instance.property_type if self.instance else None
+        )
+        if not pt:
+            return
+        nested_map = [
+            (PropertyType.APARTMENT, "apartment_details", attrs.get("apartment_details")),
+            (PropertyType.HOUSE, "house_details", attrs.get("house_details")),
+            (PropertyType.LAND, "land_plot_details", attrs.get("land_plot_details")),
+            (
+                PropertyType.COMMERCIAL,
+                "commercial_details",
+                attrs.get("commercial_details"),
+            ),
+        ]
+        for expected, key, payload in nested_map:
+            if payload is not None and pt != expected:
+                raise serializers.ValidationError(
+                    {
+                        key: "Этот блок характеристик не соответствует выбранному типу объекта."
+                    }
+                )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if self.instance is None and user and isinstance(user, User):
+            if user.has_staff_level_access and not attrs.get("assigned_realtor"):
+                raise serializers.ValidationError(
+                    {"assigned_realtor": "Укажите ответственного риэлтора."}
+                )
+        self._validate_nested_matches_type(attrs)
+        return attrs
+
+    def _merged_detail_defaults(self, model_cls, instance: Property, incoming: dict) -> dict:
+        """При PATCH объединяем переданные поля характеристик с уже сохранённой строкой."""
+        if not self.partial:
+            return incoming
+        try:
+            existing = model_cls.objects.get(property=instance)
+        except model_cls.DoesNotExist:
+            return incoming
+        skip = {"id", "property", "property_id", "created_at", "updated_at"}
+        out: dict = {}
+        for f in model_cls._meta.fields:
+            if f.name in skip:
+                continue
+            if f.name in incoming:
+                out[f.name] = incoming[f.name]
+            else:
+                out[f.name] = getattr(existing, f.name)
+        return out
+
+    def _save_type_details(self, instance: Property, payloads: dict) -> None:
+        apt, house, land_d, comm = (
+            payloads["apartment"],
+            payloads["house"],
+            payloads["land"],
+            payloads["commercial"],
+        )
+        pt = instance.property_type
+        if pt == PropertyType.APARTMENT and apt is not None:
+            defaults = self._merged_detail_defaults(ApartmentDetails, instance, apt)
+            ApartmentDetails.objects.update_or_create(
+                property=instance, defaults=defaults
+            )
+        if pt == PropertyType.HOUSE and house is not None:
+            defaults = self._merged_detail_defaults(HouseDetails, instance, house)
+            HouseDetails.objects.update_or_create(property=instance, defaults=defaults)
+        if pt == PropertyType.LAND and land_d is not None:
+            defaults = self._merged_detail_defaults(LandPlotDetails, instance, land_d)
+            LandPlotDetails.objects.update_or_create(
+                property=instance, defaults=defaults
+            )
+        if pt == PropertyType.COMMERCIAL and comm is not None:
+            defaults = self._merged_detail_defaults(CommercialDetails, instance, comm)
+            CommercialDetails.objects.update_or_create(
+                property=instance, defaults=defaults
+            )
+
     def create(self, validated_data):
-        user = self.context["request"].user
+        request = self.context["request"]
+        user = request.user
+        payloads = self._pop_detail_payloads(validated_data)
+        if isinstance(user, User) and user.is_realtor_role and not user.has_staff_level_access:
+            validated_data["assigned_realtor"] = user
         if user and user.is_authenticated:
             validated_data.setdefault("created_by", user)
-        return super().create(validated_data)
+        instance = super().create(validated_data)
+        self._save_type_details(instance, payloads)
+        instance.refresh_from_db()
+        return instance
+
+    def update(self, instance, validated_data):
+        request = self.context["request"]
+        user = request.user
+        if isinstance(user, User) and user.is_realtor_role and not user.has_staff_level_access:
+            validated_data.pop("assigned_realtor", None)
+        elif "assigned_realtor" in validated_data and validated_data["assigned_realtor"] is None:
+            raise serializers.ValidationError(
+                {"assigned_realtor": "Ответственный риэлтор обязателен."}
+            )
+        payloads = self._pop_detail_payloads(validated_data)
+        instance = super().update(instance, validated_data)
+        self._save_type_details(instance, payloads)
+        instance.refresh_from_db()
+        return instance
 
 
 class CrmPropertyPhotoSerializer(serializers.ModelSerializer):
@@ -267,6 +596,13 @@ class CrmPropertyPhotoUploadSerializer(serializers.ModelSerializer):
             "sort_order": {"required": False},
             "is_main": {"required": False, "default": False},
         }
+
+    def validate_original_file(self, value):
+        try:
+            validate_property_photo_original_size(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages)
+        return value
 
     def create(self, validated_data):
         f = validated_data["original_file"]
@@ -310,9 +646,191 @@ class CrmPropertyVideoSerializer(serializers.ModelSerializer):
 class CrmPropertyVideoWriteSerializer(serializers.ModelSerializer):
     """CRM create/update: platform, video_url, embed_url (caller-supplied; no auto-derivation)."""
 
+    video_url = serializers.URLField(max_length=2048)
+    embed_url = serializers.URLField(
+        max_length=2048,
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+
     class Meta:
         model = PropertyVideo
         fields = ["platform", "video_url", "embed_url"]
-        extra_kwargs = {
-            "embed_url": {"required": False, "allow_blank": True},
-        }
+
+    def validate_embed_url(self, value):
+        return (value or "").strip()
+
+
+class CrmImportItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImportItem
+        fields = [
+            "id",
+            "row_index",
+            "external_id",
+            "raw_snapshot",
+            "status",
+            "property",
+            "duplicate_candidate",
+            "dedup_outcome",
+            "error_message",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class CrmImportJobListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImportJob
+        fields = [
+            "id",
+            "source_format",
+            "status",
+            "row_count_total",
+            "row_count_created",
+            "row_count_skipped_duplicate",
+            "row_count_error",
+            "error_summary",
+            "created_at",
+            "updated_at",
+            "finished_at",
+        ]
+        read_only_fields = fields
+
+
+class CrmImportJobDetailSerializer(serializers.ModelSerializer):
+    items = CrmImportItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ImportJob
+        fields = [
+            "id",
+            "source_format",
+            "status",
+            "field_mapping",
+            "row_count_total",
+            "row_count_created",
+            "row_count_skipped_duplicate",
+            "row_count_error",
+            "error_summary",
+            "created_at",
+            "updated_at",
+            "finished_at",
+            "items",
+        ]
+        read_only_fields = fields
+
+
+class CrmImportJobCreateSerializer(serializers.ModelSerializer):
+    """
+    Multipart: ``source_file``, ``source_format`` (csv|xml),
+    ``field_mapping`` — JSON-строка вида {\"ВнешнийСтолбец\": \"price\", ...}.
+    """
+
+    field_mapping = serializers.CharField()
+
+    class Meta:
+        model = ImportJob
+        fields = ["source_file", "source_format", "field_mapping"]
+
+    def validate_source_format(self, value):
+        v = (value or "").strip().lower()
+        allowed = {c.value for c in ImportSourceFormat}
+        if v not in allowed:
+            raise serializers.ValidationError("Допустимо: csv или xml.")
+        return v
+
+    def validate_field_mapping(self, value):
+        if isinstance(value, dict):
+            raw = value
+        else:
+            s = (value or "").strip()
+            if not s:
+                raise serializers.ValidationError(
+                    "Укажите field_mapping (JSON-объект: внешнее имя → внутреннее поле)."
+                )
+            try:
+                raw = json.loads(s)
+            except json.JSONDecodeError as exc:
+                raise serializers.ValidationError(
+                    "field_mapping: невалидный JSON."
+                ) from exc
+        if not isinstance(raw, dict):
+            raise serializers.ValidationError("field_mapping должен быть JSON-объектом.")
+        out = {}
+        for k, v in raw.items():
+            if not isinstance(k, str) or not isinstance(v, str):
+                raise serializers.ValidationError(
+                    "Ключи и значения сопоставления должны быть строками."
+                )
+            out[k.strip()] = (v or "").strip()
+        return out
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        user = request.user
+        mapping = validated_data.pop("field_mapping")
+        agency = None
+        if user and user.is_authenticated:
+            from users.models import RealtorProfile
+
+            prof = (
+                RealtorProfile.objects.filter(user=user)
+                .select_related("agency")
+                .first()
+            )
+            if prof:
+                agency = prof.agency
+        return ImportJob.objects.create(
+            created_by=user if user.is_authenticated else None,
+            agency=agency,
+            field_mapping=mapping,
+            **validated_data,
+        )
+
+
+class DuplicateCheckSerializer(serializers.Serializer):
+    """
+    Input for POST /api/crm/properties/check_duplicates/.
+
+    Accepts base property fields plus optional type-specific detail signals.
+    City / district / residential_complex are passed as integer PKs (no FK
+    validation — this endpoint has no side effects).
+
+    The optional `ignore_duplicate_warning` field is accepted and ignored
+    server-side; it exists to support the client-side two-step flow contract
+    where the UI calls check_duplicates first, shows warnings, and then
+    calls the real create endpoint with this flag to signal explicit confirmation.
+    """
+
+    property_type = serializers.ChoiceField(choices=PropertyType.choices)
+    city = serializers.IntegerField(required=False, allow_null=True)
+    district = serializers.IntegerField(required=False, allow_null=True)
+    residential_complex = serializers.IntegerField(required=False, allow_null=True)
+    street = serializers.CharField(required=False, allow_blank=True, default="")
+    house_number = serializers.CharField(required=False, allow_blank=True, default="")
+    price = serializers.DecimalField(
+        max_digits=15, decimal_places=2, required=False, allow_null=True
+    )
+    # Apartment-specific
+    rooms = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    area_total = serializers.DecimalField(
+        max_digits=8, decimal_places=2, required=False, allow_null=True
+    )
+    floor = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    floors_total = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    # House-specific
+    house_area = serializers.DecimalField(
+        max_digits=8, decimal_places=2, required=False, allow_null=True
+    )
+    land_area = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
+    )
+    # Commercial-specific
+    commercial_type = serializers.ChoiceField(
+        choices=CommercialType.choices, required=False, allow_null=True, allow_blank=True
+    )
+    # Client-side flow signal — accepted but not enforced server-side
+    ignore_duplicate_warning = serializers.BooleanField(required=False, default=False)

@@ -23,9 +23,22 @@ services:
     networks:
       - app
 
-  # Backend: Django app in ./backend. Run migrations and dev server via exec, e.g.:
-  #   docker compose exec backend python manage.py migrate
-  #   docker compose exec backend python manage.py runserver 0.0.0.0:8000
+  redis:
+    image: redis:7-alpine
+    container_name: real-estate-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    networks:
+      - app
+
+  # Backend: Django app in ./backend (dev server on 8000 in-container → host 8001).
   backend:
     build: ./backend
     image: real-estate-backend:latest
@@ -39,25 +52,63 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-dev-key-change-in-production}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
       POSTGRES_DB: ${POSTGRES_DB:-real_estate_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_HOST: db
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      MEDIA_STORAGE: ${MEDIA_STORAGE:-local}
+      MEDIA_STORAGE_BACKEND: ${MEDIA_STORAGE_BACKEND:-local}
       MEDIA_ROOT: ${MEDIA_ROOT:-/app/media}
       MEDIA_URL: ${MEDIA_URL:-/media/}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      CELERY_TASK_ALWAYS_EAGER: ${CELERY_TASK_ALWAYS_EAGER:-false}
     depends_on:
       db:
         condition: service_healthy
-    # Default: minimal HTTP server so container stays up. Override to run Django, e.g.:
-    # command: python manage.py runserver 0.0.0.0:8000
-    command: python -m http.server 8000
+      redis:
+        condition: service_healthy
+    command: python manage.py runserver 0.0.0.0:8000
     networks:
       - app
 
-  # Placeholder only: no Next.js project yet. Keeps container up for infrastructure verification.
+  # Celery worker: process background tasks (e.g. property photo derivatives).
+  #   docker compose up celery_worker -d
+  celery_worker:
+    build: ./backend
+    image: real-estate-backend:latest
+    container_name: real-estate-celery
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-dev-key-change-in-production}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      POSTGRES_DB: ${POSTGRES_DB:-real_estate_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      MEDIA_STORAGE_BACKEND: ${MEDIA_STORAGE_BACKEND:-local}
+      MEDIA_ROOT: ${MEDIA_ROOT:-/app/media}
+      MEDIA_URL: ${MEDIA_URL:-/media/}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      CELERY_TASK_ALWAYS_EAGER: ${CELERY_TASK_ALWAYS_EAGER:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A config.celery worker -l info
+    networks:
+      - app
+
   frontend:
     image: node:22-alpine
     container_name: real-estate-frontend
@@ -69,11 +120,13 @@ services:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api}
+      # Host browser → published backend port (8001 maps to container 8000).
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001/api}
+      # Next.js rewrites and server-side fetch run inside this container — must use service DNS, not host localhost.
+      BACKEND_URL: http://backend:8000
       NEXT_PUBLIC_MAP_PROVIDER: ${NEXT_PUBLIC_MAP_PROVIDER:-yandex}
       NEXT_PUBLIC_YANDEX_MAPS_API_KEY: ${NEXT_PUBLIC_YANDEX_MAPS_API_KEY:-}
-    # Placeholder: tiny Node HTTP server on 3000 so container starts without Next.js (infrastructure only).
-    command: node -e "require('http').createServer((req,res)=>res.end('OK')).listen(3000)"
+    command: sh -c "npm ci --legacy-peer-deps && npm run dev -- -H 0.0.0.0 -p 3000"
     networks:
       - app
 

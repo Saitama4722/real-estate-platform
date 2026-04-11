@@ -1,11 +1,13 @@
+import logging
+import re
 from decimal import Decimal
 
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
-from django.db import models
-from django.utils.text import slugify
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db import IntegrityError, models, transaction
 
 from common.models import BaseTimestampedModel
+from common.slug_latin import join_slug_parts, slugify_latin
 from locations.choices import (
     BathroomType,
     BuildingType,
@@ -23,6 +25,11 @@ from properties.choices import (
     PropertyType,
     VideoPlatform,
 )
+from properties.property_photo_images import validate_property_photo_original_size
+
+logger = logging.getLogger(__name__)
+
+_PID_ID_PATTERN = re.compile(r"^PID(\d{6})$")
 
 
 class Property(BaseTimestampedModel):
@@ -50,6 +57,13 @@ class Property(BaseTimestampedModel):
         blank=True,
         related_name="assigned_properties",
         verbose_name="Ответственный риэлтор",
+    )
+    crm_property_id = models.CharField(
+        max_length=10,
+        unique=True,
+        db_index=True,
+        blank=True,
+        verbose_name="CRM ID объекта (PID)",
     )
 
     # --- Status & Publication ---
@@ -101,8 +115,8 @@ class Property(BaseTimestampedModel):
         unique=True,
         blank=True,
         null=True,
-        allow_unicode=True,
-        verbose_name="Slug",
+        db_index=True,
+        verbose_name="ЧПУ (slug)",
     )
     short_description = models.CharField(
         max_length=500, blank=True, verbose_name="Краткое описание"
@@ -220,7 +234,20 @@ class Property(BaseTimestampedModel):
         ]
 
     def __str__(self):
-        return self.title_generated or f"Property #{self.pk}"
+        return self.title_generated or f"Объект #{self.pk}"
+
+    @classmethod
+    def allocate_next_crm_property_id(cls) -> str:
+        """Next PID###### from existing rows (retries on rare collisions in save)."""
+        best = 0
+        qs = cls.objects.exclude(crm_property_id="").values_list(
+            "crm_property_id", flat=True
+        )
+        for cid in qs:
+            m = _PID_ID_PATTERN.fullmatch(cid or "")
+            if m:
+                best = max(best, int(m.group(1)))
+        return f"PID{best + 1:06d}"
 
     @staticmethod
     def _format_decimal_for_title(value) -> str | None:
@@ -323,19 +350,68 @@ class Property(BaseTimestampedModel):
             return self._build_fallback_title()
         return ""
 
+    def _slug_is_placeholder(self, value: str | None) -> bool:
+        s = (value or "").strip()
+        if not s:
+            return True
+        return bool(re.fullmatch(r"property-\d+", s))
+
     def build_generated_slug(self) -> str:
+        """
+        Latin, hyphen-separated, ends with stable id suffix.
+        Uses property type, optional type-specific attributes, city, district.
+        """
         if not self.pk:
             return ""
-        title = (self.title_generated or "").strip()
-        suffix = f"-{self.pk}"
-        if title:
-            base = slugify(title, allow_unicode=True).strip("-")
-            max_base_len = max(1, 320 - len(suffix))
-            if len(base) > max_base_len:
-                base = base[:max_base_len].rstrip("-")
-            if base:
-                return f"{base}{suffix}"
-        return f"property-{self.pk}"
+        parts: list[str] = []
+        pt = self.property_type
+        if pt == PropertyType.APARTMENT:
+            parts.append("kvartira")
+            try:
+                ad = self.apartment_details
+            except ObjectDoesNotExist:
+                ad = None
+            if ad is not None and ad.rooms is not None:
+                parts.append(f"{ad.rooms}-komnaty")
+        elif pt == PropertyType.HOUSE:
+            parts.append("dom")
+        elif pt == PropertyType.LAND:
+            parts.append("uchastok")
+        elif pt == PropertyType.COMMERCIAL:
+            parts.append("kommercheskoe")
+            try:
+                cd = self.commercial_details
+            except ObjectDoesNotExist:
+                cd = None
+            if cd is not None and cd.commercial_type:
+                parts.append(str(cd.commercial_type))
+        else:
+            label = self.get_property_type_display() or ""
+            seg = slugify_latin(label)
+            if seg:
+                parts.append(seg)
+
+        try:
+            city = self.city
+        except ObjectDoesNotExist:
+            city = None
+        if city is not None and getattr(city, "name", None):
+            cn = slugify_latin(city.name)
+            if cn:
+                parts.append(cn)
+
+        try:
+            district = self.district
+        except ObjectDoesNotExist:
+            district = None
+        if district is not None and getattr(district, "name", None):
+            dn = slugify_latin(district.name)
+            if dn:
+                parts.append(dn)
+
+        parts.append(str(self.pk))
+        base = join_slug_parts(*parts, max_length=320)
+        return base or f"property-{self.pk}"
 
     def _title_matches_fallback(self) -> bool:
         if not self.pk:
@@ -345,15 +421,41 @@ class Property(BaseTimestampedModel):
             return True
         return current == self._build_fallback_title()
 
+    def clean(self):
+        super().clean()
+        if not self.assigned_realtor_id:
+            raise ValidationError(
+                {"assigned_realtor": "Укажите ответственного риэлтора."}
+            )
+
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
+        if update_fields is None and self._state.adding and not self.assigned_realtor_id:
+            raise ValidationError(
+                {"assigned_realtor": "Укажите ответственного риэлтора."}
+            )
         if update_fields is not None:
             return super().save(*args, **kwargs)
 
-        if not (self.title_generated or "").strip():
-            self.title_generated = self.build_generated_title() or ""
+        is_new = self._state.adding
 
-        super().save(*args, **kwargs)
+        if is_new and not (self.crm_property_id or "").strip():
+            max_attempts = 12
+            for attempt in range(max_attempts):
+                self.crm_property_id = type(self).allocate_next_crm_property_id()
+                if not (self.title_generated or "").strip():
+                    self.title_generated = self.build_generated_title() or ""
+                try:
+                    super().save(*args, **kwargs)
+                    break
+                except IntegrityError:
+                    if attempt >= max_attempts - 1:
+                        raise
+                    self.crm_property_id = ""
+        else:
+            if not (self.title_generated or "").strip():
+                self.title_generated = self.build_generated_title() or ""
+            super().save(*args, **kwargs)
 
         db_updates = {}
         if not (self.title_generated or "").strip():
@@ -362,8 +464,7 @@ class Property(BaseTimestampedModel):
                 db_updates["title_generated"] = new_title
                 self.title_generated = new_title
 
-        slug_empty = self.slug is None or str(self.slug).strip() == ""
-        if slug_empty:
+        if self._slug_is_placeholder(self.slug):
             new_slug = self.build_generated_slug()
             if new_slug:
                 db_updates["slug"] = new_slug
@@ -391,12 +492,12 @@ def _sync_property_title_slug_after_detail_save(property_id: int | None) -> None
         return
     if candidate == (prop.title_generated or "").strip():
         return
-    prop.title_generated = candidate
-    new_slug = prop.build_generated_slug()
-    Property.objects.filter(pk=prop.pk).update(
-        title_generated=candidate,
-        slug=new_slug,
-    )
+    updates: dict = {"title_generated": candidate}
+    if prop._slug_is_placeholder(prop.slug):
+        new_slug = prop.build_generated_slug()
+        if new_slug:
+            updates["slug"] = new_slug
+    Property.objects.filter(pk=prop.pk).update(**updates)
 
 
 class ApartmentDetails(BaseTimestampedModel):
@@ -467,8 +568,8 @@ class ApartmentDetails(BaseTimestampedModel):
 
     def __str__(self):
         return (
-            f"{self.rooms}-room apartment, {self.area_total} m², "
-            f"floor {self.floor}/{self.floors_total}"
+            f"{self.rooms}-комн., {self.area_total} м², "
+            f"эт. {self.floor}/{self.floors_total}"
         )
 
 
@@ -533,8 +634,8 @@ class HouseDetails(BaseTimestampedModel):
 
     def __str__(self):
         return (
-            f"House {self.house_area} m², land {self.land_area}, "
-            f"floors {self.floors_total}"
+            f"Дом {self.house_area} м², участок {self.land_area} сот., "
+            f"эт. {self.floors_total}"
         )
 
 
@@ -587,7 +688,7 @@ class LandPlotDetails(BaseTimestampedModel):
 
     def __str__(self):
         return (
-            f"Land plot {self.land_area}, category {self.land_category or '-'}"
+            f"Участок {self.land_area} сот., категория {self.land_category or '—'}"
         )
 
 
@@ -642,7 +743,7 @@ class CommercialDetails(BaseTimestampedModel):
 
     def __str__(self):
         return (
-            f"Commercial {self.area_total} m², type {self.commercial_type or '-'}"
+            f"Коммерция {self.area_total} м², тип {self.commercial_type or '—'}"
         )
 
 
@@ -657,8 +758,8 @@ class PropertyPhoto(BaseTimestampedModel):
       друг друга (без цепочек medium → thumb и т.п.).
     - Отсутствие или сбой генерации производных не должен затрагивать
       ``original_file``; при отсутствии дериватов можно показывать оригинал.
-    - Реальная обработка изображений — в последующих этапах; здесь только поля
-      хранения.
+    - Генерация производных и лимит размера загрузки — ``property_photo_images``
+      и ``save()`` модели (этап 14.1).
     """
 
     property = models.ForeignKey(
@@ -709,8 +810,8 @@ class PropertyPhoto(BaseTimestampedModel):
     )
 
     class Meta:
-        verbose_name = "Фото объекта"
-        verbose_name_plural = "Фото объектов"
+        verbose_name = "Фотография"
+        verbose_name_plural = "Фотографии"
         ordering = ["sort_order", "id"]
 
     def __str__(self):
@@ -718,6 +819,62 @@ class PropertyPhoto(BaseTimestampedModel):
         if self.pk:
             return f"Фото #{self.pk} (объект #{prop_id})"
         return f"Фото (объект #{prop_id})"
+
+    def clean(self):
+        super().clean()
+        if self.original_file:
+            validate_property_photo_original_size(self.original_file)
+
+    def _clear_derivative_image_fields(self) -> None:
+        for name in ("image_large", "image_medium", "image_thumb"):
+            field = getattr(self, name)
+            if field:
+                field.delete(save=False)
+                setattr(self, name, None)
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "original_file" not in update_fields:
+            return super().save(*args, **kwargs)
+
+        prev_original_name = ""
+        if self.pk:
+            row = (
+                type(self)
+                .objects.filter(pk=self.pk)
+                .only("original_file")
+                .first()
+            )
+            if row and row.original_file:
+                prev_original_name = row.original_file.name
+
+        super().save(*args, **kwargs)
+
+        if not self.original_file:
+            return
+
+        current_name = self.original_file.name
+        if current_name == prev_original_name:
+            return
+
+        self._clear_derivative_image_fields()
+        super().save(
+            update_fields=[
+                "image_large",
+                "image_medium",
+                "image_thumb",
+                "updated_at",
+            ]
+        )
+
+        pk = self.pk
+
+        def _enqueue():
+            from properties.tasks import generate_property_photo_derivatives
+
+            generate_property_photo_derivatives.delay(pk)
+
+        transaction.on_commit(_enqueue)
 
 
 class PropertyVideo(BaseTimestampedModel):
@@ -802,3 +959,51 @@ class PropertyContact(BaseTimestampedModel):
         if self.pk:
             return f"Контакт #{self.pk}: {self.contact_name} (объект #{prop_id})"
         return f"Контакт: {self.contact_name} (объект #{prop_id})"
+
+
+class PhoneRevealLog(models.Model):
+    """
+    Запись о раскрытии телефона по объекту (эндпоинт и бизнес-логика — позже).
+    """
+
+    property = models.ForeignKey(
+        "properties.Property",
+        on_delete=models.CASCADE,
+        related_name="phone_reveal_logs",
+        verbose_name="Объект недвижимости",
+    )
+    realtor_profile = models.ForeignKey(
+        "users.RealtorProfile",
+        on_delete=models.CASCADE,
+        related_name="phone_reveal_logs",
+        verbose_name="Профиль риэлтора",
+    )
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        verbose_name="IP-адрес",
+    )
+    user_agent = models.TextField(
+        blank=True,
+        verbose_name="User-Agent (браузер)",
+    )
+    revealed_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Время раскрытия",
+        db_index=True,
+    )
+
+    class Meta:
+        verbose_name = "Лог раскрытия телефона"
+        verbose_name_plural = "Логи раскрытия телефона"
+        ordering = ["-revealed_at"]
+
+    def __str__(self):
+        prop_id = self.property_id
+        if self.pk:
+            return f"Раскрытие телефона #{self.pk} (объект #{prop_id})"
+        return f"Раскрытие телефона (объект #{prop_id})"
+
+
+# Stage 14.6 — import foundation (models live in import_models.py)
+from .import_models import ImportItem, ImportJob  # noqa: E402, F401

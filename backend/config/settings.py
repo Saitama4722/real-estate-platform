@@ -6,6 +6,8 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from common.media_storage import default_storages_entry
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get(
@@ -15,7 +17,10 @@ SECRET_KEY = os.environ.get(
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
 
-_raw_allowed = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+_default_allowed_hosts = "localhost,127.0.0.1"
+_raw_allowed = os.environ.get("DJANGO_ALLOWED_HOSTS", _default_allowed_hosts).strip()
+if not _raw_allowed:
+    _raw_allowed = _default_allowed_hosts
 ALLOWED_HOSTS = [h.strip() for h in _raw_allowed.split(",") if h.strip()]
 
 INSTALLED_APPS = [
@@ -84,7 +89,53 @@ STATICFILES_DIRS = [
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Stage 14.4 — media storage: default remains local. Central switch for a future
+# S3 / R2 backend (not implemented yet; ``s3`` / ``r2`` raise ImproperlyConfigured).
+# Accept legacy MEDIA_STORAGE for older .env files; MEDIA_STORAGE_BACKEND wins when set.
+MEDIA_STORAGE_BACKEND = (
+    os.environ.get("MEDIA_STORAGE_BACKEND")
+    or os.environ.get("MEDIA_STORAGE")
+    or "local"
+).strip().lower()
+
+STORAGES = {
+    "default": default_storages_entry(
+        backend_key=MEDIA_STORAGE_BACKEND,
+        media_root=MEDIA_ROOT,
+        media_url=MEDIA_URL,
+    ),
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Celery / Redis (Stage 14.5) ---
+REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0").strip()
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", REDIS_URL).strip()
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", REDIS_URL).strip()
+# Eager mode only when explicitly set — not tied to DEBUG (honest queue behavior).
+_celery_eager_raw = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "").strip().lower()
+if _celery_eager_raw in ("1", "true", "yes"):
+    CELERY_TASK_ALWAYS_EAGER = True
+elif _celery_eager_raw in ("0", "false", "no"):
+    CELERY_TASK_ALWAYS_EAGER = False
+else:
+    CELERY_TASK_ALWAYS_EAGER = False
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
+
+# Кэш по умолчанию (локальная память процесса; для публичных справочников и cache_page)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "real_estate_platform",
+    }
+}
 
 # Custom user model (email as login)
 AUTH_USER_MODEL = "users.User"

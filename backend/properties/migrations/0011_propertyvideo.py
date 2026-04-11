@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('platform', models.CharField(choices=[('youtube', 'YouTube'), ('vk', 'VK'), ('rutube', 'RuTube')], max_length=16, verbose_name='Платформа')),
                 ('video_url', models.URLField(max_length=2048, verbose_name='Ссылка на видео')),
-                ('embed_url', models.URLField(blank=True, max_length=2048, verbose_name='Ссылка для встраивания')),
+                ('embed_url', models.URLField(max_length=2048, verbose_name='Ссылка для встраивания')),
                 ('property', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='videos', to='properties.property', verbose_name='Объект недвижимости')),
             ],
             options={
