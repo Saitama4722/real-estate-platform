@@ -6,6 +6,8 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+import dj_database_url
+
 from common.media_storage import default_storages_entry
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -61,16 +63,22 @@ ROOT_URLCONF = "config.urls"
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "real_estate_db"),
-        "USER": os.environ.get("POSTGRES_USER", "postgres"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "postgres"),
-        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+_database_url = os.environ.get("DATABASE_URL", "").strip()
+if _database_url:
+    DATABASES = {
+        "default": dj_database_url.parse(_database_url, conn_max_age=600),
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("POSTGRES_DB", "real_estate_db"),
+            "USER": os.environ.get("POSTGRES_USER", "postgres"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "postgres"),
+            "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+            "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        }
+    }
 
 LANGUAGE_CODE = "ru-ru"
 
