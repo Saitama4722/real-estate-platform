@@ -21,7 +21,7 @@ _default_allowed_hosts = "localhost,127.0.0.1"
 _raw_allowed = os.environ.get("DJANGO_ALLOWED_HOSTS", _default_allowed_hosts).strip()
 if not _raw_allowed:
     _raw_allowed = _default_allowed_hosts
-ALLOWED_HOSTS = [h.strip() for h in _raw_allowed.split(",") if h.strip()]
+ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
     # Django
