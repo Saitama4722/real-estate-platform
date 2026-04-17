@@ -23,6 +23,41 @@ export type EmployeeUser = {
   crm_capabilities?: EmployeeCrmCapabilities;
 };
 
+/** Parse GET /api/auth/me/ JSON into `EmployeeUser` or null. */
+export function parseEmployeeUser(data: unknown): EmployeeUser | null {
+  if (!data || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  if (typeof o.id !== "number" || typeof o.email !== "string" || typeof o.role !== "string") {
+    return null;
+  }
+  let crm_capabilities: EmployeeCrmCapabilities | undefined;
+  const capsRaw = o.crm_capabilities;
+  if (capsRaw && typeof capsRaw === "object") {
+    const c = capsRaw as Record<string, unknown>;
+    crm_capabilities = {
+      create_property: Boolean(c.create_property),
+      edit_property: Boolean(c.edit_property),
+      delete_property: Boolean(c.delete_property),
+      view_clients: Boolean(c.view_clients),
+      delete_clients: Boolean(c.delete_clients),
+      change_status: Boolean(c.change_status),
+    };
+  }
+  return {
+    id: o.id,
+    email: o.email,
+    first_name: typeof o.first_name === "string" ? o.first_name : "",
+    last_name: typeof o.last_name === "string" ? o.last_name : "",
+    phone: typeof o.phone === "string" ? o.phone : undefined,
+    crm_id: typeof o.crm_id === "string" ? o.crm_id : undefined,
+    avatar: typeof o.avatar === "string" ? o.avatar : null,
+    role: o.role,
+    is_active: Boolean(o.is_active),
+    is_staff: Boolean(o.is_staff),
+    crm_capabilities,
+  };
+}
+
 /** Staff-level roles: same CRM scope as backend `has_staff_level_access`. */
 export function isCabinetAdminRole(role: string): boolean {
   return role === "superadmin" || role === "admin";

@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { authBearerHeaders, getCrmAccessToken } from "@/lib/crmAuth";
+import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
 import { playCrmNewInquirySound } from "@/lib/crmInquiryNotifySound";
 import { isCabinetAdminRole } from "@/lib/employeeUser";
 import { cn } from "@/lib/utils";
@@ -112,8 +112,8 @@ function LeadNotesHistoryPanel({
     setLoading(true);
     try {
       const [rn, rh] = await Promise.all([
-        fetch(`/api/crm/leads/${leadId}/notes/`, { headers: authBearerHeaders() }),
-        fetch(`/api/crm/leads/${leadId}/history/`, { headers: authBearerHeaders() }),
+        fetchWithCrmAuthRetry(`/api/crm/leads/${leadId}/notes/`),
+        fetchWithCrmAuthRetry(`/api/crm/leads/${leadId}/history/`),
       ]);
       if (!rn.ok || !rh.ok) {
         setPanelError("Не удалось загрузить заметки или историю.");
@@ -153,10 +153,9 @@ function LeadNotesHistoryPanel({
     setNoteBusy(true);
     setPanelError("");
     try {
-      const res = await fetch(`/api/crm/leads/${leadId}/notes/`, {
+      const res = await fetchWithCrmAuthRetry(`/api/crm/leads/${leadId}/notes/`, {
         method: "POST",
         headers: {
-          ...authBearerHeaders(),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ text }),
@@ -369,9 +368,7 @@ export function AccountInquiriesTable() {
     }
     setError("");
     try {
-      const res = await fetch(`/api/crm/leads/${query}`, {
-        headers: authBearerHeaders(),
-      });
+      const res = await fetchWithCrmAuthRetry(`/api/crm/leads/${query}`);
       if (res.status === 403) {
         setRows([]);
         knownIdsRef.current = new Set();
@@ -403,9 +400,7 @@ export function AccountInquiriesTable() {
     if (!getCrmAccessToken() || !canView) return;
     if (pollSuppressedRef.current) return;
     try {
-      const res = await fetch(`/api/crm/leads/${query}`, {
-        headers: authBearerHeaders(),
-      });
+      const res = await fetchWithCrmAuthRetry(`/api/crm/leads/${query}`);
       if (res.status === 403 || !res.ok) return;
       const list = normalizeLeadList(await res.json());
       const prevKnown = knownIdsRef.current;
@@ -438,7 +433,7 @@ export function AccountInquiriesTable() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/crm/realtors/", { headers: authBearerHeaders() });
+        const res = await fetchWithCrmAuthRetry("/api/crm/realtors/");
         if (!res.ok || cancelled) return;
         const data = await res.json();
         if (!cancelled) setRealtors(normalizeRealtorList(data));
@@ -457,10 +452,9 @@ export function AccountInquiriesTable() {
       (prev ?? []).map((r) => (r.id === id ? { ...r, status } : r)),
     );
     try {
-      const res = await fetch(`/api/crm/leads/${id}/`, {
+      const res = await fetchWithCrmAuthRetry(`/api/crm/leads/${id}/`, {
         method: "PATCH",
         headers: {
-          ...authBearerHeaders(),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ status }),
@@ -480,9 +474,8 @@ export function AccountInquiriesTable() {
     setRevealBusy(id);
     setError("");
     try {
-      const res = await fetch(`/api/crm/leads/${id}/reveal_phone/`, {
+      const res = await fetchWithCrmAuthRetry(`/api/crm/leads/${id}/reveal_phone/`, {
         method: "POST",
-        headers: authBearerHeaders(),
       });
       if (res.status === 429) {
         setError("Слишком частые запросы на показ телефона. Подождите минуту.");

@@ -227,7 +227,12 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     USE_X_FORWARDED_HOST = True
 
-# Django REST Framework — JWT for CRM; default require auth
+# Django REST Framework — JWT for CRM; default require auth.
+# JSON-only in production so API clients never receive browsable HTML or ambiguous responses.
+_rest_framework_renderers = ["rest_framework.renderers.JSONRenderer"]
+if DEBUG:
+    _rest_framework_renderers.append("rest_framework.renderers.BrowsableAPIRenderer")
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -235,6 +240,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_RENDERER_CLASSES": _rest_framework_renderers,
 }
 
 # JWT token lifetimes (minimal config)

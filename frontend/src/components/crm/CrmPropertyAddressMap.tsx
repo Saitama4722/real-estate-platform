@@ -46,6 +46,9 @@ function hasValidCoords(latStr: string, lngStr: string): boolean {
   return Number.isFinite(la) && Number.isFinite(lo);
 }
 
+/** Краснодар — стартовый центр карты до выбора точки. */
+const DEFAULT_MAP_CENTER: [number, number] = [45.0355, 38.9753];
+
 interface CrmPropertyAddressMapProps {
   addressText: string;
   onAddressTextChange: (v: string) => void;
@@ -180,9 +183,11 @@ export function CrmPropertyAddressMap({
     [],
   );
 
-  const showMap = hasValidCoords(latitudeStr, longitudeStr);
+  const hasMarker = hasValidCoords(latitudeStr, longitudeStr);
   const latNum = parseFloat(latitudeStr.replace(",", "."));
   const lngNum = parseFloat(longitudeStr.replace(",", "."));
+  const center: [number, number] = hasMarker ? [latNum, lngNum] : DEFAULT_MAP_CENTER;
+  const zoom = hasMarker ? 15 : 12;
 
   const onMapPick = (lat: number, lng: number) => {
     onLatitudeChange(lat.toFixed(6));
@@ -207,14 +212,15 @@ export function CrmPropertyAddressMap({
           )}
           {apiKey && ymapsStatus === "error" && (
             <p className="mt-1 text-xs text-amber-700">
-              Не удалось загрузить Яндекс.Карты — введите адрес и координаты вручную.
+              Не удалось загрузить подсказки Яндекса — укажите адрес текстом и поставьте метку на карте
+              ниже.
             </p>
           )}
           {!apiKey && (
             <p className="mt-1 text-xs text-gray-500">
               Подсказки по адресу: задайте переменную окружения{" "}
               <code className="rounded bg-gray-100 px-1">NEXT_PUBLIC_YANDEX_MAPS_API_KEY</code>{" "}
-              (как на публичном сайте). Без ключа доступен ручной ввод адреса и координат.
+              (как на публичном сайте). Без ключа можно ввести адрес и указать точку на карте кликом.
             </p>
           )}
           {suggestOpen && suggestions.length > 0 && (
@@ -238,55 +244,31 @@ export function CrmPropertyAddressMap({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Широта
-          </label>
-          <Input
-            value={latitudeStr}
-            onChange={(e) => onLatitudeChange(e.target.value)}
-            placeholder="Например: 45.035470"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Долгота
-          </label>
-          <Input
-            value={longitudeStr}
-            onChange={(e) => onLongitudeChange(e.target.value)}
-            placeholder="Например: 38.975313"
-          />
-        </div>
-      </div>
-
       <div>
         <p className="text-sm font-medium text-gray-700 mb-2">Точка на карте</p>
-        {!showMap ? (
-          <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-600">
-            Укажите широту и долготу или выберите адрес из подсказки — маркер появится на карте.
-            Клик по карте задаёт координаты.
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-lg border border-gray-200">
-            <MapContainer
-              center={[latNum, lngNum]}
-              zoom={15}
-              scrollWheelZoom={false}
-              className="h-[240px] w-full"
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              <Marker position={[latNum, lngNum]} icon={markerIcon} />
-              <MapClickHandler onPick={onMapPick} />
-            </MapContainer>
-          </div>
-        )}
+        <p className="mb-2 text-xs text-gray-600">
+          Кликните по карте, чтобы поставить метку, или выберите адрес из подсказки — координаты
+          сохранятся автоматически.
+        </p>
+        <div className="overflow-hidden rounded-lg border border-gray-200">
+          <MapContainer
+            key={hasMarker ? `${latitudeStr}-${longitudeStr}` : "no-marker"}
+            center={center}
+            zoom={zoom}
+            scrollWheelZoom={false}
+            className="h-[240px] w-full"
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {hasMarker ? <Marker position={[latNum, lngNum]} icon={markerIcon} /> : null}
+            <MapClickHandler onPick={onMapPick} />
+          </MapContainer>
+        </div>
         <p className="mt-1 text-xs text-gray-500">
-          Плитки карты — OpenStreetMap (как на карточке объекта на сайте). Подсказки адреса — Яндекс при наличии ключа.
+          Плитки карты — OpenStreetMap (как на карточке объекта на сайте). Подсказки адреса — Яндекс
+          при наличии ключа.
         </p>
       </div>
     </div>

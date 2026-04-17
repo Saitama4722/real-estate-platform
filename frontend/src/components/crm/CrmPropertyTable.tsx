@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { authBearerHeaders, getCrmAccessToken } from "@/lib/crmAuth";
+import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
 import { CRM_PROPERTY_TYPE_LABELS, type CrmPropertyTypeValue } from "@/lib/crmPropertyForm";
 
 interface CrmPropertyRow {
@@ -45,7 +45,7 @@ export function CrmPropertyTable() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/crm/properties/", { headers: authBearerHeaders() });
+        const res = await fetchWithCrmAuthRetry("/api/crm/properties/");
         if (res.status === 401) {
           if (!cancelled) {
             setUnauthenticated(true);

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { authBearerHeaders } from "@/lib/crmAuth";
+import { fetchWithCrmAuthRetry } from "@/lib/crmAuth";
 
 export type RealtorRow = {
   id: number;
@@ -126,8 +126,7 @@ export function AccountStaffRealtorsPanel() {
     setError(null);
     setAccessDenied(false);
     try {
-      const res = await fetch("/api/crm/realtors/", {
-        headers: { ...authBearerHeaders() },
+      const res = await fetchWithCrmAuthRetry("/api/crm/realtors/", {
         credentials: "same-origin",
       });
       if (res.status === 403) {
@@ -141,8 +140,13 @@ export function AccountStaffRealtorsPanel() {
         setRows([]);
         return;
       }
-      const data = (await res.json()) as RealtorRow[];
-      setRows(Array.isArray(data) ? data.map(normalizeRealtorRow) : []);
+      const raw = (await res.json()) as unknown;
+      const list = Array.isArray(raw)
+        ? raw
+        : raw && typeof raw === "object" && Array.isArray((raw as { results?: unknown }).results)
+          ? ((raw as { results: RealtorRow[] }).results as RealtorRow[])
+          : [];
+      setRows(list.map(normalizeRealtorRow));
     } catch (e) {
       console.error(e);
       setError("Ошибка сети при загрузке списка.");
@@ -210,9 +214,7 @@ export function AccountStaffRealtorsPanel() {
 
       const hasFile = formAvatar instanceof File;
       let body: BodyInit;
-      const headers: Record<string, string> = {
-        ...(authBearerHeaders() as Record<string, string>),
-      };
+      const headers: Record<string, string> = {};
 
       if (hasFile) {
         const fd = new FormData();
@@ -249,9 +251,14 @@ export function AccountStaffRealtorsPanel() {
         body = JSON.stringify(payload);
       }
 
-      const res = await fetch(url, {
+      const res = await fetchWithCrmAuthRetry(url, {
         method,
-        headers,
+        headers:
+          Object.keys(headers).length > 0
+            ? headers
+            : hasFile
+              ? undefined
+              : { "Content-Type": "application/json" },
         body,
         credentials: "same-origin",
       });
@@ -285,10 +292,9 @@ export function AccountStaffRealtorsPanel() {
     if (!window.confirm(`Отключить доступ для ${row.display_name}?`)) return;
     setError(null);
     try {
-      const res = await fetch(`/api/crm/realtors/${row.id}/`, {
+      const res = await fetchWithCrmAuthRetry(`/api/crm/realtors/${row.id}/`, {
         method: "PATCH",
         headers: {
-          ...authBearerHeaders(),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ is_active: false }),
@@ -315,9 +321,8 @@ export function AccountStaffRealtorsPanel() {
     }
     setError(null);
     try {
-      const res = await fetch(`/api/crm/realtors/${row.id}/`, {
+      const res = await fetchWithCrmAuthRetry(`/api/crm/realtors/${row.id}/`, {
         method: "DELETE",
-        headers: { ...authBearerHeaders() },
         credentials: "same-origin",
       });
       if (!res.ok) {

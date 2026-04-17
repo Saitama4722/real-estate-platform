@@ -8,8 +8,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { DuplicateWarningModal } from "@/components/crm/DuplicateWarningModal";
-import { authBearerHeaders, getCrmAccessToken } from "@/lib/crmAuth";
-import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
+import {
+  authBearerHeaders,
+  fetchWithCrmAuthRetry,
+  getCrmAccessToken,
+  refreshCrmAccessToken,
+} from "@/lib/crmAuth";
+import { crmBrowserApiUrl, employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 import {
   type ApartmentDetailsForm,
   type ChoiceItem,
@@ -137,6 +142,7 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
   const [neighborhoods, setNeighborhoods] = useState<{ id: number; name: string }[]>([]);
   const [rcList, setRcList] = useState<{ id: number; name: string }[]>([]);
   const [choices, setChoices] = useState<LocationsChoicesResponse | null>(null);
+  const [choicesLoadError, setChoicesLoadError] = useState("");
 
   const [bootstrapping, setBootstrapping] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
@@ -158,17 +164,25 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     let cancelled = false;
     (async () => {
       try {
-        const ch = await fetch("/api/locations/choices/");
+        setChoicesLoadError("");
+        const ch = await fetch(crmBrowserApiUrl("/api/locations/choices/"));
+        if (!cancelled && !ch.ok) {
+          setChoicesLoadError("Не удалось загрузить справочники для полей формы.");
+        }
         if (ch.ok && !cancelled) {
           setChoices((await ch.json()) as LocationsChoicesResponse);
         }
-        const c = await fetch("/api/locations/cities/");
+        const c = await fetch(crmBrowserApiUrl("/api/locations/cities/"));
+        if (!cancelled && !c.ok) {
+          setChoicesLoadError((prev) => prev || "Не удалось загрузить список городов.");
+        }
         if (c.ok && !cancelled) {
           const list = (await c.json()) as CityRow[];
           setCities(Array.isArray(list) ? list : []);
         }
       } catch (e) {
         console.error("[CrmPropertyFullForm] choices/cities", e);
+        if (!cancelled) setChoicesLoadError("Ошибка сети при загрузке справочников.");
       }
     })();
     return () => {
@@ -185,13 +199,18 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     let cancelled = false;
     (async () => {
       try {
-        const mr = await fetch(employeeAuthAbsoluteUrl("me"), { headers: authBearerHeaders() });
+        const fetchMe = () =>
+          fetch(employeeAuthAbsoluteUrl("me"), { headers: authBearerHeaders() });
+        let mr = await fetchMe();
+        if (mr.status === 401) {
+          if (await refreshCrmAccessToken()) mr = await fetchMe();
+        }
         if (!mr.ok || cancelled) return;
         const m = (await mr.json()) as MeRole;
         if (cancelled) return;
         setMeRole(m.role);
         if (isStaffRole(m.role)) {
-          const rr = await fetch("/api/crm/realtors/", { headers: authBearerHeaders() });
+          const rr = await fetchWithCrmAuthRetry("/api/crm/realtors/");
           if (!rr.ok || cancelled) return;
           const list = (await rr.json()) as CrmRealtorRow[];
           if (cancelled) return;
@@ -217,7 +236,9 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch(`/api/locations/districts/?city=${encodeURIComponent(cityId)}`);
+        const r = await fetch(
+          crmBrowserApiUrl(`/api/locations/districts/?city=${encodeURIComponent(cityId)}`),
+        );
         if (!r.ok || cancelled) return;
         const raw = await r.json();
         const list = Array.isArray(raw) ? raw : [];
@@ -243,7 +264,7 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
       try {
         let url = `/api/locations/neighborhoods/?city=${encodeURIComponent(cityId)}`;
         if (districtId) url += `&district=${encodeURIComponent(districtId)}`;
-        const r = await fetch(url);
+        const r = await fetch(crmBrowserApiUrl(url));
         if (!r.ok || cancelled) return;
         const raw = await r.json();
         const list = Array.isArray(raw) ? raw : [];
@@ -269,7 +290,7 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
       try {
         let url = `/api/locations/residential-complexes/?city=${encodeURIComponent(cityId)}`;
         if (districtId) url += `&district=${encodeURIComponent(districtId)}`;
-        const r = await fetch(url);
+        const r = await fetch(crmBrowserApiUrl(url));
         if (!r.ok || cancelled) return;
         const raw = await r.json();
         const list = Array.isArray(raw) ? raw : [];
@@ -289,9 +310,7 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     setBootstrapping(true);
     setError("");
     try {
-      const res = await fetch(`/api/crm/properties/${propertyId}/`, {
-        headers: authBearerHeaders(),
-      });
+      const res = await fetchWithCrmAuthRetry(`/api/crm/properties/${propertyId}/`);
       if (!res.ok) {
         setError(res.status === 404 ? "Объект не найден." : "Не удалось загрузить объект.");
         setBootstrapping(false);
@@ -425,9 +444,9 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
         ...buildDuplicateCheckExtras(propertyType, apt, house, land, comm),
       };
 
-      const checkRes = await fetch("/api/crm/properties/check_duplicates/", {
+      const checkRes = await fetchWithCrmAuthRetry("/api/crm/properties/check_duplicates/", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authBearerHeaders() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(checkPayload),
       });
       if (!checkRes.ok) throw new Error("Ошибка проверки дублей");
@@ -438,9 +457,9 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
         return;
       }
 
-      const createRes = await fetch("/api/crm/properties/", {
+      const createRes = await fetchWithCrmAuthRetry("/api/crm/properties/", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authBearerHeaders() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(base),
       });
       if (!createRes.ok) {
@@ -506,9 +525,9 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     setSaving(true);
     try {
       const base = buildBasePayload();
-      const res = await fetch(`/api/crm/properties/${propertyId}/`, {
+      const res = await fetchWithCrmAuthRetry(`/api/crm/properties/${propertyId}/`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", ...authBearerHeaders() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(base),
       });
       if (!res.ok) {
@@ -542,9 +561,9 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     setError("");
     try {
       const base = buildBasePayload();
-      const createRes = await fetch("/api/crm/properties/", {
+      const createRes = await fetchWithCrmAuthRetry("/api/crm/properties/", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authBearerHeaders() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(base),
       });
       if (!createRes.ok) {
@@ -608,6 +627,12 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
           Заголовок объекта формируется на сервере автоматически из типа, характеристик и города;
           отдельное поле «название» не требуется.
         </p>
+
+        {choicesLoadError ? (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            {choicesLoadError}
+          </div>
+        ) : null}
 
         {needsLogin && (
           <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">

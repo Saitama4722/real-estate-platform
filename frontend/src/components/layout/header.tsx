@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { HeaderAccountControls } from "@/components/layout/header-account-controls";
 import { Container } from "@/components/layout/container";
-import { cn } from "@/lib/utils";
 
 const navLinks = [
   { label: "Купить", href: "/catalog" },
@@ -33,15 +33,7 @@ export function Header() {
                 ))}
               </ul>
             </nav>
-            <Link
-              href="/account/login"
-              className={cn(
-                "inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 transition-colors",
-                "hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1",
-              )}
-            >
-              Вход в личный кабинет
-            </Link>
+            <HeaderAccountControls />
           </div>
         </div>
       </Container>

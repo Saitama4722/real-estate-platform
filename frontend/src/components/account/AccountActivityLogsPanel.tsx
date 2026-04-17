@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { authBearerHeaders, getCrmAccessToken } from "@/lib/crmAuth";
+import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
 import { isCabinetAdminRole } from "@/lib/employeeUser";
 import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
 
@@ -22,6 +22,10 @@ type ActivityRow = {
 
 function normalizeList(data: unknown): ActivityRow[] {
   if (Array.isArray(data)) return data as ActivityRow[];
+  if (data && typeof data === "object" && "results" in data) {
+    const r = (data as { results?: unknown }).results;
+    if (Array.isArray(r)) return r as ActivityRow[];
+  }
   return [];
 }
 
@@ -63,7 +67,7 @@ export function AccountActivityLogsPanel() {
       }
       const q = params.toString();
       const url = q ? `/api/crm/activity-logs/?${q}` : "/api/crm/activity-logs/";
-      const res = await fetch(url, { headers: authBearerHeaders() });
+      const res = await fetchWithCrmAuthRetry(url);
       if (res.status === 403) {
         setError("Нет доступа к журналу.");
         setRows([]);

@@ -50,6 +50,27 @@ function assertProductionRewriteDoesNotSelfProxy(): void {
 
 assertProductionRewriteDoesNotSelfProxy();
 
+/**
+ * Without BACKEND_URL, rewrites fall back to the origin of NEXT_PUBLIC_API_URL. If that is
+ * the frontend's public URL (same host as the browser), the proxy calls itself (ERR_TOO_MANY_REDIRECTS).
+ * Require an explicit Django origin in production so deploys fail fast instead of breaking at runtime.
+ */
+function assertProductionBackendUrlForRewrites(): void {
+  if (process.env.NODE_ENV !== "production") return;
+  if (process.env.SKIP_BACKEND_SITE_HOST_CHECK === "1") return;
+  if ((process.env.BACKEND_URL ?? "").trim()) return;
+  throw new Error(
+    [
+      "Production requires BACKEND_URL: the Django origin that Next.js proxies /api/* to",
+      "(e.g. http://backend.railway.internal:8000 or http://backend:8000 in Docker).",
+      "Without it, NEXT_PUBLIC_API_URL-based rewrite targets may equal the frontend host and cause ERR_TOO_MANY_REDIRECTS.",
+      "To bypass (not recommended): SKIP_BACKEND_SITE_HOST_CHECK=1.",
+    ].join(" "),
+  );
+}
+
+assertProductionBackendUrlForRewrites();
+
 function backendOriginForRewrites(): string {
   const trimEnd = (s: string) => s.replace(/\/+$/, "");
   const backend = (process.env.BACKEND_URL ?? "").trim();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PageHeading } from "@/components/layout/page-heading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,8 @@ export default function AccountProfilePage() {
   const [phone, setPhone] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +51,16 @@ export default function AccountProfilePage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!file) {
+      setFilePreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setFilePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,13 +97,19 @@ export default function AccountProfilePage() {
         setError(detail);
         return;
       }
+      const hadAvatarFile = Boolean(file);
       const data = (await res.json()) as MeResponse;
       setFirstName(data.first_name ?? "");
       setLastName(data.last_name ?? "");
       setPhone(data.phone ?? "");
       setAvatarUrl(typeof data.avatar === "string" ? data.avatar : null);
       setFile(null);
-      setOk("Изменения сохранены.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setOk(
+        hadAvatarFile
+          ? "Изменения сохранены. Новая фотография загружена."
+          : "Изменения сохранены.",
+      );
     } catch {
       setError("Ошибка соединения при сохранении.");
     } finally {
@@ -118,8 +136,18 @@ export default function AccountProfilePage() {
           )}
 
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0">
-              {avatarUrl ? (
+            <div className="flex-shrink-0 space-y-2">
+              {filePreviewUrl ? (
+                <>
+                  <p className="text-xs font-medium text-slate-600">Предпросмотр нового фото</p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={filePreviewUrl}
+                    alt=""
+                    className="h-20 w-20 rounded-full object-cover ring-2 ring-sky-300"
+                  />
+                </>
+              ) : avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={avatarUrl}
@@ -137,12 +165,21 @@ export default function AccountProfilePage() {
                 Фотография
               </label>
               <input
+                ref={fileInputRef}
                 id="profile-avatar"
                 type="file"
                 accept="image/*"
                 className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-800 hover:file:bg-slate-200"
                 onChange={(ev) => setFile(ev.target.files?.[0] ?? null)}
               />
+              {file ? (
+                <p className="text-xs text-slate-700">
+                  Выбран файл: <span className="font-medium">{file.name}</span> — будет отправлен при
+                  нажатии «Сохранить».
+                </p>
+              ) : (
+                <p className="text-xs text-slate-500">Файл не выбран.</p>
+              )}
               <p className="text-xs text-slate-500">Поддерживаются обычные форматы изображений.</p>
             </div>
           </div>
