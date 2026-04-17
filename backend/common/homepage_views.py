@@ -20,6 +20,7 @@ class HomepageTextBlockPublicListView(APIView):
     Публичный список текстов главной (только значения по заранее заданным ключам).
     """
 
+    authentication_classes = []
     permission_classes = [AllowAny]
     http_method_names = ["get", "head", "options"]
 

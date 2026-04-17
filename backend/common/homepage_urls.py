@@ -1,11 +1,4 @@
-from django.urls import path
+# Extend /api/homepage/ here. The public text-blocks list is registered in
+# config.urls (before this include) so it always resolves from the root urlconf.
 
-from common.homepage_views import HomepageTextBlockPublicListView
-
-urlpatterns = [
-    path(
-        "text-blocks/",
-        HomepageTextBlockPublicListView.as_view(),
-        name="homepage-text-blocks-public",
-    ),
-]
+urlpatterns = []

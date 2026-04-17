@@ -6,7 +6,10 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
-from common.homepage_views import HomepageTextBlockCrmPatchView
+from common.homepage_views import (
+    HomepageTextBlockCrmPatchView,
+    HomepageTextBlockPublicListView,
+)
 from users import views as users_views
 
 admin.site.site_header = "Недвижимость — администрирование"
@@ -18,6 +21,11 @@ urlpatterns = [
     path("api/auth/", include("users.urls")),
     path("api/realtors/", include("users.public_urls")),
     path("api/articles/", include("articles.urls")),
+    path(
+        "api/homepage/text-blocks/",
+        HomepageTextBlockPublicListView.as_view(),
+        name="homepage-text-blocks-public",
+    ),
     path("api/homepage/", include("common.homepage_urls")),
     path("api/locations/", include("locations.urls")),
     path("api/properties/", include("properties.urls")),
