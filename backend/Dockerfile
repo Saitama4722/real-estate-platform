@@ -13,4 +13,4 @@ COPY . .
 # Admin (and other) static assets for WhiteNoise in production — requires STATIC_ROOT in settings.
 RUN python manage.py collectstatic --noinput
 
-CMD ["sh", "-c", "exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000}"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py create_initial_admin && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000}"]
