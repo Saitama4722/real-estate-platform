@@ -227,6 +227,10 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     USE_X_FORWARDED_HOST = True
 
+# TLS terminates at the platform (Railway). Never let Django emit HTTP→HTTPS redirects:
+# internal HTTP hops from Next.js → Django would loop with SECURE_SSL_REDIRECT=True.
+SECURE_SSL_REDIRECT = False
+
 # Django REST Framework — JWT for CRM; default require auth.
 # JSON-only in production so API clients never receive browsable HTML or ambiguous responses.
 _rest_framework_renderers = ["rest_framework.renderers.JSONRenderer"]
