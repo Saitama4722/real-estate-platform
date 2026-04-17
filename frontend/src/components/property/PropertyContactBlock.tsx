@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ interface PropertyContactBlockProps {
   propertyId: number;
   realtorName?: string;
   realtorAvatar?: string;
+  realtorCrmId?: string;
 }
 
 type PhoneState =
@@ -49,6 +51,7 @@ export function PropertyContactBlock({
   propertyId,
   realtorName,
   realtorAvatar,
+  realtorCrmId,
 }: PropertyContactBlockProps) {
   const [phoneState, setPhoneState] = useState<PhoneState>({ status: "hidden" });
   const [requestOpen, setRequestOpen] = useState(false);
@@ -144,6 +147,14 @@ export function PropertyContactBlock({
             >
               Задать вопрос
             </Button>
+            {realtorCrmId ? (
+              <Link
+                href={`/realtors/${encodeURIComponent(realtorCrmId)}`}
+                className="block w-full text-center text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+              >
+                Страница риэлтора
+              </Link>
+            ) : null}
           </div>
 
           <div className="border-t border-gray-200 pt-4">

@@ -6,8 +6,9 @@ from rest_framework.test import APIClient
 
 from leads.choices import LeadStatus
 from leads.models import Lead
-from properties.choices import PropertyType
+from properties.choices import PropertyStatus, PropertyType
 from properties.models import Property
+from users.models import EmployeeActivityLog, RealtorProfile
 from users.permissions import (
     crm_property_queryset_for_user,
     crm_user_has_capability,
@@ -355,6 +356,7 @@ class CrmRealtorCapabilityFlagsTests(TestCase):
             client_name="Клиент",
             client_phone="+79990001122",
             property=self.prop,
+            assigned_realtor=self.realtor,
         )
 
     def test_crm_user_has_capability_staff_unrestricted(self):
@@ -532,6 +534,7 @@ class CrmLeadDeletePermissionTests(TestCase):
             client_name="Мой",
             client_phone="+79991111111",
             property=self.prop_mine,
+            assigned_realtor=self.realtor,
         )
         self.lead_foreign = Lead.objects.create(
             client_name="Чужой",
@@ -575,4 +578,163 @@ class CrmLeadDeletePermissionTests(TestCase):
         res = self.client.delete(f"/api/crm/leads/{self.lead_foreign.pk}/")
         self.assertEqual(res.status_code, 403)
         self.assertTrue(Lead.objects.filter(pk=self.lead_foreign.pk).exists())
+
+
+class EmployeeActivityLogTests(TestCase):
+    """Журнал входа/выхода и доступ администратора к API списка."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            email="adm-activity@test.local",
+            password="pw",
+            first_name="A",
+            last_name="Admin",
+            role=User.Role.ADMIN,
+        )
+        self.realtor = User.objects.create_user(
+            email="rel-activity@test.local",
+            password="pw",
+            first_name="R",
+            last_name="Realtor",
+            role=User.Role.REALTOR,
+        )
+
+    def test_login_creates_log_row(self):
+        self.assertEqual(EmployeeActivityLog.objects.count(), 0)
+        res = self.client.post(
+            "/api/auth/login/",
+            {"email": "rel-activity@test.local", "password": "pw"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(EmployeeActivityLog.objects.count(), 1)
+        row = EmployeeActivityLog.objects.get()
+        self.assertEqual(row.user_id, self.realtor.pk)
+        self.assertEqual(row.action_type, EmployeeActivityLog.ActionType.LOGIN)
+
+    def test_failed_login_does_not_create_log(self):
+        res = self.client.post(
+            "/api/auth/login/",
+            {"email": "rel-activity@test.local", "password": "wrong"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 401)
+        self.assertEqual(EmployeeActivityLog.objects.count(), 0)
+
+    def test_logout_creates_log_when_authenticated(self):
+        self.client.force_authenticate(user=self.realtor)
+        self.assertEqual(EmployeeActivityLog.objects.count(), 0)
+        res = self.client.post("/api/auth/logout/")
+        self.assertEqual(res.status_code, 204)
+        self.assertEqual(EmployeeActivityLog.objects.count(), 1)
+        row = EmployeeActivityLog.objects.get()
+        self.assertEqual(row.action_type, EmployeeActivityLog.ActionType.LOGOUT)
+
+    def test_realtor_forbidden_activity_logs_list(self):
+        self.client.force_authenticate(user=self.realtor)
+        res = self.client.get("/api/crm/activity-logs/")
+        self.assertEqual(res.status_code, 403)
+
+    def test_admin_lists_activity_logs_newest_first(self):
+        EmployeeActivityLog.objects.create(
+            user=self.realtor,
+            action_type=EmployeeActivityLog.ActionType.LOGIN,
+        )
+        EmployeeActivityLog.objects.create(
+            user=self.admin,
+            action_type=EmployeeActivityLog.ActionType.LOGOUT,
+        )
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get("/api/crm/activity-logs/")
+        self.assertEqual(res.status_code, 200)
+        self.assertIsInstance(res.data, list)
+        self.assertEqual(len(res.data), 2)
+        self.assertEqual(res.data[0]["action_type"], EmployeeActivityLog.ActionType.LOGOUT)
+        self.assertEqual(res.data[1]["action_type"], EmployeeActivityLog.ActionType.LOGIN)
+
+    def test_admin_filters_by_action_type_and_user(self):
+        EmployeeActivityLog.objects.create(
+            user=self.realtor,
+            action_type=EmployeeActivityLog.ActionType.LOGIN,
+        )
+        EmployeeActivityLog.objects.create(
+            user=self.realtor,
+            action_type=EmployeeActivityLog.ActionType.LOGOUT,
+        )
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get(
+            "/api/crm/activity-logs/",
+            {"action_type": "login", "user": self.realtor.pk},
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]["action_type"], EmployeeActivityLog.ActionType.LOGIN)
+
+
+class PublicRealtorApiTests(TestCase):
+    """Публичная страница риэлтора: GET /api/realtors/<crm_id>/."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.realtor = User.objects.create_user(
+            email="rel-public@test.local",
+            password="pw",
+            first_name="Анна",
+            last_name="Светлова",
+            role=User.Role.REALTOR,
+            phone="+79997776655",
+        )
+        self.pub = Property.objects.create(
+            property_type=PropertyType.APARTMENT,
+            price=Decimal("12.00"),
+            assigned_realtor=self.realtor,
+            status=PropertyStatus.PUBLISHED,
+            is_published=True,
+        )
+        Property.objects.create(
+            property_type=PropertyType.APARTMENT,
+            price=Decimal("13.00"),
+            assigned_realtor=self.realtor,
+            status=PropertyStatus.DRAFT,
+            is_published=False,
+        )
+
+    def test_public_realtor_detail_ok_and_counts_published_only(self):
+        cid = self.realtor.crm_id
+        res = self.client.get(f"/api/realtors/{cid.lower()}/")
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(res.data["crm_id"], cid)
+        self.assertEqual(res.data["display_name"], "Анна Светлова")
+        self.assertEqual(res.data["phone"], "+79997776655")
+        self.assertEqual(res.data["published_properties_count"], 1)
+
+    def test_public_realtor_prefers_profile_public_fields(self):
+        RealtorProfile.objects.create(
+            user=self.realtor,
+            public_name="Анна Публичная",
+            public_phone="+79990001122",
+            short_bio="Кратко о себе.",
+        )
+        res = self.client.get(f"/api/realtors/{self.realtor.crm_id}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["display_name"], "Анна Публичная")
+        self.assertEqual(res.data["phone"], "+79990001122")
+        self.assertEqual(res.data["short_bio"], "Кратко о себе.")
+
+    def test_inactive_realtor_not_found(self):
+        User.objects.filter(pk=self.realtor.pk).update(is_active=False)
+        res = self.client.get(f"/api/realtors/{self.realtor.crm_id}/")
+        self.assertEqual(res.status_code, 404)
+
+    def test_admin_crm_id_not_exposed_as_realtor(self):
+        admin = User.objects.create_user(
+            email="adm-public-rel@test.local",
+            password="pw",
+            first_name="A",
+            last_name="Admin",
+            role=User.Role.ADMIN,
+        )
+        res = self.client.get(f"/api/realtors/{admin.crm_id}/")
+        self.assertEqual(res.status_code, 404)
 

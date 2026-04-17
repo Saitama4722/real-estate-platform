@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +48,7 @@ const PERM_CHECKBOXES: { field: RealtorPermField; label: string }[] = [
   { field: "perm_create_property", label: "Создавать объекты в CRM" },
   { field: "perm_edit_property", label: "Редактировать объекты в CRM" },
   { field: "perm_delete_property", label: "Архивировать объекты в CRM" },
-  { field: "perm_view_clients", label: "Просматривать клиентов (лиды)" },
+  { field: "perm_view_clients", label: "Просматривать заявки (лиды)" },
   { field: "perm_delete_clients", label: "Удалять клиентов (лиды)" },
   { field: "perm_change_status", label: "Менять статус лидов" },
 ];
@@ -90,6 +91,7 @@ export function AccountStaffRealtorsPanel() {
   const [rows, setRows] = useState<RealtorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<RealtorRow | null>(null);
   const [formEmail, setFormEmail] = useState("");
@@ -122,13 +124,15 @@ export function AccountStaffRealtorsPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setAccessDenied(false);
     try {
       const res = await fetch("/api/crm/realtors/", {
         headers: { ...authBearerHeaders() },
         credentials: "same-origin",
       });
       if (res.status === 403) {
-        setError("Недостаточно прав.");
+        setAccessDenied(true);
+        setError(null);
         setRows([]);
         return;
       }
@@ -151,6 +155,18 @@ export function AccountStaffRealtorsPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  if (accessDenied) {
+    return (
+      <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        Раздел доступен только администратору. Если вы открыли страницу по прямой ссылке, вернитесь в{" "}
+        <Link href="/account" className="font-medium text-amber-950 underline underline-offset-2">
+          панель кабинета
+        </Link>
+        .
+      </p>
+    );
+  }
 
   const openCreate = () => {
     setEditing(null);

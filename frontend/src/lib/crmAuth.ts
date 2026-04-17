@@ -35,6 +35,23 @@ export function clearCrmTokens(): void {
   syncAccessCookie(null);
 }
 
+/** Сообщить бэкенду о выходе (журнал), затем очистить токены. Сеть не блокирует выход из кабинета. */
+export async function performEmployeeLogout(): Promise<void> {
+  try {
+    const headers = authBearerHeaders();
+    if ("Authorization" in headers && headers.Authorization) {
+      await fetch("/api/auth/logout/", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+      });
+    }
+  } catch {
+    // игнорируем — локальный выход всё равно выполняется
+  } finally {
+    clearCrmTokens();
+  }
+}
+
 export function authBearerHeaders(): HeadersInit {
   const t = getCrmAccessToken();
   if (!t) return {};

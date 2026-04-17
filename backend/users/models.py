@@ -147,6 +147,42 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.has_any_role((self.Role.SUPERADMIN, self.Role.ADMIN))
 
 
+class EmployeeActivityLog(models.Model):
+    """Журнал входа и выхода сотрудников в личный кабинет / CRM."""
+
+    class ActionType(models.TextChoices):
+        LOGIN = "login", "Вход"
+        LOGOUT = "logout", "Выход"
+
+    user = models.ForeignKey(
+        "User",
+        on_delete=models.CASCADE,
+        related_name="activity_logs",
+        verbose_name="Пользователь",
+    )
+    action_type = models.CharField(
+        "Действие",
+        max_length=16,
+        choices=ActionType.choices,
+        db_index=True,
+    )
+    created_at = models.DateTimeField("Дата и время", auto_now_add=True, db_index=True)
+    ip_address = models.GenericIPAddressField(
+        "IP-адрес",
+        null=True,
+        blank=True,
+    )
+    user_agent = models.TextField("User-Agent", blank=True)
+
+    class Meta:
+        verbose_name = "Запись активности сотрудника"
+        verbose_name_plural = "Журнал активности сотрудников"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user_id} {self.action_type} @ {self.created_at}"
+
+
 class RealtorProfile(BaseTimestampedModel):
     """
     Staff profile for realtors: public-facing data stored separately from auth.

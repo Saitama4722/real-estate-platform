@@ -1,10 +1,5 @@
-import { PageHeading } from "@/components/layout/page-heading";
+import { redirect } from "next/navigation";
 
 export default function AccountClientsPage() {
-  return (
-    <>
-      <PageHeading title="Клиенты" subtitle="Заявки и обращения" />
-      <p className="mt-4 text-sm text-gray-600">Раздел в разработке.</p>
-    </>
-  );
+  redirect("/account/inquiries");
 }

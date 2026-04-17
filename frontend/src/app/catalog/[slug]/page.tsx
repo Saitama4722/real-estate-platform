@@ -113,6 +113,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
               propertyId={property.id}
               realtorName={property.realtorName}
               realtorAvatar={property.realtorAvatar}
+              realtorCrmId={property.realtorCrmId}
             />
           </div>
         </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { authBearerHeaders, clearCrmTokens, getCrmAccessToken } from "@/lib/crmAuth";
+import { authBearerHeaders, clearCrmTokens, getCrmAccessToken, performEmployeeLogout } from "@/lib/crmAuth";
 
 interface MeUser {
   id: number;
@@ -52,8 +52,8 @@ export function CrmDashboardPanel() {
     };
   }, []);
 
-  const logout = () => {
-    clearCrmTokens();
+  const logout = async () => {
+    await performEmployeeLogout();
     setUser(null);
   };
 

@@ -3,7 +3,7 @@ from django.db import models
 
 from common.models import BaseTimestampedModel
 
-from .choices import LeadPriority, LeadSource, LeadStatus
+from .choices import LeadActionType, LeadPriority, LeadSource, LeadStatus
 
 
 class Lead(BaseTimestampedModel):
@@ -79,6 +79,52 @@ class Lead(BaseTimestampedModel):
         if self.pk:
             return f"Лид #{self.pk}: {label}"
         return f"Лид: {label}"
+
+
+class LeadPhoneRevealLog(models.Model):
+    """
+    Аудит раскрытия телефона клиента в CRM (аналогично PhoneRevealLog для объекта).
+    """
+
+    lead = models.ForeignKey(
+        "leads.Lead",
+        on_delete=models.CASCADE,
+        related_name="phone_reveal_logs",
+        verbose_name="Лид",
+    )
+    revealed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lead_phone_reveal_logs",
+        verbose_name="Сотрудник",
+    )
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        verbose_name="IP-адрес",
+    )
+    user_agent = models.TextField(
+        blank=True,
+        verbose_name="User-Agent (браузер)",
+    )
+    revealed_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Время раскрытия",
+        db_index=True,
+    )
+
+    class Meta:
+        verbose_name = "Лог раскрытия телефона (лид)"
+        verbose_name_plural = "Логи раскрытия телефона (лиды)"
+        ordering = ["-revealed_at"]
+
+    def __str__(self):
+        lid = self.lead_id
+        if self.pk:
+            return f"Раскрытие телефона лида #{lid} (#{self.pk})"
+        return f"Раскрытие телефона лида #{lid}"
 
 
 class LeadStatusHistory(BaseTimestampedModel):
@@ -161,3 +207,76 @@ class LeadComment(BaseTimestampedModel):
         if self.pk:
             return f"Комментарий #{self.pk} (лид #{lead_id})"
         return f"Комментарий (лид #{lead_id})"
+
+
+class LeadNote(BaseTimestampedModel):
+    lead = models.ForeignKey(
+        "leads.Lead",
+        on_delete=models.CASCADE,
+        related_name="notes",
+        verbose_name="Лид",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lead_notes",
+        verbose_name="Автор",
+    )
+    text = models.TextField(
+        verbose_name="Текст",
+    )
+
+    class Meta:
+        verbose_name = "Комментарий к лиду (заметка)"
+        verbose_name_plural = "Комментарии к лидам (заметки)"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        lid = self.lead_id
+        if self.pk:
+            return f"Заметка #{self.pk} (лид #{lid})"
+        return f"Заметка (лид #{lid})"
+
+
+class LeadActionLog(models.Model):
+    lead = models.ForeignKey(
+        "leads.Lead",
+        on_delete=models.CASCADE,
+        related_name="action_logs",
+        verbose_name="Лид",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lead_action_logs",
+        verbose_name="Сотрудник",
+    )
+    action_type = models.CharField(
+        max_length=32,
+        choices=LeadActionType.choices,
+        verbose_name="Тип действия",
+        db_index=True,
+    )
+    description = models.TextField(
+        verbose_name="Описание",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Создано",
+        db_index=True,
+    )
+
+    class Meta:
+        verbose_name = "Действие по лиду"
+        verbose_name_plural = "История действий по лидам"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        lid = self.lead_id
+        if self.pk:
+            return f"{self.action_type} (лид #{lid}, #{self.pk})"
+        return f"{self.action_type} (лид #{lid})"

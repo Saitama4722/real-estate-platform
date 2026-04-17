@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import RealtorProfile, User
+from .models import EmployeeActivityLog, RealtorProfile, User
 
 
 @admin.register(User)
@@ -65,6 +65,24 @@ class UserAdmin(BaseUserAdmin):
         ),
         ("Роль и статус", {"fields": ("role", "is_active", "is_staff")}),
     )
+
+
+@admin.register(EmployeeActivityLog)
+class EmployeeActivityLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "user", "action_type", "ip_address")
+    list_filter = ("action_type",)
+    search_fields = ("user__email", "user__first_name", "user__last_name", "ip_address")
+    readonly_fields = ("user", "action_type", "created_at", "ip_address", "user_agent")
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(RealtorProfile)

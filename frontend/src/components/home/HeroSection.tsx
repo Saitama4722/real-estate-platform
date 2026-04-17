@@ -1,26 +1,20 @@
 import { Container } from "@/components/layout/container";
+import { HeroHeadlines } from "@/components/home/HeroHeadlines";
 import { SearchBar } from "@/components/home/SearchBar";
+import type { HomepageTextMap } from "@/lib/homepageTextBlocks";
 
 interface HeroSectionProps {
-  title: string;
-  subtitle: string;
+  homepageText: Pick<HomepageTextMap, "hero_title" | "hero_subtitle">;
 }
 
-export function HeroSection({ title, subtitle }: HeroSectionProps) {
+export function HeroSection({ homepageText }: HeroSectionProps) {
   return (
     <section className="relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-black/25" />
 
       <Container className="relative py-14 text-white md:py-20">
-        <div className="max-w-3xl">
-          <h1 className="text-3xl font-bold leading-tight text-white md:text-5xl">
-            {title}
-          </h1>
-          <p className="mt-3 text-sm text-slate-100 md:mt-4 md:text-lg">
-            {subtitle}
-          </p>
-        </div>
+        <HeroHeadlines text={homepageText} />
         <div className="mt-8 md:mt-10">
           <SearchBar variant="hero" />
         </div>

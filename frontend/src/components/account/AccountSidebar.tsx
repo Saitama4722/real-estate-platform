@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { clearCrmTokens } from "@/lib/crmAuth";
+import { performEmployeeLogout } from "@/lib/crmAuth";
 import { isCabinetAdminRole } from "@/lib/employeeUser";
 import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
 import { cn } from "@/lib/utils";
@@ -13,9 +13,10 @@ type NavItem = { href: string; label: string; adminOnly?: boolean };
 const NAV_ITEMS: NavItem[] = [
   { href: "/account", label: "Панель" },
   { href: "/account/properties", label: "Объекты" },
-  { href: "/account/clients", label: "Клиенты" },
+  { href: "/account/inquiries", label: "Заявки" },
   { href: "/account/profile", label: "Профиль" },
   { href: "/account/staff", label: "Сотрудники", adminOnly: true },
+  { href: "/account/activity-logs", label: "Журнал активности", adminOnly: true },
 ];
 
 export function AccountSidebar() {
@@ -26,8 +27,8 @@ export function AccountSidebar() {
 
   const visible = NAV_ITEMS.filter((item) => !item.adminOnly || showAdminNav);
 
-  const logout = () => {
-    clearCrmTokens();
+  const logout = async () => {
+    await performEmployeeLogout();
     router.replace("/account/login");
     router.refresh();
   };

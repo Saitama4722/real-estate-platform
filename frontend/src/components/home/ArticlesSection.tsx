@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
+import { HomepageInlineText } from "@/components/home/HomepageInlineText";
 
 interface ArticleItem {
   slug: string;
@@ -9,15 +10,21 @@ interface ArticleItem {
 
 interface ArticlesSectionProps {
   articles: ArticleItem[];
+  sectionTitle: string;
 }
 
-export function ArticlesSection({ articles }: ArticlesSectionProps) {
+export function ArticlesSection({ articles, sectionTitle }: ArticlesSectionProps) {
   if (articles.length === 0) return null;
 
   return (
     <section className="py-10 md:py-12">
       <Container>
-        <h2 className="text-2xl font-semibold text-gray-900">Статьи</h2>
+        <HomepageInlineText
+          blockKey="articles_section_title"
+          value={sectionTitle}
+          as="h2"
+          className="text-2xl font-semibold text-gray-900"
+        />
         <div className="mt-5 grid gap-4 md:mt-6 md:grid-cols-3">
           {articles.map((article) => (
             <article

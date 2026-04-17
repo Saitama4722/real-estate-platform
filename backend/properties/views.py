@@ -190,6 +190,10 @@ class PropertyViewSet(ReadOnlyModelViewSet):
                 commercial_details__area_total__lte=commercial_area_max
             )
 
+        realtor_crm = (self.request.query_params.get("assigned_realtor_crm_id") or "").strip()
+        if realtor_crm:
+            qs = qs.filter(assigned_realtor__crm_id__iexact=realtor_crm)
+
         if self.action == "list":
             qs = qs.select_related(
                 "apartment_details",

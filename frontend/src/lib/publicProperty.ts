@@ -45,6 +45,7 @@ export interface PublicPropertyDetail {
   videos: { video_url: string }[];
   assigned_realtor: {
     id: number;
+    crm_id: string;
     first_name: string;
     last_name: string;
     avatar?: string | null;
@@ -135,6 +136,10 @@ export function mapPublicDetailToCatalogItem(
     typeof p.assigned_realtor?.avatar === "string" && p.assigned_realtor.avatar
       ? p.assigned_realtor.avatar
       : undefined;
+  const realtorCrmId =
+    typeof p.assigned_realtor?.crm_id === "string" && p.assigned_realtor.crm_id.trim()
+      ? p.assigned_realtor.crm_id.trim()
+      : undefined;
 
   const lat = p.public_latitude != null ? Number(p.public_latitude) : 0;
   const lng = p.public_longitude != null ? Number(p.public_longitude) : 0;
@@ -174,5 +179,6 @@ export function mapPublicDetailToCatalogItem(
     description: p.description || p.short_description,
     realtorName,
     realtorAvatar,
+    realtorCrmId,
   };
 }

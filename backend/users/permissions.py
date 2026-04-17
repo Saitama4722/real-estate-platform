@@ -4,7 +4,6 @@ Role-based permission foundation for DRF.
 Use these permission classes on views when you need to restrict access by role.
 Safe for anonymous: unauthenticated users get has_permission == False.
 """
-from django.db.models import Q
 from rest_framework import permissions
 from rest_framework.exceptions import PermissionDenied
 
@@ -89,8 +88,8 @@ def user_can_access_crm_property(user, property_obj) -> bool:
 
 def crm_lead_queryset_for_user(user):
     """
-    Base Lead queryset for CRM: staff see all; realtors see assigned leads or
-    leads tied to a property they may manage in CRM.
+    Base Lead queryset for CRM: staff see all; realtors see only leads assigned
+    to them (assigned_realtor).
     """
     from leads.models import Lead
 
@@ -100,10 +99,7 @@ def crm_lead_queryset_for_user(user):
     if user.has_staff_level_access:
         return qs
     if user.is_realtor_role:
-        prop_qs = crm_property_queryset_for_user(user)
-        return qs.filter(
-            Q(assigned_realtor=user) | Q(property__in=prop_qs)
-        ).distinct()
+        return qs.filter(assigned_realtor=user)
     return qs.none()
 
 
@@ -152,7 +148,7 @@ class HasAllowedRole(permissions.BasePermission):
     Override allowed_roles in subclasses or pass via view.
     """
     allowed_roles = ()
-    message = "You do not have permission to perform this action."
+    message = "Недостаточно прав для этого действия."
 
     def get_allowed_roles(self, request, view):
         return self.allowed_roles
@@ -237,7 +233,7 @@ class IsCrmPropertyStaffOrOwner(permissions.BasePermission):
     Realtor: only owned listings (see ``user_can_access_crm_property``).
     """
 
-    message = "You do not have permission to perform this action."
+    message = "Нет доступа к этому объекту или недостаточно прав."
 
     def has_permission(self, request, view):
         return True
@@ -253,11 +249,11 @@ class IsCrmLeadStaffOrOwner(permissions.BasePermission):
     """
     Object-level CRM access for leads.
 
-    Requires ``IsCrmUser`` on the same view. Staff: any lead. Realtor: assigned
-    lead or lead linked to a property they may manage (see ``crm_lead_queryset_for_user``).
+    Requires ``IsCrmUser`` on the same view. Staff: any lead. Realtor: only leads
+    assigned to them (see ``crm_lead_queryset_for_user``).
     """
 
-    message = "You do not have permission to perform this action."
+    message = "Нет доступа к этой заявке или недостаточно прав."
 
     def has_permission(self, request, view):
         return True
@@ -276,7 +272,7 @@ class IsCrmImportJobOwnerOrStaff(permissions.BasePermission):
     ``crm_import_job_queryset_for_user``.
     """
 
-    message = "You do not have permission to perform this action."
+    message = "Нет доступа к этой задаче импорта или недостаточно прав."
 
     def has_permission(self, request, view):
         return True

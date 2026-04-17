@@ -1,6 +1,66 @@
 from django.contrib import admin
 
-from leads.models import Lead, LeadComment, LeadStatusHistory
+from leads.models import (
+    Lead,
+    LeadActionLog,
+    LeadComment,
+    LeadNote,
+    LeadPhoneRevealLog,
+    LeadStatusHistory,
+)
+
+
+@admin.register(LeadPhoneRevealLog)
+class LeadPhoneRevealLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "lead",
+        "revealed_by",
+        "ip_address",
+        "revealed_at",
+    )
+    list_filter = ("revealed_at",)
+    raw_id_fields = ("lead", "revealed_by")
+    readonly_fields = ("revealed_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(LeadNote)
+class LeadNoteAdmin(admin.ModelAdmin):
+    list_display = ("id", "lead", "author", "created_at")
+    search_fields = ("text",)
+    raw_id_fields = ("lead", "author")
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        (None, {"fields": ("lead", "author", "text")}),
+        ("Даты", {"fields": ("created_at", "updated_at")}),
+    )
+
+
+@admin.register(LeadActionLog)
+class LeadActionLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "lead",
+        "action_type",
+        "user",
+        "created_at",
+    )
+    list_filter = ("action_type",)
+    search_fields = ("description",)
+    raw_id_fields = ("lead", "user")
+    readonly_fields = ("created_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(LeadComment)

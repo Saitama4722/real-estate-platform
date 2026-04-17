@@ -34,6 +34,8 @@ export interface CatalogPropertyItem {
   description?: string;
   realtorName?: string;
   realtorAvatar?: string;
+  /** Публичный CRM ID риэлтора (RID######) для ссылки на страницу /realtors/... */
+  realtorCrmId?: string;
   details?: {
     ceilingHeight?: string;
     kitchenArea?: string;

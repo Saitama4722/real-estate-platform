@@ -4,7 +4,7 @@ from django.core.cache import cache
 from rest_framework import serializers
 
 from leads.choices import LeadSource, LeadStatus
-from leads.models import Lead, LeadComment, LeadStatusHistory
+from leads.models import Lead, LeadActionLog, LeadComment, LeadNote, LeadStatusHistory
 from properties.choices import PropertyStatus
 from properties.serializers import (
     AgencyShortSerializer,
@@ -15,6 +15,18 @@ from properties.serializers import (
 _CLIENT_MESSAGE_MAX = 4000
 _PHONE_MAX_LEN = 32
 _PHONE_MIN_DIGITS = 10
+
+
+def mask_client_phone(value: str) -> str:
+    """Маска для CRM-списков и карточек; полный номер — только через reveal_phone."""
+    raw = (value or "").strip()
+    if not raw:
+        return "—"
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) < 4:
+        return "••••"
+    tail = digits[-4:]
+    return f"+7 ••• •••-{tail[:2]}-{tail[2:]}"
 
 
 _CAPTCHA_CACHE_KEY = "lead_captcha:{}"
@@ -131,6 +143,7 @@ class CrmLeadListSerializer(serializers.ModelSerializer):
     property = CrmPropertyListSerializer(read_only=True, allow_null=True)
     assigned_realtor = RealtorShortSerializer(read_only=True, allow_null=True)
     agency = AgencyShortSerializer(read_only=True, allow_null=True)
+    client_phone = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
@@ -149,6 +162,9 @@ class CrmLeadListSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_client_phone(self, obj):
+        return mask_client_phone(obj.client_phone)
 
 
 class LeadStatusHistoryReadSerializer(serializers.ModelSerializer):
@@ -173,12 +189,35 @@ class CrmLeadCommentReadSerializer(serializers.ModelSerializer):
         fields = ["id", "text", "author_user", "created_at", "updated_at"]
 
 
+class CrmLeadNoteReadSerializer(serializers.ModelSerializer):
+    author = RealtorShortSerializer(read_only=True, allow_null=True)
+
+    class Meta:
+        model = LeadNote
+        fields = ["id", "text", "author", "created_at"]
+
+
+class CrmLeadActionLogReadSerializer(serializers.ModelSerializer):
+    user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LeadActionLog
+        fields = ["id", "action_type", "description", "user", "created_at"]
+
+    def get_user(self, obj):
+        if obj.user_id is None:
+            return None
+        return RealtorShortSerializer(obj.user, context=self.context).data
+
+
 class CrmLeadDetailSerializer(serializers.ModelSerializer):
     property = CrmPropertyListSerializer(read_only=True, allow_null=True)
     assigned_realtor = RealtorShortSerializer(read_only=True, allow_null=True)
     agency = AgencyShortSerializer(read_only=True, allow_null=True)
     comments = CrmLeadCommentReadSerializer(many=True, read_only=True)
+    notes = CrmLeadNoteReadSerializer(many=True, read_only=True)
     status_history = LeadStatusHistoryReadSerializer(many=True, read_only=True)
+    client_phone = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
@@ -195,10 +234,14 @@ class CrmLeadDetailSerializer(serializers.ModelSerializer):
             "assigned_realtor",
             "agency",
             "comments",
+            "notes",
             "status_history",
             "created_at",
             "updated_at",
         ]
+
+    def get_client_phone(self, obj):
+        return mask_client_phone(obj.client_phone)
 
 
 class CrmLeadSetStatusSerializer(serializers.Serializer):
@@ -206,6 +249,18 @@ class CrmLeadSetStatusSerializer(serializers.Serializer):
 
 
 class CrmLeadCommentCreateSerializer(serializers.Serializer):
+    text = serializers.CharField(max_length=8000, min_length=1)
+
+    def validate_text(self, value):
+        s = (value or "").strip()
+        if not s:
+            raise serializers.ValidationError("Введите текст комментария.")
+        if len(s) > 8000:
+            raise serializers.ValidationError("Текст комментария слишком длинный.")
+        return s
+
+
+class CrmLeadNoteCreateSerializer(serializers.Serializer):
     text = serializers.CharField(max_length=8000, min_length=1)
 
     def validate_text(self, value):

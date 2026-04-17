@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authBearerHeaders, clearCrmTokens, getCrmAccessToken } from "@/lib/crmAuth";
-import type { EmployeeUser } from "@/lib/employeeUser";
+import type { EmployeeCrmCapabilities, EmployeeUser } from "@/lib/employeeUser";
 import { EmployeeUserProvider } from "@/components/account/EmployeeAuthContext";
 
 function parseEmployeeUser(data: unknown): EmployeeUser | null {
@@ -11,6 +11,19 @@ function parseEmployeeUser(data: unknown): EmployeeUser | null {
   const o = data as Record<string, unknown>;
   if (typeof o.id !== "number" || typeof o.email !== "string" || typeof o.role !== "string") {
     return null;
+  }
+  let crm_capabilities: EmployeeCrmCapabilities | undefined;
+  const capsRaw = o.crm_capabilities;
+  if (capsRaw && typeof capsRaw === "object") {
+    const c = capsRaw as Record<string, unknown>;
+    crm_capabilities = {
+      create_property: Boolean(c.create_property),
+      edit_property: Boolean(c.edit_property),
+      delete_property: Boolean(c.delete_property),
+      view_clients: Boolean(c.view_clients),
+      delete_clients: Boolean(c.delete_clients),
+      change_status: Boolean(c.change_status),
+    };
   }
   return {
     id: o.id,
@@ -20,6 +33,7 @@ function parseEmployeeUser(data: unknown): EmployeeUser | null {
     role: o.role,
     is_active: Boolean(o.is_active),
     is_staff: Boolean(o.is_staff),
+    crm_capabilities,
   };
 }
 

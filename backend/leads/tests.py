@@ -7,8 +7,8 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from agencies.models import Agency
-from leads.choices import LeadSource, LeadStatus
-from leads.models import Lead, LeadStatusHistory
+from leads.choices import LeadActionType, LeadSource, LeadStatus
+from leads.models import Lead, LeadActionLog, LeadPhoneRevealLog, LeadStatusHistory
 from properties.choices import PropertyStatus, PropertyType
 from properties.models import Property
 
@@ -224,3 +224,115 @@ class PublicLeadCaptchaAndCreateTests(TestCase):
         m = re.search(r"(\d+)\s*\+\s*(\d+)", question)
         assert m is not None
         return int(m.group(1)), int(m.group(2))
+
+
+class CrmLeadInquiryWorkflowTests(TestCase):
+    """CRM: маскирование телефона, PATCH статуса, раскрытие номера, доступ по назначению."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.realtor = User.objects.create_user(
+            email="rel-inq@test.local",
+            password="pw",
+            first_name="R",
+            last_name="Ealtor",
+            role=User.Role.REALTOR,
+        )
+        User.objects.filter(pk=self.realtor.pk).update(
+            perm_view_clients=True,
+            perm_change_status=True,
+        )
+        self.realtor.refresh_from_db()
+        self.lead = Lead.objects.create(
+            client_name="Иван",
+            client_phone="+79991234567",
+            client_message="Вопрос по квартире",
+            assigned_realtor=self.realtor,
+        )
+
+    def _rows(self, data):
+        if isinstance(data, list):
+            return data
+        return data.get("results", [])
+
+    def test_list_masks_phone(self):
+        self.client.force_authenticate(user=self.realtor)
+        r = self.client.get("/api/crm/leads/")
+        self.assertEqual(r.status_code, 200, r.data)
+        rows = self._rows(r.data)
+        self.assertEqual(len(rows), 1)
+        self.assertNotIn("79991234567", rows[0]["client_phone"])
+
+    def test_patch_status_updates_lead(self):
+        self.client.force_authenticate(user=self.realtor)
+        r = self.client.patch(
+            f"/api/crm/leads/{self.lead.pk}/",
+            {"status": LeadStatus.IN_PROGRESS},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 200, r.data)
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.status, LeadStatus.IN_PROGRESS)
+        logs = LeadActionLog.objects.filter(lead=self.lead)
+        self.assertEqual(logs.count(), 1)
+        self.assertEqual(logs[0].action_type, LeadActionType.STATUS_CHANGED)
+        self.assertIn("Статус изменён", logs[0].description)
+
+    def test_reveal_phone_returns_full_and_writes_log(self):
+        self.client.force_authenticate(user=self.realtor)
+        r = self.client.post(f"/api/crm/leads/{self.lead.pk}/reveal_phone/")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data.get("phone"), "+79991234567")
+        self.assertEqual(
+            LeadPhoneRevealLog.objects.filter(lead=self.lead).count(),
+            1,
+        )
+        log = LeadPhoneRevealLog.objects.get(lead=self.lead)
+        self.assertEqual(log.revealed_by_id, self.realtor.pk)
+        al = LeadActionLog.objects.filter(lead=self.lead, action_type=LeadActionType.PHONE_REVEALED)
+        self.assertEqual(al.count(), 1)
+        self.assertEqual(al[0].description, "Риэлтор открыл телефон")
+
+    def test_notes_get_post_and_history(self):
+        self.client.force_authenticate(user=self.realtor)
+        r0 = self.client.get(f"/api/crm/leads/{self.lead.pk}/notes/")
+        self.assertEqual(r0.status_code, 200, r0.data)
+        self.assertEqual(r0.data, [])
+        r1 = self.client.post(
+            f"/api/crm/leads/{self.lead.pk}/notes/",
+            {"text": "  Первый комментарий  "},
+            format="json",
+        )
+        self.assertEqual(r1.status_code, 201, r1.data)
+        self.assertEqual(r1.data["text"], "Первый комментарий")
+        self.assertEqual(r1.data["author"]["id"], self.realtor.pk)
+        r2 = self.client.get(f"/api/crm/leads/{self.lead.pk}/notes/")
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(len(r2.data), 1)
+        rh = self.client.get(f"/api/crm/leads/{self.lead.pk}/history/")
+        self.assertEqual(rh.status_code, 200)
+        types = [row["action_type"] for row in rh.data]
+        self.assertIn(LeadActionType.NOTE_ADDED, types)
+        note_rows = [row for row in rh.data if row["action_type"] == LeadActionType.NOTE_ADDED]
+        self.assertEqual(note_rows[0]["description"], "Добавлена внутренняя заметка")
+
+    def test_realtor_sees_only_assigned_leads(self):
+        unassigned = Lead.objects.create(
+            client_name="Без ответственного",
+            client_phone="+79990000000",
+        )
+        self.client.force_authenticate(user=self.realtor)
+        r = self.client.get("/api/crm/leads/")
+        self.assertEqual(r.status_code, 200)
+        ids = {row["id"] for row in self._rows(r.data)}
+        self.assertIn(self.lead.pk, ids)
+        self.assertNotIn(unassigned.pk, ids)
+
+    def test_notes_on_foreign_lead_returns_404(self):
+        other = Lead.objects.create(
+            client_name="Чужой",
+            client_phone="+79991112233",
+        )
+        self.client.force_authenticate(user=self.realtor)
+        r = self.client.get(f"/api/crm/leads/{other.pk}/notes/")
+        self.assertEqual(r.status_code, 404)

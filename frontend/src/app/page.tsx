@@ -10,6 +10,7 @@ import { SeoLinksFooter } from "@/components/home/SeoLinksFooter";
 import { HomeInquirySection } from "@/components/home/HomeInquirySection";
 import { fetchPublicArticlesList, listArticlesSorted } from "@/lib/publicArticles";
 import { fetchPublicPropertiesList } from "@/lib/publicPropertyList";
+import { fetchHomepageTextBlockMap } from "@/lib/homepageTextBlocks";
 
 const categories = [
   {
@@ -50,9 +51,6 @@ const seoLinks = [
   },
 ];
 
-const seoText =
-  "Centreal помогает купить недвижимость в Краснодаре и Геленджике: квартиры, дома, участки и коммерческие помещения. На сайте — актуальный каталог опубликованных объектов, статьи для покупателей и форма заявки по выбранному объекту.";
-
 export async function generateMetadata(): Promise<Metadata> {
   return {
     alternates: { canonical: `${siteOrigin()}/` },
@@ -60,9 +58,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [catalogItems, articlesRaw] = await Promise.all([
+  const [catalogItems, articlesRaw, hp] = await Promise.all([
     fetchPublicPropertiesList(),
     fetchPublicArticlesList(),
+    fetchHomepageTextBlockMap(),
   ]);
 
   const latestProperties = catalogItems.slice(0, 6).map((p) => ({
@@ -83,15 +82,29 @@ export default async function HomePage() {
   return (
     <>
       <HeroSection
-        title="Найдите недвижимость вашей мечты"
-        subtitle="Квартиры, дома, участки и коммерция в Краснодаре и Геленджике"
+        homepageText={{ hero_title: hp.hero_title, hero_subtitle: hp.hero_subtitle }}
       />
-      <HomeInquirySection />
-      <CategoriesSection categories={categories} />
-      <PropertiesSection properties={latestProperties} />
-      <MapSection properties={catalogItems} />
-      <ArticlesSection articles={articles} />
-      <SeoTextSection text={seoText} />
+      <HomeInquirySection
+        text={{
+          inquiry_section_title: hp.inquiry_section_title,
+          inquiry_section_subtitle: hp.inquiry_section_subtitle,
+          inquiry_button_label: hp.inquiry_button_label,
+          inquiry_modal_title: hp.inquiry_modal_title,
+          inquiry_modal_subtitle: hp.inquiry_modal_subtitle,
+        }}
+      />
+      <CategoriesSection categories={categories} sectionTitle={hp.categories_section_title} />
+      <PropertiesSection
+        properties={latestProperties}
+        sectionTitle={hp.properties_section_title}
+      />
+      <MapSection
+        properties={catalogItems}
+        sectionTitle={hp.map_section_title}
+        emptyMessage={hp.map_empty_message}
+      />
+      <ArticlesSection articles={articles} sectionTitle={hp.articles_section_title} />
+      <SeoTextSection title={hp.seo_section_title} body={hp.seo_section_body} />
       <SeoLinksFooter links={seoLinks} />
     </>
   );

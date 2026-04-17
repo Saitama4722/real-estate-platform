@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from .models import EmployeeActivityLog
 
 User = get_user_model()
 
@@ -77,12 +78,50 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     username_field = User.USERNAME_FIELD  # "email"
 
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        from .activity import record_employee_activity
+
+        record_employee_activity(
+            self.context.get("request"),
+            self.user,
+            EmployeeActivityLog.ActionType.LOGIN,
+        )
+        return data
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
         # Optional: add role to token payload if needed later
         token["role"] = user.role
         return token
+
+
+class EmployeeActivityLogSerializer(serializers.ModelSerializer):
+    """Список журнала активности для CRM (только чтение администратором)."""
+
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    user_display_name = serializers.SerializerMethodField()
+    action_label = serializers.CharField(source="get_action_type_display", read_only=True)
+
+    class Meta:
+        model = EmployeeActivityLog
+        fields = [
+            "id",
+            "user",
+            "user_email",
+            "user_display_name",
+            "action_type",
+            "action_label",
+            "created_at",
+            "ip_address",
+            "user_agent",
+        ]
+        read_only_fields = fields
+
+    def get_user_display_name(self, obj):
+        name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return name or obj.user.email
 
 
 class RealtorCrmReadSerializer(serializers.ModelSerializer):
@@ -120,6 +159,17 @@ class RealtorCrmReadSerializer(serializers.ModelSerializer):
 
     def get_avatar(self, obj):
         return _absolute_media_url(self.context.get("request"), obj.avatar)
+
+
+class PublicRealtorSerializer(serializers.Serializer):
+    """Публичная карточка риэлтора для сайта (без email и внутренних полей)."""
+
+    crm_id = serializers.CharField()
+    display_name = serializers.CharField()
+    avatar = serializers.URLField(allow_null=True)
+    phone = serializers.CharField(allow_blank=True)
+    published_properties_count = serializers.IntegerField()
+    short_bio = serializers.CharField(allow_blank=True, required=False)
 
 
 class RealtorCrmWriteSerializer(serializers.ModelSerializer):

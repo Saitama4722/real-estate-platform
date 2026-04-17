@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
+import { HomepageInlineText } from "@/components/home/HomepageInlineText";
 
 interface Category {
   id: string;
@@ -10,13 +11,19 @@ interface Category {
 
 interface CategoriesSectionProps {
   categories: Category[];
+  sectionTitle: string;
 }
 
-export function CategoriesSection({ categories }: CategoriesSectionProps) {
+export function CategoriesSection({ categories, sectionTitle }: CategoriesSectionProps) {
   return (
     <section className="py-10 md:py-12">
       <Container>
-        <h2 className="text-2xl font-semibold text-gray-900">Категории</h2>
+        <HomepageInlineText
+          blockKey="categories_section_title"
+          value={sectionTitle}
+          as="h2"
+          className="text-2xl font-semibold text-gray-900"
+        />
         <div className="mt-5 grid grid-cols-2 gap-3 md:mt-6 md:grid-cols-4">
           {categories.map((category) => (
             <Link

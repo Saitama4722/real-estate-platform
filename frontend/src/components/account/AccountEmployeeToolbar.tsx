@@ -2,13 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { clearCrmTokens } from "@/lib/crmAuth";
+import { performEmployeeLogout } from "@/lib/crmAuth";
 
 export function AccountEmployeeToolbar() {
   const router = useRouter();
 
-  const logout = () => {
-    clearCrmTokens();
+  const logout = async () => {
+    await performEmployeeLogout();
     router.replace("/account/login");
     router.refresh();
   };

@@ -361,3 +361,45 @@ class ImportAssignedRealtorResolutionTests(TestCase):
             role=User.Role.ADMIN,
         )
         self.assertIsNone(_assigned_realtor_for_import_row(u, None))
+
+
+class PublicPropertyListRealtorFilterTests(TestCase):
+    """Публичный каталог: фильтр по ответственному риэлтору (только опубликованные)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.realtor = User.objects.create_user(
+            email="rel-pub-filter@test.local",
+            password="pw",
+            first_name="Пётр",
+            last_name="Публичный",
+            role=User.Role.REALTOR,
+            phone="+79991112233",
+        )
+        self.pub = Property.objects.create(
+            property_type=PropertyType.APARTMENT,
+            price=Decimal("5.00"),
+            assigned_realtor=self.realtor,
+            status=PropertyStatus.PUBLISHED,
+            is_published=True,
+        )
+        Property.objects.create(
+            property_type=PropertyType.APARTMENT,
+            price=Decimal("6.00"),
+            assigned_realtor=self.realtor,
+            status=PropertyStatus.DRAFT,
+            is_published=False,
+        )
+
+    def test_list_filters_by_assigned_realtor_crm_id_case_insensitive(self):
+        cid = self.realtor.crm_id
+        self.assertRegex(cid, r"^RID\d{6}$")
+        low = cid.lower()
+        res = self.client.get(
+            "/api/properties/",
+            {"assigned_realtor_crm_id": low},
+        )
+        self.assertEqual(res.status_code, 200)
+        rows = res.data if isinstance(res.data, list) else res.data.get("results", [])
+        ids = {row["id"] for row in rows}
+        self.assertEqual(ids, {self.pub.pk})

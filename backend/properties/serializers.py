@@ -54,6 +54,7 @@ class ResidentialComplexShortSerializer(serializers.Serializer):
 
 class RealtorShortSerializer(serializers.Serializer):
     id = serializers.IntegerField()
+    crm_id = serializers.CharField()
     first_name = serializers.CharField()
     last_name = serializers.CharField()
     avatar = serializers.SerializerMethodField()

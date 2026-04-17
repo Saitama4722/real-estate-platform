@@ -1,17 +1,21 @@
 """
 Auth views: login (JWT pair), refresh, current user.
 """
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .permissions import IsCrmUser
+from .activity import record_employee_activity
+from .models import EmployeeActivityLog
+from .permissions import IsCrmStaffManager, IsCrmUser
 from .serializers import (
     CurrentUserSerializer,
     CurrentUserUpdateSerializer,
     EmailTokenObtainPairSerializer,
+    EmployeeActivityLogSerializer,
 )
 
 
@@ -33,6 +37,46 @@ class RefreshView(TokenRefreshView):
     Returns: {"access": "..."}
     """
     permission_classes = [AllowAny]
+
+
+class LogoutView(APIView):
+    """
+    POST /api/auth/logout/
+    Фиксирует выход сотрудника в журнале. Токены по-прежнему сбрасываются на клиенте.
+    """
+
+    permission_classes = [IsCrmUser]
+    http_method_names = ["post", "head", "options"]
+
+    def post(self, request, *args, **kwargs):
+        record_employee_activity(
+            request,
+            request.user,
+            EmployeeActivityLog.ActionType.LOGOUT,
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CrmEmployeeActivityLogListView(generics.ListAPIView):
+    """
+    GET /api/crm/activity-logs/
+    Журнал входов/выходов — только superadmin / admin.
+    Query: action_type=login|logout, user=<id>
+    """
+
+    permission_classes = [IsAuthenticated, IsCrmStaffManager]
+    serializer_class = EmployeeActivityLogSerializer
+
+    def get_queryset(self):
+        qs = EmployeeActivityLog.objects.select_related("user").order_by("-created_at")
+        action_type = self.request.query_params.get("action_type")
+        valid_actions = {c.value for c in EmployeeActivityLog.ActionType}
+        if action_type in valid_actions:
+            qs = qs.filter(action_type=action_type)
+        user_id = self.request.query_params.get("user")
+        if user_id is not None and str(user_id).isdigit():
+            qs = qs.filter(user_id=int(user_id))
+        return qs
 
 
 class CurrentUserView(generics.RetrieveUpdateAPIView):
