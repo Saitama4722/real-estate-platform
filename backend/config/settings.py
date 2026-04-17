@@ -221,6 +221,12 @@ else:
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_ALLOWED_ORIGINS = _cors_allowed
 
+# Railway / reverse TLS termination: Gunicorn sees http while clients use HTTPS.
+# Without this, request.build_absolute_uri() uses http://… (mixed content for avatars/media).
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+
 # Django REST Framework — JWT for CRM; default require auth
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

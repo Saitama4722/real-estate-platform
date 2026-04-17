@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { authBearerHeaders, getCrmAccessToken } from "@/lib/crmAuth";
-import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
+import { crmBrowserApiUrl, employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 import type { EmployeeUser } from "@/lib/employeeUser";
 import { isCabinetAdminRole } from "@/lib/employeeUser";
 import type { HomepageTextBlockKey } from "@/lib/homepageTextBlocks";
@@ -75,7 +75,7 @@ export function HomepageInlineText({
     setSaving(true);
     setStatus("idle");
     try {
-      const res = await fetch(`/api/crm/homepage/text-blocks/${blockKey}/`, {
+      const res = await fetch(crmBrowserApiUrl(`/api/crm/homepage/text-blocks/${blockKey}/`), {
         method: "PATCH",
         headers: {
           ...authBearerHeaders(),

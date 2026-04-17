@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { authBearerHeaders, getCrmAccessToken } from "@/lib/crmAuth";
+import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
 
 interface CrmLeadRow {
   id: number;
@@ -36,7 +36,7 @@ export function CrmLeadsTable() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/crm/leads/", { headers: authBearerHeaders() });
+        const res = await fetchWithCrmAuthRetry("/api/crm/leads/");
         if (res.status === 401) {
           if (!cancelled) {
             setUnauthenticated(true);
