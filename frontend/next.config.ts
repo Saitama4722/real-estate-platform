@@ -26,6 +26,16 @@ const nextConfig: NextConfig = {
         source: "/api/auth/login",
         destination: `${backend}/api/auth/login/`,
       },
+      // Same as login: Next may 308-strip trailing slashes before rewrites; the catch-all would forward
+      // `/api/auth/me` without `/` and Django APPEND_SLASH would 301 back → ERR_TOO_MANY_REDIRECTS.
+      {
+        source: "/api/auth/me",
+        destination: `${backend}/api/auth/me/`,
+      },
+      {
+        source: "/api/auth/refresh",
+        destination: `${backend}/api/auth/refresh/`,
+      },
       {
         source: "/api/:path*",
         destination: `${backend}/api/:path*`,
