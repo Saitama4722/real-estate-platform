@@ -24,22 +24,37 @@ def _csv_env_list(value):
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-_railway_public = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
 _default_allowed_hosts = "localhost,127.0.0.1"
 _raw_allowed = os.environ.get("DJANGO_ALLOWED_HOSTS", "").strip()
 if not _raw_allowed:
     if DEBUG:
         _raw_allowed = _default_allowed_hosts
-    elif _railway_public:
-        _raw_allowed = _railway_public
 
 _hosts_list = _csv_env_list(_raw_allowed)
-if _hosts_list:
-    ALLOWED_HOSTS = _hosts_list
-elif DEBUG:
-    ALLOWED_HOSTS = _csv_env_list(_default_allowed_hosts)
-else:
-    ALLOWED_HOSTS = []
+if not _hosts_list and DEBUG:
+    _hosts_list = _csv_env_list(_default_allowed_hosts)
+
+# Railway sets RAILWAY_ENVIRONMENT and often RAILWAY_PUBLIC_DOMAIN. If the public
+# Host header is missing from DJANGO_ALLOWED_HOSTS, Django returns 400 DisallowedHost
+# for every API route (not a serializer/query issue).
+_railway_public = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
+if _railway_public:
+    _hosts_list.append(_railway_public)
+if os.environ.get("RAILWAY_ENVIRONMENT", "").strip():
+    # Leading dot: match any subdomain of up.railway.app (Django ALLOWED_HOSTS rule).
+    if ".up.railway.app" not in _hosts_list:
+        _hosts_list.append(".up.railway.app")
+
+_seen_hosts = set()
+ALLOWED_HOSTS = []
+for _host_entry in _hosts_list:
+    _h = _host_entry.strip()
+    if not _h:
+        continue
+    _key = _h.lower()
+    if _key not in _seen_hosts:
+        _seen_hosts.add(_key)
+        ALLOWED_HOSTS.append(_h)
 
 
 def _csrf_origin_with_scheme(entry):
@@ -59,11 +74,6 @@ _csrf_seen = set()
 CSRF_TRUSTED_ORIGINS = []
 for _part in _csv_env_list(os.environ.get("CSRF_TRUSTED_ORIGINS", "")):
     _o = _csrf_origin_with_scheme(_part)
-    if _o and _o not in _csrf_seen:
-        _csrf_seen.add(_o)
-        CSRF_TRUSTED_ORIGINS.append(_o)
-if _railway_public:
-    _o = _csrf_origin_with_scheme(_railway_public)
     if _o and _o not in _csrf_seen:
         _csrf_seen.add(_o)
         CSRF_TRUSTED_ORIGINS.append(_o)
