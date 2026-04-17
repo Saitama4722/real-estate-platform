@@ -19,10 +19,16 @@ function backendOriginForRewrites(): string {
 
 const nextConfig: NextConfig = {
   async rewrites() {
+    const backend = backendOriginForRewrites();
     return [
+      // Django defines `login/`; POST without trailing slash breaks APPEND_SLASH. Normalize at the proxy.
+      {
+        source: "/api/auth/login",
+        destination: `${backend}/api/auth/login/`,
+      },
       {
         source: "/api/:path*",
-        destination: `${backendOriginForRewrites()}/api/:path*`,
+        destination: `${backend}/api/:path*`,
       },
     ];
   },
