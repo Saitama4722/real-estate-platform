@@ -231,6 +231,10 @@ if not DEBUG:
 # internal HTTP hops from Next.js → Django would loop with SECURE_SSL_REDIRECT=True.
 SECURE_SSL_REDIRECT = False
 
+# Defense in depth: even if SECURE_SSL_REDIRECT is enabled by mistake in an environment,
+# API routes must never 301/302 — clients expect JSON / 401 / 403 (Next /api proxy loop).
+SECURE_REDIRECT_EXEMPT = [r"^api/"]
+
 # Django REST Framework — JWT for CRM; default require auth.
 # JSON-only in production so API clients never receive browsable HTML or ambiguous responses.
 _rest_framework_renderers = ["rest_framework.renderers.JSONRenderer"]

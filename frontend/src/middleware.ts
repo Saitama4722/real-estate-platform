@@ -21,28 +21,30 @@ function backendOriginForApiProxy(): string | null {
 }
 
 /**
- * Fail fast if BACKEND_URL points at the same host the browser uses for the Next app.
- * Otherwise the proxy calls itself indefinitely (browser: ERR_TOO_MANY_REDIRECTS).
+ * Fail fast if BACKEND_URL points at the same origin as the incoming browser request.
+ * Comparing raw `host` strings misses equivalent origins (e.g. example.com vs example.com:443),
+ * which lets the proxy target the same public URL and yields ERR_TOO_MANY_REDIRECTS.
  */
 function selfProxyErrorResponse(
   request: NextRequest,
   backendOrigin: string,
 ): NextResponse | null {
   if (process.env.SKIP_BACKEND_SITE_HOST_CHECK === "1") return null;
-  let backendHost: string;
+  let backendUrl: URL;
   try {
-    const u = new URL(
+    backendUrl = new URL(
       backendOrigin.includes("://") ? backendOrigin : `http://${backendOrigin}`,
     );
-    backendHost = u.host.toLowerCase();
   } catch {
     return null;
   }
-  if (request.nextUrl.host.toLowerCase() === backendHost) {
+  const incomingOrigin = request.nextUrl.origin;
+  const backendOriginNormalized = backendUrl.origin;
+  if (incomingOrigin === backendOriginNormalized) {
     return NextResponse.json(
       {
         detail:
-          "Misconfiguration: BACKEND_URL must not use the same host as this Next.js app; the /api proxy would redirect in a loop. Use the Django service private URL (e.g. *.railway.internal) or another host.",
+          "Misconfiguration: BACKEND_URL must not use the same origin as this Next.js app; the /api proxy would redirect in a loop. Use the Django service private URL (e.g. *.railway.internal) or another host.",
       },
       { status: 500 },
     );
@@ -74,10 +76,15 @@ export function middleware(request: NextRequest) {
     );
 
     const outgoingHeaders = new Headers(request.headers);
-    const xfProto = request.headers.get("x-forwarded-proto");
+    const xfProtoHeader = request.headers.get("x-forwarded-proto");
+    const xfProtoFirst =
+      xfProtoHeader?.split(",")[0]?.trim() ?? "";
+    const proto =
+      xfProtoFirst ||
+      (request.nextUrl.protocol === "https:" ? "https" : "http");
+    outgoingHeaders.set("x-forwarded-proto", proto);
     const xfHost =
       request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-    if (xfProto) outgoingHeaders.set("x-forwarded-proto", xfProto);
     if (xfHost) outgoingHeaders.set("x-forwarded-host", xfHost);
 
     return NextResponse.rewrite(destination, {
