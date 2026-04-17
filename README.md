@@ -40,22 +40,30 @@ Centreal is a full-stack real estate platform with a public catalog and an inter
    npm run dev
    ```
 
-### Deployment
+### Deployment ([Railway](https://railway.app))
 
-#### Backend → [Railway](https://railway.app)
+The app is typically deployed as **one Railway project** with **two services**: a Next.js frontend and a Django backend. Example: public site `https://your-frontend.up.railway.app` and a separate backend hostname or private networking.
 
-- Connect the repository (or deploy from `./backend`).  
-- Set **Root Directory** to `backend` if the service builds from the monorepo.  
-- Configure **environment variables** (see below). Use `DATABASE_URL` from Railway PostgreSQL and `REDIS_URL` from Railway Redis (or your provider).  
+- Connect the repository; set each service **Root Directory** (`backend` / `frontend`).  
+- Use `DATABASE_URL` from Railway PostgreSQL and `REDIS_URL` from Railway Redis (or your provider).  
 - Run migrations on deploy (e.g. release command: `python manage.py migrate`).  
-- Ensure `DJANGO_DEBUG=False`, set `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` (or rely on `RAILWAY_PUBLIC_DOMAIN` where applicable), and `CSRF_TRUSTED_ORIGINS` for your HTTPS origins.  
-- Set `CORS_ALLOWED_ORIGINS` to your **Vercel** frontend URL(s) (comma-separated).  
 
-#### Frontend → [Vercel](https://vercel.com)
+**Backend (production)** — set at least:
 
-- Import the project; set **Root Directory** to `frontend`.  
-- Set **environment variables** (at minimum `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SITE_URL`; optional `BACKEND_URL` for rewrites if it differs).  
-- Production builds require `NEXT_PUBLIC_API_URL` or `BACKEND_URL` so API rewrites resolve correctly.  
+- `DJANGO_DEBUG=False`  
+- `DJANGO_SECRET_KEY`  
+- `DJANGO_ALLOWED_HOSTS` — include your backend public hostname(s) and, if needed, Railway defaults (the project appends `RAILWAY_PUBLIC_DOMAIN` when set).  
+- `CORS_ALLOWED_ORIGINS` — comma-separated **frontend** origins (e.g. `https://your-frontend.up.railway.app`)  
+- `CSRF_TRUSTED_ORIGINS` — same as CORS when using session/CSRF-protected flows  
+
+**Frontend (production)** — set at build/runtime (especially `NEXT_PUBLIC_*` inlined at build):
+
+- `NEXT_PUBLIC_SITE_URL` — public URL of the **Next.js** site  
+- `NEXT_PUBLIC_API_URL` — public API base including `/api` (often the same hostname as the site plus `/api`, or the backend’s public URL — see below)  
+- **`BACKEND_URL` — Django origin without `/api` reachable from the Next container. It must not be the same public hostname as `NEXT_PUBLIC_SITE_URL`**, otherwise Next.js rewrites `/api/*` to the same host and triggers **ERR_TOO_MANY_REDIRECTS**. Use the backend service **private** URL (e.g. `http://<backend>.railway.internal:<port>`) or the backend’s **own** public hostname — never only the frontend URL unless a separate edge routes `/api` elsewhere.  
+- Optional: `SKIP_BACKEND_SITE_HOST_CHECK=1` only if you intentionally use a nonstandard proxy (not recommended).  
+
+Production builds require `NEXT_PUBLIC_API_URL` or `BACKEND_URL` so API rewrites resolve correctly.  
 
 ### Environment variables
 
@@ -70,7 +78,7 @@ Centreal is a full-stack real estate platform with a public catalog and an inter
 | `CORS_ALLOWED_ORIGINS` | Backend | Allowed browser origins when `DJANGO_DEBUG=False` |
 | `NEXT_PUBLIC_API_URL` | Frontend | Public API base URL including `/api` |
 | `NEXT_PUBLIC_SITE_URL` | Frontend | Canonical public site URL (SEO) |
-| `BACKEND_URL` | Frontend | Django origin for SSR/rewrites (optional if same as API host) |
+| `BACKEND_URL` | Frontend | Django origin for SSR/rewrites (**must not** equal the Next.js public host unless you use a dedicated internal URL for rewrites — see deployment section) |
 
 See **`.env.example`** in the repository root for a complete template.
 
@@ -111,10 +119,12 @@ real estate, property listings, CRM, leads, Django, Next.js, PostgreSQL, Redis, 
 3. Выполните миграции бэкенда, при необходимости создайте суперпользователя.  
 4. Фронтенд: `cd frontend && npm ci && npm run dev`.  
 
-### Деплой
+### Деплой (Railway)
 
-- **Бэкенд — Railway:** переменные окружения из таблицы выше; `DATABASE_URL` и `REDIS_URL`; `DJANGO_DEBUG=False`; настройте CORS под домен Vercel.  
-- **Фронтенд — Vercel:** корень `frontend`; задайте `NEXT_PUBLIC_API_URL` и `NEXT_PUBLIC_SITE_URL`.  
+Обычно два сервиса (Next.js и Django) в одном проекте Railway.
+
+- Бэкенд: переменные из таблицы выше; `DATABASE_URL`, `REDIS_URL`, `DJANGO_DEBUG=False`; `DJANGO_ALLOWED_HOSTS`; `CORS_ALLOWED_ORIGINS` и `CSRF_TRUSTED_ORIGINS` — с публичным HTTPS-источником **фронтенда**.  
+- Фронтенд: корень `frontend`; `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_API_URL`; **`BACKEND_URL` должен указывать на Django (частный URL Railway или отдельный публичный хост бэкенда), а не на тот же хост, что и Next.js**, иначе реврайты `/api/*` зацикливаются (`ERR_TOO_MANY_REDIRECTS`). Подробности — в английской секции выше.  
 
 ### Контакт
 

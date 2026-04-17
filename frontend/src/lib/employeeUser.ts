@@ -27,3 +27,25 @@ export type EmployeeUser = {
 export function isCabinetAdminRole(role: string): boolean {
   return role === "superadmin" || role === "admin";
 }
+
+/** Russian labels for `User.Role` values from the backend. */
+export function employeeRoleLabelRu(role: string): string {
+  switch (role) {
+    case "superadmin":
+      return "Суперадминистратор";
+    case "admin":
+      return "Администратор";
+    case "realtor":
+      return "Риэлтор";
+    default:
+      return role;
+  }
+}
+
+/** Имя и фамилия в шапке кабинета; если пусто — email. */
+export function formatEmployeeCabinetDisplayName(
+  user: Pick<EmployeeUser, "first_name" | "last_name" | "email">,
+): string {
+  const full = `${(user.first_name ?? "").trim()} ${(user.last_name ?? "").trim()}`.trim();
+  return full || user.email;
+}

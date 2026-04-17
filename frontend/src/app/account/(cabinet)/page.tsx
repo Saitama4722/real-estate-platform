@@ -1,11 +1,15 @@
 import Link from "next/link";
+import { AccountDashboardUserSummary } from "@/components/account/AccountDashboardUserSummary";
 import { PageHeading } from "@/components/layout/page-heading";
 
 export default function AccountDashboardPage() {
   return (
     <>
       <PageHeading title="Панель" subtitle="Обзор личного кабинета сотрудника" />
-      <p className="mt-4 text-sm text-slate-600">
+      <div className="mt-6">
+        <AccountDashboardUserSummary />
+      </div>
+      <p className="mt-6 text-sm text-slate-600">
         Основные разделы:{" "}
         <Link href="/account/properties" className="font-medium text-sky-700 underline-offset-2 hover:underline">
           объекты
