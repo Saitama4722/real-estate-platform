@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { DuplicateWarningModal } from "@/components/crm/DuplicateWarningModal";
 import { authBearerHeaders, getCrmAccessToken } from "@/lib/crmAuth";
+import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 import {
   type ApartmentDetailsForm,
   type ChoiceItem,
@@ -184,7 +185,7 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     let cancelled = false;
     (async () => {
       try {
-        const mr = await fetch("/api/auth/me/", { headers: authBearerHeaders() });
+        const mr = await fetch(employeeAuthAbsoluteUrl("me"), { headers: authBearerHeaders() });
         if (!mr.ok || cancelled) return;
         const m = (await mr.json()) as MeRole;
         if (cancelled) return;

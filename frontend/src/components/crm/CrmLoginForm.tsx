@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setCrmTokens } from "@/lib/crmAuth";
-import { API_AUTH_LOGIN_URL } from "@/lib/crmAuthConstants";
+import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 
 function formatLoginErrorMessage(data: Record<string, unknown>): string {
   const fallback = "Неверный email или пароль, либо учётная запись неактивна.";
@@ -52,7 +52,7 @@ export function CrmLoginForm() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch(API_AUTH_LOGIN_URL, {
+      const res = await fetch(employeeAuthAbsoluteUrl("login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password }),

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { authBearerHeaders, clearCrmTokens, getCrmAccessToken, performEmployeeLogout } from "@/lib/crmAuth";
+import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 
 interface MeUser {
   id: number;
@@ -26,7 +27,7 @@ export function CrmDashboardPanel() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/auth/me/", { headers: authBearerHeaders() });
+        const res = await fetch(employeeAuthAbsoluteUrl("me"), { headers: authBearerHeaders() });
         if (res.status === 401) {
           clearCrmTokens();
           if (!cancelled) setUser(null);

@@ -5,6 +5,7 @@ import { PageHeading } from "@/components/layout/page-heading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authBearerHeaders } from "@/lib/crmAuth";
+import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 
 type MeResponse = {
   first_name: string;
@@ -28,7 +29,7 @@ export default function AccountProfilePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/auth/me/", { headers: authBearerHeaders() });
+      const res = await fetch(employeeAuthAbsoluteUrl("me"), { headers: authBearerHeaders() });
       if (!res.ok) {
         setError("Не удалось загрузить профиль.");
         return;
@@ -63,9 +64,9 @@ export default function AccountProfilePage() {
         fd.append("last_name", lastName.trim());
         fd.append("phone", phone.trim());
         fd.append("avatar", file);
-        res = await fetch("/api/auth/me/", { method: "PATCH", headers, body: fd });
+        res = await fetch(employeeAuthAbsoluteUrl("me"), { method: "PATCH", headers, body: fd });
       } else {
-        res = await fetch("/api/auth/me/", {
+        res = await fetch(employeeAuthAbsoluteUrl("me"), {
           method: "PATCH",
           headers: { ...headers, "Content-Type": "application/json" },
           body: JSON.stringify({

@@ -2,6 +2,7 @@ import {
   CRM_ACCESS_COOKIE_NAME,
   CRM_ACCESS_LS_KEY,
   CRM_REFRESH_LS_KEY,
+  employeeAuthAbsoluteUrl,
 } from "@/lib/crmAuthConstants";
 
 const ACCESS_COOKIE_MAX_AGE_SEC = 60 * 60 * 24;
@@ -40,7 +41,7 @@ export async function performEmployeeLogout(): Promise<void> {
   try {
     const headers = authBearerHeaders();
     if ("Authorization" in headers && headers.Authorization) {
-      await fetch("/api/auth/logout/", {
+      await fetch(employeeAuthAbsoluteUrl("logout"), {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
       });

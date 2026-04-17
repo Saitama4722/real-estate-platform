@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { authBearerHeaders, getCrmAccessToken } from "@/lib/crmAuth";
+import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 import type { EmployeeUser } from "@/lib/employeeUser";
 import { isCabinetAdminRole } from "@/lib/employeeUser";
 import type { HomepageTextBlockKey } from "@/lib/homepageTextBlocks";
@@ -47,7 +48,7 @@ export function HomepageInlineText({
       setCheckDone(true);
       return;
     }
-    fetch("/api/auth/me/", { headers: authBearerHeaders() })
+    fetch(employeeAuthAbsoluteUrl("me"), { headers: authBearerHeaders() })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("me"))))
       .then((u: EmployeeUser) => setCanEdit(isCabinetAdminRole(u.role)))
       .catch(() => setCanEdit(false))

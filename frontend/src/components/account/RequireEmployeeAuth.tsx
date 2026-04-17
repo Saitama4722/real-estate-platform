@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authBearerHeaders, clearCrmTokens, getCrmAccessToken } from "@/lib/crmAuth";
+import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 import type { EmployeeCrmCapabilities, EmployeeUser } from "@/lib/employeeUser";
 import { EmployeeUserProvider } from "@/components/account/EmployeeAuthContext";
 
@@ -54,7 +55,7 @@ export function RequireEmployeeAuth({ children }: { children: React.ReactNode })
         return;
       }
       try {
-        const res = await fetch("/api/auth/me/", { headers: authBearerHeaders() });
+        const res = await fetch(employeeAuthAbsoluteUrl("me"), { headers: authBearerHeaders() });
         if (res.status === 401) {
           clearCrmTokens();
           router.replace("/account/login");
