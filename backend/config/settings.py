@@ -233,7 +233,8 @@ SECURE_SSL_REDIRECT = False
 
 # Defense in depth: even if SECURE_SSL_REDIRECT is enabled by mistake in an environment,
 # API routes must never 301/302 — clients expect JSON / 401 / 403 (Next /api proxy loop).
-SECURE_REDIRECT_EXEMPT = [r"^api/"]
+# request.path includes a leading slash; "^api/" never matched.
+SECURE_REDIRECT_EXEMPT = [r"^/api/"]
 
 # Django REST Framework — JWT for CRM; default require auth.
 # JSON-only in production so API clients never receive browsable HTML or ambiguous responses.

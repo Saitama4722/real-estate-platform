@@ -21,9 +21,13 @@ function backendOriginForApiProxy(): string | null {
 }
 
 /**
- * Fail fast if BACKEND_URL points at the same origin as the incoming browser request.
- * Comparing raw `host` strings misses equivalent origins (e.g. example.com vs example.com:443),
- * which lets the proxy target the same public URL and yields ERR_TOO_MANY_REDIRECTS.
+ * Fail fast when the proxy target would loop.
+ * - Same origin as the browser request (classic misconfiguration).
+ * - Same hostname with browser HTTPS and BACKEND_URL HTTP: Railway/public edges
+ *   redirect HTTP→HTTPS on the same host/path → ERR_TOO_MANY_REDIRECTS (origin
+ *   equality misses this because schemes differ).
+ * Local dev keeps http://localhost:3000 → http://localhost:8001 (same host,
+ * both HTTP, different ports) — allowed.
  */
 function selfProxyErrorResponse(
   request: NextRequest,
@@ -45,6 +49,21 @@ function selfProxyErrorResponse(
       {
         detail:
           "Misconfiguration: BACKEND_URL must not use the same origin as this Next.js app; the /api proxy would redirect in a loop. Use the Django service private URL (e.g. *.railway.internal) or another host.",
+      },
+      { status: 500 },
+    );
+  }
+  const incomingHost = request.nextUrl.hostname.toLowerCase();
+  const backendHost = backendUrl.hostname.toLowerCase();
+  if (
+    incomingHost === backendHost &&
+    request.nextUrl.protocol === "https:" &&
+    backendUrl.protocol === "http:"
+  ) {
+    return NextResponse.json(
+      {
+        detail:
+          "Misconfiguration: BACKEND_URL uses http:// on the same hostname as this HTTPS site; the edge redirects to HTTPS and the /api proxy loops. Use the Django private URL (e.g. *.railway.internal) or https:// on a dedicated API host.",
       },
       { status: 500 },
     );
