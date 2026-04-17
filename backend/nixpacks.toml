@@ -1,0 +1,3 @@
+# Railway / Nixpacks: gather static files into STATIC_ROOT for WhiteNoise when not using Docker.
+[phases.build]
+cmds = ["python manage.py collectstatic --noinput"]

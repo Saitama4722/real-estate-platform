@@ -55,6 +55,8 @@ export interface PublicPropertyDetail {
 /** Public API base without trailing slash: server uses `BACKEND_URL`+`/api`, browser uses `NEXT_PUBLIC_API_URL`. */
 export function getPublicApiBaseUrl(): string {
   const trim = (s: string) => s.replace(/\/$/, "");
+  const devFallback = () =>
+    process.env.NODE_ENV !== "production" ? trim("http://localhost:8001/api") : trim("");
   if (typeof window === "undefined") {
     const internal = process.env.BACKEND_URL?.trim();
     if (internal) {
@@ -62,11 +64,11 @@ export function getPublicApiBaseUrl(): string {
     }
     const pub = process.env.NEXT_PUBLIC_API_URL?.trim();
     if (pub) return trim(pub);
-    return trim("http://localhost:8001/api");
+    return devFallback();
   }
   const pub = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (pub) return trim(pub);
-  return trim("http://localhost:8001/api");
+  return devFallback();
 }
 
 export async function fetchPublicPropertyBySlug(

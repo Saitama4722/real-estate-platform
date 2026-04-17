@@ -13,8 +13,14 @@ function clipSentence(s: string, minLen: number, maxLen: number): string {
 }
 
 export function siteOrigin(): string {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  return raw.replace(/\/$/, "");
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_URL?.trim();
+  if (vercel) return `https://${vercel.replace(/\/$/, "")}`;
+  if (process.env.NODE_ENV !== "production") {
+    return "http://localhost:3000".replace(/\/$/, "");
+  }
+  return "";
 }
 
 export function buildArticleDocumentTitle(article: PublicArticle): string {

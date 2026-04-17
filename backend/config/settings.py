@@ -19,11 +19,54 @@ SECRET_KEY = os.environ.get(
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
 
+
+def _csv_env_list(value):
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+_railway_public = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
 _default_allowed_hosts = "localhost,127.0.0.1"
-_raw_allowed = os.environ.get("DJANGO_ALLOWED_HOSTS", _default_allowed_hosts).strip()
+_raw_allowed = os.environ.get("DJANGO_ALLOWED_HOSTS", "").strip()
 if not _raw_allowed:
-    _raw_allowed = _default_allowed_hosts
-ALLOWED_HOSTS = ["*"]
+    if DEBUG:
+        _raw_allowed = _default_allowed_hosts
+    elif _railway_public:
+        _raw_allowed = _railway_public
+
+_hosts_list = _csv_env_list(_raw_allowed)
+if _hosts_list:
+    ALLOWED_HOSTS = _hosts_list
+elif DEBUG:
+    ALLOWED_HOSTS = _csv_env_list(_default_allowed_hosts)
+else:
+    ALLOWED_HOSTS = []
+
+
+def _csrf_origin_with_scheme(entry):
+    """Django requires each CSRF_TRUSTED_ORIGINS entry to include http:// or https://."""
+    origin = entry.strip().rstrip("/")
+    if not origin:
+        return ""
+    lower = origin.lower()
+    if lower.startswith("http://") or lower.startswith("https://"):
+        return origin
+    if origin.startswith("127.0.0.1") or origin.startswith("localhost"):
+        return f"http://{origin}"
+    return f"https://{origin}"
+
+
+_csrf_seen = set()
+CSRF_TRUSTED_ORIGINS = []
+for _part in _csv_env_list(os.environ.get("CSRF_TRUSTED_ORIGINS", "")):
+    _o = _csrf_origin_with_scheme(_part)
+    if _o and _o not in _csrf_seen:
+        _csrf_seen.add(_o)
+        CSRF_TRUSTED_ORIGINS.append(_o)
+if _railway_public:
+    _o = _csrf_origin_with_scheme(_railway_public)
+    if _o and _o not in _csrf_seen:
+        _csrf_seen.add(_o)
+        CSRF_TRUSTED_ORIGINS.append(_o)
 
 INSTALLED_APPS = [
     # Django
@@ -51,6 +94,11 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+]
+# Production: Gunicorn does not serve static files; WhiteNoise serves STATIC_ROOT after collectstatic.
+if not DEBUG:
+    MIDDLEWARE.append("whitenoise.middleware.WhiteNoiseMiddleware")
+MIDDLEWARE += [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -89,10 +137,17 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
+
+_staticfiles_storage = (
+    "whitenoise.storage.CompressedStaticFilesStorage"
+    if not DEBUG
+    else "django.contrib.staticfiles.storage.StaticFilesStorage"
+)
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -113,7 +168,7 @@ STORAGES = {
         media_url=MEDIA_URL,
     ),
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        "BACKEND": _staticfiles_storage,
     },
 }
 
@@ -148,8 +203,13 @@ CACHES = {
 # Custom user model (email as login)
 AUTH_USER_MODEL = "users.User"
 
-# CORS — development: allow all origins
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS — permissive in DEBUG; in production use CORS_ALLOWED_ORIGINS (comma-separated).
+_cors_allowed = _csv_env_list(os.environ.get("CORS_ALLOWED_ORIGINS", ""))
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = _cors_allowed
 
 # Django REST Framework — JWT for CRM; default require auth
 REST_FRAMEWORK = {
