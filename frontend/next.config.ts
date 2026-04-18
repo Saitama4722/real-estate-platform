@@ -4,108 +4,25 @@ function trimEndSlashes(s: string): string {
   return s.replace(/\/+$/, "");
 }
 
-/** Origin (scheme + host + port) for detecting self-referential rewrites. */
-function originKey(urlish: string): string | null {
-  const t = urlish.trim();
-  if (!t) return null;
-  try {
-    const u = new URL(t.includes("://") ? t : `https://${t}`);
-    const host = u.hostname.toLowerCase();
-    const port = u.port || (u.protocol === "https:" ? "443" : "80");
-    return `${u.protocol}//${host}:${port}`;
-  } catch {
-    return null;
-  }
-}
-
 /**
- * `NEXT_PUBLIC_API_URL` is usually `https://django-host.../api` — strip that suffix so
- * rewrites target Django, not the browser's Next.js origin when BACKEND_URL is mis-set.
- */
-function djangoBaseFromPublicApiUrl(apiUrl: string): string | null {
-  const t = apiUrl.trim();
-  if (!/^https?:\/\//i.test(t)) return null;
-  try {
-    const u = new URL(t);
-    let path = u.pathname.replace(/\/+$/, "") || "/";
-    if (path === "/api" || path.endsWith("/api")) {
-      path = path === "/api" ? "/" : path.slice(0, -4) || "/";
-    }
-    const suffix = path === "/" ? "" : path;
-    return trimEndSlashes(`${u.origin}${suffix}`);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Django origin for `/api/*` rewrites. If `BACKEND_URL` equals the public Next origin
- * (from `NEXT_PUBLIC_SITE_URL` and/or same host as `NEXT_PUBLIC_API_URL`), Next would
- * proxy `/api` to itself → ERR_TOO_MANY_REDIRECTS. Recover using a different host from
- * `NEXT_PUBLIC_API_URL`, or `BACKEND_INTERNAL_URL` for same-host setups.
- */
-function resolveDjangoBaseForApiRewrites(): string {
-  const siteRaw = process.env.NEXT_PUBLIC_SITE_URL?.trim() ?? "";
-  const configuredRaw = process.env.BACKEND_URL?.trim() ?? "";
-  const apiPublicRaw = process.env.NEXT_PUBLIC_API_URL?.trim() ?? "";
-  const internalRaw = process.env.BACKEND_INTERNAL_URL?.trim() ?? "";
-  const railwayPublicRaw =
-    process.env.RAILWAY_PUBLIC_DOMAIN?.trim() ||
-    process.env.RAILWAY_STATIC_URL?.trim() ||
-    "";
-
-  const defaultLocal = "http://localhost:8001";
-  let backend = configuredRaw ? trimEndSlashes(configuredRaw) : defaultLocal;
-
-  const siteOrigin = siteRaw ? originKey(siteRaw) : null;
-  const configuredOrigin = originKey(backend);
-  const fromApi = apiPublicRaw ? djangoBaseFromPublicApiUrl(apiPublicRaw) : null;
-  const fromApiOrigin = fromApi ? originKey(fromApi) : null;
-  const railwayPublicOrigin = railwayPublicRaw
-    ? originKey(railwayPublicRaw.includes("://") ? railwayPublicRaw : `https://${railwayPublicRaw}`)
-    : null;
-
-  const backendCollidesWithPublicProxy =
-    Boolean(configuredOrigin) &&
-    (Boolean(siteOrigin && siteOrigin === configuredOrigin) ||
-      Boolean(fromApiOrigin && fromApiOrigin === configuredOrigin) ||
-      Boolean(railwayPublicOrigin && railwayPublicOrigin === configuredOrigin));
-
-  if (backendCollidesWithPublicProxy) {
-    if (fromApi && fromApiOrigin && fromApiOrigin !== configuredOrigin) {
-      backend = fromApi;
-    } else if (internalRaw) {
-      backend = trimEndSlashes(internalRaw);
-    } else {
-      throw new Error(
-        "Invalid proxy config: BACKEND_URL matches the public site/API origin, so Next.js /api rewrites would call itself (ERR_TOO_MANY_REDIRECTS). " +
-          "Set BACKEND_URL to your Django origin (e.g. Railway private URL), or set NEXT_PUBLIC_API_URL to an absolute URL on a different host than the site, " +
-          "or set BACKEND_INTERNAL_URL for same-host deployments. If NEXT_PUBLIC_SITE_URL is unset at build time, same-origin NEXT_PUBLIC_API_URL still triggers this check.",
-      );
-    }
-  }
-
-  return backend;
-}
-
-/**
- * `/api/*` → Django at `resolveDjangoBaseForApiRewrites()` (build/start time). Must not
- * resolve to the public Next.js origin.
+ * `/api/*` → Django at `BACKEND_URL` (resolved when Next loads this config — typically
+ * `next build` / `next start` in the container). Must not be the public Next.js origin.
  *
  * Auth routes get slash-normalized rules so Django does not APPEND_SLASH-redirect when
  * the framework strips a trailing slash.
  */
 const nextConfig: NextConfig = {
   async rewrites() {
-    const backend = resolveDjangoBaseForApiRewrites();
+    const fromEnv = process.env.BACKEND_URL?.trim();
+    const backend = fromEnv ? trimEndSlashes(fromEnv) : "http://localhost:8001";
     const apiBase = `${backend}/api`;
     return [
       { source: "/api/auth/login", destination: `${apiBase}/auth/login/` },
       { source: "/api/auth/logout", destination: `${apiBase}/auth/logout/` },
       { source: "/api/auth/refresh", destination: `${apiBase}/auth/refresh/` },
       { source: "/api/auth/me", destination: `${apiBase}/auth/me/` },
-      { source: "/api/auth/me/", destination: `${apiBase}/auth/me/` },
       { source: "/api/:path*", destination: `${apiBase}/:path*` },
+      { source: "/media/:path*", destination: `${backend}/media/:path*` },
     ];
   },
 };

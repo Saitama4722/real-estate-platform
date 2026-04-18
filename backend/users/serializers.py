@@ -11,14 +11,14 @@ User = get_user_model()
 
 
 def _absolute_media_url(request, file_field):
+    # Return relative /media/... so Next.js can proxy it (build_absolute_uri would
+    # embed the private backend host, unreachable from the browser in production).
     if not file_field:
         return None
     try:
         url = file_field.url
     except ValueError:
         return None
-    if request:
-        return request.build_absolute_uri(url)
     return url
 
 

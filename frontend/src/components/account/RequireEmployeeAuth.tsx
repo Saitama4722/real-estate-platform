@@ -115,5 +115,5 @@ export function RequireEmployeeAuth({ children }: { children: React.ReactNode })
     return <p className="mt-6 text-sm text-gray-600">Загрузка…</p>;
   }
 
-  return <EmployeeUserProvider user={user}>{children}</EmployeeUserProvider>;
+  return <EmployeeUserProvider user={user} setUser={setUser}>{children}</EmployeeUserProvider>;
 }

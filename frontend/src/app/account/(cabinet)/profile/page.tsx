@@ -6,15 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authBearerHeaders } from "@/lib/crmAuth";
 import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
-
-type MeResponse = {
-  first_name: string;
-  last_name: string;
-  phone?: string;
-  avatar?: string | null;
-};
+import { parseEmployeeUser } from "@/lib/employeeUser";
+import { useSetEmployeeUser } from "@/components/account/EmployeeAuthContext";
 
 export default function AccountProfilePage() {
+  const setEmployeeUser = useSetEmployeeUser();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +32,7 @@ export default function AccountProfilePage() {
         setError("Не удалось загрузить профиль.");
         return;
       }
-      const data = (await res.json()) as MeResponse;
+      const data = (await res.json()) as { first_name?: string; last_name?: string; phone?: string; avatar?: string | null };
       setFirstName(data.first_name ?? "");
       setLastName(data.last_name ?? "");
       setPhone(data.phone ?? "");
@@ -98,7 +94,12 @@ export default function AccountProfilePage() {
         return;
       }
       const hadAvatarFile = Boolean(file);
-      const data = (await res.json()) as MeResponse;
+      const raw = await res.json();
+      const updated = parseEmployeeUser(raw);
+      if (updated) {
+        setEmployeeUser(updated);
+      }
+      const data = raw as { first_name?: string; last_name?: string; phone?: string; avatar?: string | null };
       setFirstName(data.first_name ?? "");
       setLastName(data.last_name ?? "");
       setPhone(data.phone ?? "");
