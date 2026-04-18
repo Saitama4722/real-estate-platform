@@ -52,7 +52,7 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-dev-key-change-in-production}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,real-estate-platform}
       POSTGRES_DB: ${POSTGRES_DB:-real_estate_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -72,7 +72,10 @@ services:
         condition: service_healthy
     command: python manage.py runserver 0.0.0.0:8000
     networks:
-      - app
+      app:
+        aliases:
+          # BACKEND_URL sometimes uses the Compose project/repo name; ensure it resolves to Django.
+          - real-estate-platform
 
   # Celery worker: process background tasks (e.g. property photo derivatives).
   #   docker compose up celery_worker -d
@@ -87,7 +90,7 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-dev-key-change-in-production}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,real-estate-platform}
       POSTGRES_DB: ${POSTGRES_DB:-real_estate_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -110,7 +113,7 @@ services:
       - app
 
   frontend:
-    image: node:22-alpine
+    image: node:20-alpine
     container_name: real-estate-frontend
     restart: unless-stopped
     working_dir: /app
