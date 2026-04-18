@@ -1,14 +1,27 @@
 """
-Default file storage configuration for Django ``STORAGES["default"]`` (Stage 14.4).
+Default file storage configuration for Django ``STORAGES["default"]``.
 
-Active backend: local filesystem (``FileSystemStorage``). S3 and R2 are reserved
-names only; selecting them raises ``ImproperlyConfigured`` until a real backend
-is wired (e.g. django-storages) in this module and settings.
+Backends:
+  local  — Django FileSystemStorage (dev only; ephemeral on Railway)
+  s3     — AWS S3 via django-storages S3Boto3Storage
+  r2     — Cloudflare R2 via django-storages S3Boto3Storage (S3-compatible)
 
-Switch: set ``MEDIA_STORAGE_BACKEND`` in environment (see ``config.settings``).
+Switch: set ``MEDIA_STORAGE_BACKEND`` env var (default: local).
+
+Required env vars per backend:
+
+  r2 / s3:
+    AWS_ACCESS_KEY_ID         — R2 Access Key ID  (or AWS key)
+    AWS_SECRET_ACCESS_KEY     — R2 Secret Access Key (or AWS secret)
+    AWS_STORAGE_BUCKET_NAME   — bucket name
+    AWS_S3_ENDPOINT_URL       — R2: https://<account_id>.r2.cloudflarestorage.com
+                                 S3: omit (uses default AWS endpoint)
+    AWS_S3_CUSTOM_DOMAIN      — public URL host for file.url, e.g. pub-xxx.r2.dev
+                                 or your custom domain. Must NOT include https://.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -28,10 +41,6 @@ def default_storages_entry(
 ) -> dict:
     """
     Build the ``STORAGES["default"]`` dict for the given backend key.
-
-    ``local`` uses Django's filesystem storage with the same roots as
-    ``MEDIA_ROOT`` / ``MEDIA_URL`` (passed explicitly so this module stays
-    free of import cycles with full settings).
     """
     key = (backend_key or BACKEND_LOCAL).strip().lower()
     if key not in KNOWN_BACKENDS:
@@ -39,6 +48,7 @@ def default_storages_entry(
             f"Unknown MEDIA_STORAGE_BACKEND={backend_key!r}. "
             f"Expected one of: {', '.join(sorted(KNOWN_BACKENDS))}."
         )
+
     if key == BACKEND_LOCAL:
         return {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -47,8 +57,49 @@ def default_storages_entry(
                 "base_url": media_url,
             },
         }
-    # Reserved for a future step: configure S3 / R2 (e.g. S3Boto3Storage) here.
-    raise ImproperlyConfigured(
-        f"MEDIA_STORAGE_BACKEND={key!r} is not implemented yet. "
-        "Use 'local', or add cloud storage in common.media_storage and settings."
-    )
+
+    if key in (BACKEND_S3, BACKEND_R2):
+        bucket = os.environ.get("AWS_STORAGE_BUCKET_NAME", "").strip()
+        if not bucket:
+            raise ImproperlyConfigured(
+                f"MEDIA_STORAGE_BACKEND={key!r} requires AWS_STORAGE_BUCKET_NAME."
+            )
+        access_key = os.environ.get("AWS_ACCESS_KEY_ID", "").strip()
+        secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "").strip()
+        if not access_key or not secret_key:
+            raise ImproperlyConfigured(
+                f"MEDIA_STORAGE_BACKEND={key!r} requires "
+                "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
+            )
+
+        options: dict = {
+            "bucket_name": bucket,
+            "access_key": access_key,
+            "secret_key": secret_key,
+            # Files are public — no signed URLs needed for avatars.
+            "querystring_auth": False,
+            # Prevent django-storages from overwriting files with the same name
+            # (keeps the original filename so URLs stay stable).
+            "file_overwrite": True,
+        }
+
+        endpoint = os.environ.get("AWS_S3_ENDPOINT_URL", "").strip()
+        if endpoint:
+            options["endpoint_url"] = endpoint
+
+        custom_domain = os.environ.get("AWS_S3_CUSTOM_DOMAIN", "").strip()
+        if custom_domain:
+            # django-storages uses this as the host for file.url → full public URL.
+            options["custom_domain"] = custom_domain
+
+        region = os.environ.get("AWS_S3_REGION_NAME", "").strip()
+        if region:
+            options["region_name"] = region
+
+        return {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+            "OPTIONS": options,
+        }
+
+    # Unreachable given KNOWN_BACKENDS check above, but keeps type checkers happy.
+    raise ImproperlyConfigured(f"Unhandled backend: {key!r}")
