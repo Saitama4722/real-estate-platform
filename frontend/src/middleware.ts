@@ -7,6 +7,24 @@ function trimEndSlashes(s: string): string {
 }
 
 /**
+ * Next.js may normalize `/api/auth/.../` to `/api/auth/...` before the request hits
+ * middleware. Django registers these routes with a trailing slash and APPEND_SLASH is
+ * on: POST without slash raises RuntimeError; GET can bounce between Next and Django
+ * redirects. Always forward the slash-terminated path to Django.
+ */
+function djangoAuthApiPathname(pathname: string): string {
+  switch (pathname) {
+    case "/api/auth/login":
+    case "/api/auth/logout":
+    case "/api/auth/refresh":
+    case "/api/auth/me":
+      return `${pathname}/`;
+    default:
+      return pathname;
+  }
+}
+
+/**
  * Django origin for same-origin `/api/*` browser calls. Resolved at request time so
  * production never bakes a wrong rewrite target from `next build` (a common cause of
  * ERR_TOO_MANY_REDIRECTS when BACKEND_URL is only set at container runtime).
@@ -89,8 +107,9 @@ export function middleware(request: NextRequest) {
     const loop = selfProxyErrorResponse(request, backend);
     if (loop) return loop;
 
+    const apiPath = djangoAuthApiPathname(request.nextUrl.pathname);
     const destination = new URL(
-      request.nextUrl.pathname + request.nextUrl.search,
+      apiPath + request.nextUrl.search,
       trimEndSlashes(backend) + "/",
     );
 
