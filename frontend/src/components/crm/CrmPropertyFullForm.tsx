@@ -165,23 +165,33 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     (async () => {
       try {
         setChoicesLoadError("");
-        const ch = await fetch(crmBrowserApiUrl("/api/locations/choices/"));
-        if (!cancelled && !ch.ok) {
+        const jsonHeaders = { Accept: "application/json" };
+
+        const ch = await fetch(crmBrowserApiUrl("/api/locations/choices/"), {
+          headers: jsonHeaders,
+        });
+        if (cancelled) return;
+        if (!ch.ok) {
+          console.error(`[CrmPropertyFullForm] choices HTTP ${ch.status}`);
           setChoicesLoadError("Не удалось загрузить справочники для полей формы.");
+          return;
         }
-        if (ch.ok && !cancelled) {
-          setChoices((await ch.json()) as LocationsChoicesResponse);
+        const choicesData = (await ch.json()) as LocationsChoicesResponse;
+        if (!cancelled) setChoices(choicesData);
+
+        const c = await fetch(crmBrowserApiUrl("/api/locations/cities/"), {
+          headers: jsonHeaders,
+        });
+        if (cancelled) return;
+        if (!c.ok) {
+          console.error(`[CrmPropertyFullForm] cities HTTP ${c.status}`);
+          setChoicesLoadError("Не удалось загрузить список городов.");
+          return;
         }
-        const c = await fetch(crmBrowserApiUrl("/api/locations/cities/"));
-        if (!cancelled && !c.ok) {
-          setChoicesLoadError((prev) => prev || "Не удалось загрузить список городов.");
-        }
-        if (c.ok && !cancelled) {
-          const list = (await c.json()) as CityRow[];
-          setCities(Array.isArray(list) ? list : []);
-        }
+        const list = (await c.json()) as CityRow[];
+        if (!cancelled) setCities(Array.isArray(list) ? list : []);
       } catch (e) {
-        console.error("[CrmPropertyFullForm] choices/cities", e);
+        console.error("[CrmPropertyFullForm] choices/cities network error:", e);
         if (!cancelled) setChoicesLoadError("Ошибка сети при загрузке справочников.");
       }
     })();
