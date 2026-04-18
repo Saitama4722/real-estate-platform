@@ -192,12 +192,12 @@ AWS_QUERYSTRING_AUTH = False
 AWS_S3_CUSTOM_DOMAIN = os.environ.get("AWS_S3_CUSTOM_DOMAIN", "")
 AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
 
-# MEDIA_URL: use the public R2 CDN domain when cloud storage is active.
+# MEDIA_URL: use the public R2/S3 CDN domain when cloud storage is active.
+# AWS_S3_CUSTOM_DOMAIN is required for r2/s3 — media_storage.py raises
+# ImproperlyConfigured at startup if it is missing.
 # For local storage keep /media/ (served by Django in dev or the Next.js proxy).
-if MEDIA_STORAGE_BACKEND in ("r2", "s3") and AWS_S3_CUSTOM_DOMAIN:
-    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
-elif MEDIA_STORAGE_BACKEND in ("r2", "s3"):
-    MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+if MEDIA_STORAGE_BACKEND in ("r2", "s3"):
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/" if AWS_S3_CUSTOM_DOMAIN else "/media/"
 else:
     MEDIA_URL = "/media/"
 

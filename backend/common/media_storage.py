@@ -88,10 +88,16 @@ def default_storages_entry(
             options["endpoint_url"] = endpoint
 
         custom_domain = os.environ.get("AWS_S3_CUSTOM_DOMAIN", "").strip()
-        if custom_domain:
-            # django-storages uses this as the host for file.url → full public URL.
-            # e.g. https://pub-xxx.r2.dev/users/avatars/photo.jpg
-            options["custom_domain"] = custom_domain
+        if not custom_domain:
+            raise ImproperlyConfigured(
+                f"MEDIA_STORAGE_BACKEND={key!r} requires AWS_S3_CUSTOM_DOMAIN "
+                "(the public bucket URL host, e.g. pub-xxx.r2.dev). "
+                "Without it file.url returns the private storage endpoint, "
+                "which browsers cannot access."
+            )
+        # django-storages uses this as the host for file.url → full public URL.
+        # e.g. https://pub-xxx.r2.dev/users/avatars/photo.jpg
+        options["custom_domain"] = custom_domain
 
         region = os.environ.get("AWS_S3_REGION_NAME", "").strip()
         if region:

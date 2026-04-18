@@ -628,8 +628,11 @@
 
 - **Локально по умолчанию:** активный бэкенд — файловая система; ``MEDIA_ROOT`` / ``MEDIA_URL`` без изменений по смыслу; ``STORAGES["default"]`` указывает на ``FileSystemStorage`` с теми же корнями. Поведение загрузок и производных фото объектов не переводилось на облако.
 - **Абстракция под S3/R2:** единая точка выбора — переменная окружения ``MEDIA_STORAGE_BACKEND`` (по умолчанию ``local``) и функция ``default_storages_entry`` в ``common/media_storage.py``, откуда собирается запись ``STORAGES["default"]`` в ``config/settings.py``.
-- **Переключение в будущем:** зарезервированы ключи ``s3`` и ``r2``; при их выборе без реализации Django поднимает ``ImproperlyConfigured`` с явным текстом — ложной «готовности» облака нет. Реальная интеграция (например, django-storages) предполагается в этом же модуле и настройках, без переписывания логики ``PropertyPhoto`` и ``property_photo_images`` (чтение через API хранилища ``FieldFile.open``/``read`` уже совместимо).
-- **Облако не подключалось:** нет boto3, бакетов, presigned URL и отдельных runtime-путей для S3/R2.
+- **Cloudflare R2 подключён:** зависимости ``django-storages[s3]``, ``boto3``, ``python-dotenv`` добавлены в ``requirements.txt``; ``"storages"`` — в ``INSTALLED_APPS``; ``load_dotenv()`` — в начале ``config/settings.py``. Бэкенд ``storages.backends.s3boto3.S3Boto3Storage`` активируется при ``MEDIA_STORAGE_BACKEND=r2``.
+- **Обязательные переменные окружения для R2:** ``AWS_ACCESS_KEY_ID``, ``AWS_SECRET_ACCESS_KEY``, ``AWS_STORAGE_BUCKET_NAME``, ``AWS_S3_ENDPOINT_URL`` (приватный эндпоинт вида ``https://<account_id>.r2.cloudflarestorage.com``), ``AWS_S3_REGION_NAME=auto``, ``AWS_S3_CUSTOM_DOMAIN`` (публичный хост бакета вида ``pub-xxx.r2.dev`` **без** ``https://``). Отсутствие ``AWS_S3_CUSTOM_DOMAIN`` при ``MEDIA_STORAGE_BACKEND=r2`` вызывает ``ImproperlyConfigured`` при старте — ложной готовности нет.
+- **Разделение эндпоинтов:** запись файлов идёт через ``AWS_S3_ENDPOINT_URL`` (приватный S3-совместимый API R2); публичные URL для браузера строятся через ``AWS_S3_CUSTOM_DOMAIN`` (``file.url`` → ``https://<custom_domain>/<key>``). Смешивать нельзя — приватный эндпоинт возвращает ``400 Bad Request`` при попытке браузера загрузить файл напрямую.
+- **``MEDIA_URL``:** при активном облачном бэкенде равен ``https://<AWS_S3_CUSTOM_DOMAIN>/``; при ``local`` — ``/media/`` (обслуживается Django в dev или Next.js-прокси).
+- **Сериализаторы:** ``_absolute_media_url`` в ``users/serializers.py`` возвращает ``file_field.url``; при облачном хранилище это уже полный публичный URL — дополнительной трансформации не требуется.
 
 **Подэтап 14.5 — Очереди задач** (выполнено).
 
