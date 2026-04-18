@@ -9,3 +9,4 @@ celery[redis]>=5.3,<6
 gunicorn>=21.2
 whitenoise>=6.6
 django-storages[s3]>=1.14
+python-dotenv>=1.0

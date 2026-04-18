@@ -7,8 +7,13 @@ from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+from dotenv import load_dotenv
 
 from common.media_storage import default_storages_entry
+
+# Load .env for local development. In production (Railway) env vars are injected
+# by the platform and load_dotenv() is a no-op (existing vars are not overridden).
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -87,6 +92,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # Third-party
+    "storages",
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
@@ -159,17 +165,35 @@ _staticfiles_storage = (
     else "django.contrib.staticfiles.storage.StaticFilesStorage"
 )
 
-MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Stage 14.4 — media storage: default remains local. Central switch for a future
-# S3 / R2 backend (not implemented yet; ``s3`` / ``r2`` raise ImproperlyConfigured).
-# Accept legacy MEDIA_STORAGE for older .env files; MEDIA_STORAGE_BACKEND wins when set.
 MEDIA_STORAGE_BACKEND = (
     os.environ.get("MEDIA_STORAGE_BACKEND")
     or os.environ.get("MEDIA_STORAGE")
     or "local"
 ).strip().lower()
+
+# R2 / S3 settings — read from env vars, never hardcoded.
+# Used by common.media_storage when MEDIA_STORAGE_BACKEND is "r2" or "s3".
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME", "centreal-media")
+AWS_S3_ENDPOINT_URL = os.environ.get(
+    "AWS_S3_ENDPOINT_URL",
+    "https://ec9bb10c90bd739a76f314f308437066.r2.cloudflarestorage.com",
+)
+AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME", "auto")
+AWS_S3_SIGNATURE_VERSION = "s3v4"
+AWS_S3_ADDRESSING_STYLE = "path"
+AWS_DEFAULT_ACL = None
+AWS_QUERYSTRING_AUTH = False
+
+# MEDIA_URL: when using R2/S3 the bucket endpoint is the public base URL.
+# For local storage keep the standard /media/ path served by Django (dev) or the proxy.
+if MEDIA_STORAGE_BACKEND in ("r2", "s3"):
+    MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+else:
+    MEDIA_URL = "/media/"
 
 STORAGES = {
     "default": default_storages_entry(
