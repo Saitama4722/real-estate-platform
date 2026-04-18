@@ -90,11 +90,14 @@ def default_storages_entry(
         custom_domain = os.environ.get("AWS_S3_CUSTOM_DOMAIN", "").strip()
         if custom_domain:
             # django-storages uses this as the host for file.url → full public URL.
+            # e.g. https://pub-xxx.r2.dev/users/avatars/photo.jpg
             options["custom_domain"] = custom_domain
 
         region = os.environ.get("AWS_S3_REGION_NAME", "").strip()
         if region:
             options["region_name"] = region
+
+        options["object_parameters"] = {"CacheControl": "max-age=86400"}
 
         return {
             "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",

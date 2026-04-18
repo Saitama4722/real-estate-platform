@@ -187,10 +187,16 @@ AWS_S3_SIGNATURE_VERSION = "s3v4"
 AWS_S3_ADDRESSING_STYLE = "path"
 AWS_DEFAULT_ACL = None
 AWS_QUERYSTRING_AUTH = False
+# Public CDN domain for the R2 bucket (no https:// prefix).
+# S3Boto3Storage uses this for file.url → https://<custom_domain>/<key>.
+AWS_S3_CUSTOM_DOMAIN = os.environ.get("AWS_S3_CUSTOM_DOMAIN", "")
+AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
 
-# MEDIA_URL: when using R2/S3 the bucket endpoint is the public base URL.
-# For local storage keep the standard /media/ path served by Django (dev) or the proxy.
-if MEDIA_STORAGE_BACKEND in ("r2", "s3"):
+# MEDIA_URL: use the public R2 CDN domain when cloud storage is active.
+# For local storage keep /media/ (served by Django in dev or the Next.js proxy).
+if MEDIA_STORAGE_BACKEND in ("r2", "s3") and AWS_S3_CUSTOM_DOMAIN:
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
+elif MEDIA_STORAGE_BACKEND in ("r2", "s3"):
     MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
 else:
     MEDIA_URL = "/media/"
