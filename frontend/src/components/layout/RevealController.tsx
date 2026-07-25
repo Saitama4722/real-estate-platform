@@ -39,6 +39,29 @@ import { useEffect } from "react";
  */
 const COMPACT_AFTER_PX = 24;
 
+/**
+ * Hard cap on how long a section may stay hidden waiting to be scrolled to.
+ *
+ * WHY THIS EXISTS. "Visible only after you scroll to it" is fine for a human and
+ * broken for everything else. Measured on the homepage at 1440x900 `[measured]`:
+ * a full-page screenshot taken WITHOUT scrolling came out **2080px of 3306px
+ * blank — 63% of the page** — one flat band from y=940 to y=3020, because 5 of
+ * the 6 sections were still at opacity 0. Any consumer that renders at a normal
+ * viewport and does not scroll like a person — screenshot tools, PDF/archive
+ * jobs, preview crawlers, a link unfurler — captures that blank page.
+ *
+ * So this failsafe reveals whatever is still pending after the delay, and the
+ * invariant becomes: content is never hidden for longer than this, ever.
+ *
+ * THE TRADE-OFF IS REAL, and it is deliberately resolved in favour of the
+ * content: a reader who lingers past this on the hero gets no fade-in when they
+ * finally scroll, because everything below the fold has already been revealed.
+ * That costs a decoration in a minority of sessions; the alternative costs a
+ * correct page in every automated one. Raise the number to favour the animation,
+ * lower it to favour capture tools — but do not remove it.
+ */
+const REVEAL_FAILSAFE_MS = 2500;
+
 export function RevealController() {
   useEffect(() => {
     const root = document.documentElement;
@@ -51,6 +74,20 @@ export function RevealController() {
       root.classList.add("ctr-reveal-on");
       pending = Array.from(document.querySelectorAll(".ctr-sec"));
     }
+
+    // Reveal everything still waiting, in one pass. Idempotent: `is-in` is a
+    // class add, and draining `pending` means the sweep skips the work forever
+    // after (same "drops to header-only" path as reading the page through).
+    const revealAll = () => {
+      if (!pending.length) return;
+      for (const el of pending) el.classList.add("is-in");
+      pending = [];
+    };
+
+    // See REVEAL_FAILSAFE_MS: nothing may stay invisible indefinitely.
+    const failsafe = revealEnabled
+      ? window.setTimeout(revealAll, REVEAL_FAILSAFE_MS)
+      : 0;
 
     let frame = 0;
     const measure = () => {
@@ -91,6 +128,7 @@ export function RevealController() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       if (frame) cancelAnimationFrame(frame);
+      if (failsafe) clearTimeout(failsafe);
       root.classList.remove("ctr-reveal-on");
     };
   }, []);
