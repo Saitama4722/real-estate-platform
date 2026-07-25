@@ -1,31 +1,741 @@
 @import "tailwindcss";
 
-/* Base font — system stack, Cyrillic-safe */
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  font-size: 1rem;
-  line-height: 1.6;
-  color: #1a1a1a;
-  background-color: #ffffff;
-  -webkit-font-smoothing: antialiased;
+/* ============================================================================
+   CENTREAL DESIGN TOKENS  (Tailwind v4 — theme lives in CSS, not a JS config)
+   Source of truth: design-audit/design-system/tokens/*.css + readme.md
+   ----------------------------------------------------------------------------
+   TWO KINDS OF TOKEN LIVE HERE:
+
+   1. REBASED STOCK SCALES (blue/sky/gray/slate/red/green/emerald/amber/yellow).
+      Overriding Tailwind's own palette variables means the ~800 existing
+      hardcoded utilities across the app (`bg-blue-600`, `border-gray-200`, …)
+      pick up the design values with ZERO call-site edits, and the public site's
+      gray system and the cabinet's slate system converge onto one warm neutral
+      ramp (audit item 4: "two neutral+accent color systems").
+
+   2. SEMANTIC TOKENS (brand/surface/fg/border/accent/danger/…) for new work.
+      Prefer these in any component you touch; the rebased scales exist to carry
+      the untouched files.
+
+   ⚠ Naming note: Tailwind derives the utility name from the token name, so
+   `--color-fg-muted` → `text-fg-muted`. The design system calls these
+   --text-primary/secondary/muted; they are the same values, renamed to avoid
+   the stutter of `text-text-primary`.
+
+   ⚠ RADIUS IS DELIBERATELY NOT REBASED. The design's ladder (4/8/12/16) is
+   exactly Tailwind's default ladder shifted one step down in name:
+       design radius-xs  4px = rounded-sm
+       design radius-sm  8px = rounded-lg   ← buttons, inputs, badges
+       design radius-md 12px = rounded-xl   ← cards
+       design radius-lg 16px = rounded-2xl  ← panels, hero search
+   Remapping --radius-md would silently resize every `rounded-md` in the CRM.
+   Use the right-hand column instead.
+   ========================================================================== */
+
+@theme {
+  /* ---- Brand blue -------------------------------------------------------- */
+  --color-blue-50: #f0f5ff;
+  --color-blue-100: #dfeafe;
+  --color-blue-200: #bdd5fc;
+  --color-blue-300: #8fb6f6;
+  --color-blue-400: #5b8fec;
+  --color-blue-500: #2f73e6;
+  --color-blue-600: #1a5fe0; /* primary */
+  --color-blue-700: #124bc0; /* hover */
+  --color-blue-800: #0e3c9b; /* active */
+  --color-blue-900: #12306e;
+  --color-blue-950: #0f1e38; /* navy: hero, footer */
+
+  /* `sky-*` was the cabinet's link colour — folded into the one brand blue so
+     the CRM stops being a third accent system. */
+  --color-sky-50: #f0f5ff;
+  --color-sky-100: #dfeafe;
+  --color-sky-200: #bdd5fc;
+  --color-sky-300: #8fb6f6;
+  --color-sky-400: #5b8fec;
+  --color-sky-500: #2f73e6;
+  --color-sky-600: #1a5fe0;
+  --color-sky-700: #124bc0;
+  --color-sky-800: #0e3c9b;
+  --color-sky-900: #12306e;
+  --color-sky-950: #0f1e38;
+
+  /* ---- Warm neutrals ----------------------------------------------------- */
+  /* 700/800/950 are interpolated: the design system specifies 0–600 and 900. */
+  --color-gray-50: #f6f5f1;
+  --color-gray-100: #eeece6;
+  --color-gray-200: #e4e2dc;
+  --color-gray-300: #d3d0c8;
+  --color-gray-400: #a9adb6;
+  --color-gray-500: #6a7180;
+  --color-gray-600: #4e545f;
+  --color-gray-700: #3c414a;
+  --color-gray-800: #2b2f36;
+  --color-gray-900: #1c1f26;
+  --color-gray-950: #14161b;
+
+  /* slate === gray: one neutral ramp for public site AND cabinet. */
+  --color-slate-50: #f6f5f1;
+  --color-slate-100: #eeece6;
+  --color-slate-200: #e4e2dc;
+  --color-slate-300: #d3d0c8;
+  --color-slate-400: #a9adb6;
+  --color-slate-500: #6a7180;
+  --color-slate-600: #4e545f;
+  --color-slate-700: #3c414a;
+  --color-slate-800: #2b2f36;
+  --color-slate-900: #1c1f26;
+  --color-slate-950: #14161b;
+
+  /* ---- red-* === CARMINE (errors / destructive), NOT the accent red ------- */
+  /* Load-bearing decision #2: the attention red (#DE2B37) must never become a
+     button. Every existing `red-*` in the app is an error panel or a destructive
+     control, so pointing the whole scale at the deep carmine puts them all on
+     the correct colour — and leaves the attention red reachable ONLY through the
+     explicit `accent` tokens below. The rule is now structural, not just
+     documented. Anchors: carmine-600 #A1272F, carmine-700 #86212A, tint #F7EAEA. */
+  --color-red-50: #f7eaea;
+  --color-red-100: #efd6d8;
+  --color-red-200: #e0b4b8;
+  --color-red-300: #cc8b92;
+  --color-red-400: #b75a64;
+  --color-red-500: #b02f38;
+  --color-red-600: #a1272f;
+  --color-red-700: #86212a;
+  --color-red-800: #6c1b22;
+  --color-red-900: #58161c;
+  --color-red-950: #3d0f13;
+
+  /* ---- Success ----------------------------------------------------------- */
+  --color-green-50: #eaf6ef;
+  --color-green-100: #d3ebdd;
+  --color-green-200: #a8d7bc;
+  --color-green-300: #74be97;
+  --color-green-400: #3f9e72;
+  --color-green-500: #248a5b;
+  --color-green-600: #1b7a4e;
+  --color-green-700: #166241;
+  --color-green-800: #124e34;
+  --color-green-900: #0e3d29;
+  --color-green-950: #082419;
+
+  --color-emerald-50: #eaf6ef;
+  --color-emerald-100: #d3ebdd;
+  --color-emerald-200: #a8d7bc;
+  --color-emerald-300: #74be97;
+  --color-emerald-400: #3f9e72;
+  --color-emerald-500: #248a5b;
+  --color-emerald-600: #1b7a4e;
+  --color-emerald-700: #166241;
+  --color-emerald-800: #124e34;
+  --color-emerald-900: #0e3d29;
+  --color-emerald-950: #082419;
+
+  /* ---- Warning ----------------------------------------------------------- */
+  --color-amber-50: #fbf1e4;
+  --color-amber-100: #f6e2c6;
+  --color-amber-200: #efc98f;
+  --color-amber-300: #e3a954;
+  --color-amber-400: #d18b2a;
+  --color-amber-500: #bc6e12;
+  --color-amber-600: #ad5706;
+  --color-amber-700: #8c4507;
+  --color-amber-800: #70370a;
+  --color-amber-900: #5c2e0b;
+  --color-amber-950: #331705;
+
+  --color-yellow-50: #fbf1e4;
+  --color-yellow-100: #f6e2c6;
+  --color-yellow-200: #efc98f;
+  --color-yellow-300: #e3a954;
+  --color-yellow-400: #d18b2a;
+  --color-yellow-500: #bc6e12;
+  --color-yellow-600: #ad5706;
+  --color-yellow-700: #8c4507;
+  --color-yellow-800: #70370a;
+  --color-yellow-900: #5c2e0b;
+  --color-yellow-950: #331705;
+
+  /* ======================= SEMANTIC TOKENS ================================ */
+  --color-brand: #1a5fe0;
+  --color-brand-hover: #124bc0;
+  --color-brand-active: #0e3c9b;
+  --color-brand-tint: #f0f5ff;
+  --color-brand-tint-2: #dfeafe;
+
+  /* Attention only — «Цена снижена», active heart, hot map markers.
+     NEVER a button background. */
+  --color-accent: #de2b37;
+  --color-accent-hover: #c21f2c;
+  --color-accent-tint: #fdeeef;
+
+  --color-danger: #a1272f;
+  --color-danger-hover: #86212a;
+  --color-danger-tint: #f7eaea;
+  --color-success: #1b7a4e;
+  --color-success-tint: #eaf6ef;
+  --color-warning: #ad5706;
+  --color-warning-tint: #fbf1e4;
+
+  --color-surface: #f6f5f1; /* page background (warm) */
+  --color-surface-raised: #ffffff; /* cards, panels */
+  --color-surface-inset: #eeece6; /* wells, skeleton base */
+  --color-surface-dark: #0f1e38; /* hero, footer */
+
+  --color-border: #e4e2dc;
+  --color-border-strong: #d3d0c8;
+
+  --color-fg: #1c1f26; /* design --text-primary */
+  --color-fg-secondary: #4e545f; /* design --text-secondary */
+  --color-fg-muted: #6a7180; /* design --text-muted */
+  --color-fg-inverse: #ffffff;
+
+  /* ---- Typography -------------------------------------------------------- */
+  /* --font-golos is injected by next/font in app/layout.tsx. */
+  --font-sans:
+    var(--font-golos), "Golos Text", "Segoe UI", system-ui, -apple-system,
+    sans-serif;
+
+  --text-display: 44px;
+  --text-display--line-height: 52px;
+  --text-display--font-weight: 700;
+  --text-display--letter-spacing: -0.015em;
+
+  --text-h1: 36px;
+  --text-h1--line-height: 44px;
+  --text-h1--font-weight: 700;
+  --text-h1--letter-spacing: -0.01em;
+
+  --text-h2: 28px;
+  --text-h2--line-height: 36px;
+  --text-h2--font-weight: 700;
+  --text-h2--letter-spacing: -0.008em;
+
+  --text-h3: 20px;
+  --text-h3--line-height: 28px;
+  --text-h3--font-weight: 600;
+  --text-h3--letter-spacing: -0.004em;
+
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 28px;
+  --text-body: 16px;
+  --text-body--line-height: 24px;
+  --text-small: 14px;
+  --text-small--line-height: 20px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption--font-weight: 500;
+  --text-caption--letter-spacing: 0.01em;
+
+  /* Prices: always 700 + tabular numerals (see .tabular-price below). */
+  --text-price: 20px;
+  --text-price--line-height: 26px;
+  --text-price--font-weight: 700;
+  --text-price-lg: 24px;
+  --text-price-lg--line-height: 30px;
+  --text-price-lg--font-weight: 700;
+
+  /* ---- Elevation --------------------------------------------------------- */
+  --shadow-xs: 0 1px 2px rgba(15, 30, 56, 0.06);
+  --shadow-sm:
+    0 1px 3px rgba(15, 30, 56, 0.08), 0 1px 2px rgba(15, 30, 56, 0.04);
+  --shadow-md:
+    0 4px 12px rgba(15, 30, 56, 0.1), 0 2px 4px rgba(15, 30, 56, 0.05);
+  --shadow-lg:
+    0 12px 32px rgba(15, 30, 56, 0.16), 0 4px 8px rgba(15, 30, 56, 0.06);
+
+  /* ---- Motion: ease-out family only. No bounce, no overshoot. ------------ */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---- Layout ------------------------------------------------------------ */
+  --container-page: 1200px;
 }
 
-/* Base typography */
-h1 {
-  font-size: 1.875rem;
-  font-weight: 700;
-  line-height: 1.2;
+/* ----------------------------------------------------------------------------
+   Non-utility custom properties: consumed by hand-written CSS (hero field,
+   reveal, skeletons) rather than by Tailwind utilities, so they stay OUT of
+   @theme to avoid generating dozens of unused classes.
+   -------------------------------------------------------------------------- */
+:root {
+  --dur-instant: 100ms; /* press */
+  --dur-fast: 150ms; /* icons, links, chips */
+  --dur-base: 200ms; /* button hover, field focus */
+  --dur-slow: 250ms; /* card lift, compact header */
+  --dur-reveal: 360ms; /* section entrance — hard ceiling */
+  --dur-gallery: 300ms;
+  --stagger-step: 60ms;
+
+  --focus-ring: 0 0 0 3px rgba(26, 95, 224, 0.25);
+  --focus-ring-danger: 0 0 0 3px rgba(161, 39, 47, 0.22);
+
+  --skeleton-base: #eeece6;
+  --skeleton-shine: #f6f5f1;
+
+  --header-h: 64px;
+  --header-h-compact: 52px;
 }
 
-h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  line-height: 1.3;
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    color: var(--color-fg);
+    /* Warm page background + white surfaces: the design builds depth from
+       shadows, not borders (load-bearing decision #6). */
+    background-color: var(--color-surface);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Heading scale. Mobile values match the 390px reference kit; the desktop
+     values are the design's h1/h2 tokens. */
+  h1 {
+    font-size: 30px;
+    line-height: 38px;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+  }
+  h2 {
+    font-size: 24px;
+    line-height: 30px;
+    font-weight: 700;
+    letter-spacing: -0.008em;
+  }
+  h3 {
+    font-size: var(--text-h3);
+    line-height: var(--text-h3--line-height);
+    font-weight: 600;
+    letter-spacing: var(--text-h3--letter-spacing);
+  }
+
+  @media (min-width: 768px) {
+    h1 {
+      font-size: var(--text-h1);
+      line-height: var(--text-h1--line-height);
+      letter-spacing: var(--text-h1--letter-spacing);
+    }
+    h2 {
+      font-size: var(--text-h2);
+      line-height: var(--text-h2--line-height);
+      letter-spacing: var(--text-h2--letter-spacing);
+    }
+  }
+
+  ::selection {
+    background: var(--color-brand-tint-2);
+  }
 }
 
-h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  line-height: 1.4;
+@layer components {
+  /**
+   * Page section rhythm — the design's `.sec` rule.
+   *
+   * Padding is TOP-ONLY (76px desktop / 44px mobile). That is deliberate: with
+   * top-only padding the gap between any two sections is exactly one step, so
+   * the rhythm cannot drift. The previous `py-10 md:py-12` put padding on BOTH
+   * edges, which doubled at every boundary (96px desktop / 80px mobile) and
+   * also added stray space above the first section and below the last.
+   *
+   * The space below the LAST section is the footer's `margin-top` (84/48px),
+   * matching the kit's `.foot` rule — so these two must change together.
+   *
+   * In @layer components so a one-off section can still override with a
+   * Tailwind padding utility (unlayered CSS would beat @layer utilities).
+   */
+  .ctr-sec {
+    padding: 44px 0 0;
+  }
+  @media (min-width: 768px) {
+    .ctr-sec {
+      padding-top: 76px;
+    }
+  }
+
+  /* Section header row: heading left, optional "more" link right. */
+  .ctr-sech {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  @media (min-width: 768px) {
+    .ctr-sech {
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+  }
+
+  /* Prices are always 700 + tabular numerals so digits align down a column. */
+  .tabular-price {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Focus ring token as a utility-ish helper for hand-rolled controls. */
+  .focus-ring-brand:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+  .focus-ring-danger:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring-danger);
+  }
+}
+
+/* ============================================================================
+   MOTION
+   Budget (load-bearing decision #7): ≤250ms for a state change, ≤360ms for an
+   entrance, ease-out only. Raising the ceiling means re-timing the whole catalog.
+   ========================================================================== */
+@keyframes ctr-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ctr-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes ctr-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.28);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes ctr-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Hero icon-field drift (Stage 3 consumes these). */
+@keyframes ctr-drift-a {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(14px, -20px, 0);
+  }
+}
+@keyframes ctr-drift-b {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-16px, -12px, 0);
+  }
+}
+@keyframes ctr-drift-c {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(10px, 16px, 0);
+  }
+}
+@keyframes ctr-drift-d {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-11px, 18px, 0);
+  }
+}
+
+/* ============================================================================
+   HERO — navy gradient + drifting icon field
+   Ported from design-audit/design-system/components/components.css (.ctr-hero).
+   The mask, the multi-layer background and the drift animations cannot be
+   expressed as Tailwind utilities, so they live here; per-icon position, size
+   and animation-delay stay inline in HeroSection.tsx (as in the reference).
+
+   ⚠ TWO DELIBERATE DEVIATIONS FROM THE REFERENCE — do not "restore" them:
+
+   1. NO `overflow: hidden` ON `.ctr-hero`. The reference puts it on the section.
+      Doing that here re-breaks the SearchBar's District dropdown: it is
+      absolutely positioned and extends past the hero's bottom edge, so a
+      section-level clip hides the last districts (this is the documented
+      Геленджик «СНТ Сосновое» bug). The clip lives on `.ctr-hero__field`
+      instead — the purely decorative, pointer-events-none layer that actually
+      needs it, which is also what keeps the wide right-hand icons from
+      widening the document. Same fix pattern as the old gradient wrapper.
+   2. NO `isolation: isolate` on `.ctr-hero`. It would make the section a
+      stacking context and trap that same dropdown's z-index inside the hero.
+      Layering is done with plain z-index on the children instead (field 0,
+      content 1), which needs no isolation.
+   ========================================================================== */
+.ctr-hero {
+  position: relative;
+  background:
+    radial-gradient(
+      1200px 620px at 78% -18%,
+      rgba(47, 115, 230, 0.42),
+      transparent 62%
+    ),
+    radial-gradient(
+      900px 520px at 6% 108%,
+      rgba(18, 48, 110, 0.75),
+      transparent 60%
+    ),
+    linear-gradient(168deg, #16305c 0%, var(--color-blue-950) 52%, #0a1428 100%);
+}
+
+/* Mask does two jobs at once (mask-composite: intersect): a radial cut-out keeps
+   icons out of the headline zone on the left, and a linear fade empties the
+   bottom edge where the pulled-up search panel lands. */
+.ctr-hero__field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: #fff;
+  -webkit-mask-image:
+    radial-gradient(
+      130% 108% at 4% 46%,
+      transparent 0%,
+      transparent 40%,
+      #000 78%
+    ),
+    linear-gradient(to bottom, #000 0%, #000 52%, transparent 92%);
+  mask-image:
+    radial-gradient(
+      130% 108% at 4% 46%,
+      transparent 0%,
+      transparent 40%,
+      #000 78%
+    ),
+    linear-gradient(to bottom, #000 0%, #000 52%, transparent 92%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.ctr-hero__layer {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.ctr-hero__icon {
+  position: absolute;
+  display: block;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  /* Symmetric ease: the drift reverses forever, so it must not read as
+     ease-out in one direction and ease-in in the other. */
+  animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+.ctr-hero__field .ctr-hero__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Thinner than the 2px icon standard on purpose — these are large background
+     silhouettes at 5–12% opacity, not UI glyphs. */
+  stroke-width: 1.5;
+}
+
+/* Depth: further back = larger, dimmer, softer. Nearer = smaller and crisper. */
+.ctr-hero__icon--back {
+  opacity: 0.05;
+  filter: blur(0.6px);
+  animation-name: ctr-drift-a;
+  animation-duration: 38s;
+}
+.ctr-hero__icon--mid {
+  opacity: 0.08;
+  animation-name: ctr-drift-b;
+  animation-duration: 30s;
+}
+.ctr-hero__icon--front {
+  opacity: 0.12;
+  animation-name: ctr-drift-c;
+  animation-duration: 24s;
+}
+/* `.alt` staggers neighbours onto a different path/duration so the field never
+   reads as one synchronised block. */
+.ctr-hero__icon--mid.alt {
+  animation-name: ctr-drift-d;
+  animation-duration: 34s;
+}
+.ctr-hero__icon--front.alt {
+  animation-name: ctr-drift-a;
+  animation-duration: 27s;
+}
+
+/* ============================================================================
+   COMPACT HEADER — 64px → 52px past 24px of scroll, with a blurred translucent
+   background. `is-compact` is toggled by RevealController (rAF-throttled).
+
+   ⚠ These rules are deliberately UNLAYERED. The header carries Tailwind
+   `bg-surface-raised` / `border-border` utilities, and anything inside
+   `@layer components` would LOSE to `@layer utilities` — the compact background
+   simply would not apply. Unlayered CSS outranks every layer, which is what
+   makes the state change stick. (Under reduced motion the global block collapses
+   the transition duration, so the swap is instant but still happens — colour and
+   shadow are meaning, not decoration.)
+   ========================================================================== */
+.ctr-header {
+  transition:
+    box-shadow var(--dur-slow) var(--ease-out),
+    background-color var(--dur-slow) var(--ease-out),
+    border-color var(--dur-slow) var(--ease-out);
+}
+.ctr-header__row {
+  transition: height var(--dur-slow) var(--ease-out);
+}
+.ctr-header.is-compact {
+  background-color: rgba(255, 255, 255, 0.92);
+  border-bottom-color: transparent;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: saturate(1.4) blur(8px);
+}
+.ctr-header.is-compact .ctr-header__row {
+  height: var(--header-h-compact);
+}
+
+/* ============================================================================
+   SCROLL REVEAL — sections fade/rise in once, with a stagger on the first grid.
+
+   ⚠ THE BASE STATE IS VISIBLE. This inverts the design's own
+   `.ctr-reveal{opacity:0}` on purpose, and the inversion is load-bearing:
+
+     • the global reduced-motion block cancels animations outright
+       (`animation: none`), so an element that depends on a keyframe to REACH
+       opacity 1 would stay invisible forever;
+     • the same is true with JS disabled, or if hydration fails.
+
+   So hiding is OPT-IN and requires BOTH conditions to hold:
+     1. `prefers-reduced-motion: no-preference` — the media query below, and
+     2. `.ctr-reveal-on` on <html>, set by RevealController after mount.
+
+   Fail any one of them and every section simply renders in place. Never move
+   `opacity: 0` out of this block into a base rule.
+   ========================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+  .ctr-reveal-on .ctr-sec {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  .ctr-reveal-on .ctr-sec.is-in {
+    animation: ctr-reveal var(--dur-reveal) var(--ease-out-soft) both;
+  }
+
+  /* Stagger for the first-screen grid only (the design caps this at 4 steps and
+     explicitly wants no per-card delay in the long catalogue). */
+  .ctr-reveal-on .ctr-sec.is-in [data-reveal-stagger] > * {
+    animation: ctr-reveal var(--dur-reveal) var(--ease-out-soft) both;
+  }
+  .ctr-reveal-on .ctr-sec.is-in [data-reveal-stagger] > *:nth-child(2) {
+    animation-delay: var(--stagger-step);
+  }
+  .ctr-reveal-on .ctr-sec.is-in [data-reveal-stagger] > *:nth-child(3) {
+    animation-delay: calc(var(--stagger-step) * 2);
+  }
+  .ctr-reveal-on .ctr-sec.is-in [data-reveal-stagger] > *:nth-child(4) {
+    animation-delay: calc(var(--stagger-step) * 3);
+  }
+}
+
+/* PRINT is the third "never becomes visible" context, alongside reduced motion
+   and no-JS: printing does not scroll, so any section that had not yet been
+   revealed would come out as a blank region on the page. Force the end state.
+   (Found exactly this way — a full-page screenshot with animations paused
+   rendered everything below the first fold empty.) */
+@media print {
+  .ctr-reveal-on .ctr-sec,
+  .ctr-reveal-on .ctr-sec [data-reveal-stagger] > * {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+}
+
+/* The field is 16 icons on desktop and 7 on mobile; `--wide` marks the 9 that
+   only appear from md up.
+   ⚠ This is a bespoke modifier rather than Tailwind's `hidden md:block` ON
+   PURPOSE. The `.ctr-hero__icon` rules above are UNLAYERED, and unlayered CSS
+   beats anything in `@layer utilities` — so `display: block` there would win
+   over `hidden`, and the mobile field would silently render all 16. Keeping the
+   visibility switch in the same unlayered block keeps it a fair fight. */
+.ctr-hero__icon--wide {
+  display: none;
+}
+@media (min-width: 768px) {
+  .ctr-hero__icon--wide {
+    display: block;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   Reduced motion: movement is genuinely REMOVED, not merely made instant.
+   Colour, shadow and focus rings all still change, so nothing loses meaning.
+
+   ⚠ WHY THIS IS NOT JUST `transform: none !important` ON EVERYTHING.
+   That blanket rule is tempting and WRONG here, because `transform`/`translate`
+   also do LAYOUT work that has nothing to do with motion:
+     • Leaflet positions its map panes and tiles with `transform: translate3d()`
+       — nuking transforms breaks every map on the site for reduced-motion users.
+     • `SearchBar.tsx` centres a field icon with `-translate-y-1/2`, which in
+       Tailwind v4 compiles to the `translate` property, so `translate: none`
+       would drop it to the top of the field.
+   So movement is cancelled by CATEGORY instead:
+     1. keyframe animations — cancelled outright (they are all decorative here);
+     2. hover/focus transforms — cancelled at the component with `motion-reduce:`
+        (see PropertyCard's lift + photo scale);
+     3. the hero icon field — cancelled explicitly by class below.
+   If you add a new moving thing, cancel it in whichever of those three it is —
+   do NOT reach for a global transform kill.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 1ms;
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+    --dur-reveal: 1ms;
+    --dur-gallery: 1ms;
+    --stagger-step: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    /* `animation: none` rather than `animation-duration: 1ms`. A 1ms run still
+       RUNS, and lands on the keyframe's end state — which for the hero drift
+       meant the icons froze at their fully-drifted offset instead of at rest,
+       and for `ctr-pop` a 1ms scale flash. Cancelling puts every animated
+       element at its own base style, which is the resting position by design. */
+    animation: none !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Hero icon field: hold every icon and layer at its base position. Safe to
+     name `transform` here because these elements exist ONLY to drift — they do
+     no layout work, so there is nothing to break. */
+  .ctr-hero__icon,
+  .ctr-hero__layer {
+    animation: none !important;
+    transform: none !important;
+  }
 }
