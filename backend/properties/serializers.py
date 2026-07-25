@@ -5,8 +5,10 @@ from rest_framework import serializers
 
 from users.models import User
 
+from owners.models import Owner
+from owners.serializers import OwnerShortSerializer
 from locations.choices import CommercialType
-from properties.choices import PropertyType
+from properties.choices import PropertyStatus, PropertyType
 from properties.import_choices import ImportSourceFormat
 from properties.models import (
     ApartmentDetails,
@@ -15,11 +17,16 @@ from properties.models import (
     LandPlotDetails,
     ImportItem,
     ImportJob,
+    PriceHistory,
     Property,
     PropertyPhoto,
     PropertyVideo,
 )
 from properties.property_photo_images import validate_property_photo_original_size
+from users.permissions import (
+    crm_user_has_capability,
+    user_can_access_crm_property,
+)
 
 
 class AgencyShortSerializer(serializers.Serializer):
@@ -131,6 +138,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
         read_only=True, allow_null=True
     )
     preview_image = serializers.SerializerMethodField()
+    is_price_reduced = serializers.SerializerMethodField()
 
     class Meta:
         model = Property
@@ -155,7 +163,21 @@ class PropertyListSerializer(serializers.ModelSerializer):
             "land_plot_details",
             "commercial_details",
             "preview_image",
+            "is_price_reduced",
         ]
+
+    def get_is_price_reduced(self, obj) -> bool:
+        """
+        Current price below the PEAK historical price — same definition as the
+        detail endpoint. Reads `peak_price`, annotated on the list queryset
+        (Max("price_history__price")), so there's no per-row query. If the
+        annotation is absent (serializer used off a non-annotated queryset), we
+        conservatively return False rather than firing an N+1 lookup.
+        """
+        peak = getattr(obj, "peak_price", None)
+        if peak is None or obj.price is None:
+            return False
+        return obj.price < peak
 
     def get_preview_image(self, obj):
         for photo in obj.photos.all()[:1]:
@@ -169,6 +191,14 @@ class PropertyListSerializer(serializers.ModelSerializer):
         return None
 
 
+class PriceHistoryPublicSerializer(serializers.ModelSerializer):
+    """One price point (chronological). `price` is a plain decimal string."""
+
+    class Meta:
+        model = PriceHistory
+        fields = ["price", "changed_at"]
+
+
 class PropertyDetailSerializer(serializers.ModelSerializer):
     city = CityShortSerializer(read_only=True, allow_null=True)
     district = DistrictShortSerializer(read_only=True, allow_null=True)
@@ -177,6 +207,8 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
         read_only=True, allow_null=True
     )
     assigned_realtor = RealtorShortSerializer(read_only=True, allow_null=True)
+    price_history = serializers.SerializerMethodField()
+    is_price_reduced = serializers.SerializerMethodField()
     apartment_details = ApartmentDetailsPublicSerializer(
         read_only=True, allow_null=True
     )
@@ -189,6 +221,27 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
     )
     photos = PropertyPhotoPublicSerializer(many=True, read_only=True)
     videos = PropertyVideoPublicSerializer(many=True, read_only=True)
+
+    def _history(self, obj):
+        # Prefetched by the view (`prefetch_related("price_history")`), so this is
+        # already ordered ascending by the model's Meta.ordering.
+        return list(obj.price_history.all())
+
+    def get_price_history(self, obj):
+        return PriceHistoryPublicSerializer(self._history(obj), many=True).data
+
+    def get_is_price_reduced(self, obj) -> bool:
+        """
+        True when the current price is BELOW the highest price ever recorded for
+        this listing. We compare against the PEAK (max) rather than the immediately
+        previous price so a genuine markdown still reads as "снижена" even after a
+        small later bump — which is the signal buyers actually care about.
+        """
+        history = self._history(obj)
+        if len(history) < 2 or obj.price is None:
+            return False
+        peak = max(h.price for h in history)
+        return obj.price < peak
 
     class Meta:
         model = Property
@@ -217,6 +270,8 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
             "commercial_details",
             "photos",
             "videos",
+            "price_history",
+            "is_price_reduced",
         ]
 
 
@@ -226,6 +281,62 @@ class CrmPropertyListSerializer(serializers.ModelSerializer):
     agency = AgencyShortSerializer(read_only=True, allow_null=True)
     created_by = RealtorShortSerializer(read_only=True, allow_null=True)
     assigned_realtor = RealtorShortSerializer(read_only=True, allow_null=True)
+    # Owner presence flag for the "⚠ Собственник не указан" list indicator.
+    # CRM-only serializer; owner data is never exposed publicly.
+    has_owner = serializers.SerializerMethodField()
+    owner_name = serializers.CharField(source="owner.full_name", read_only=True, default=None)
+    can_delete = serializers.SerializerMethodField()
+    can_archive = serializers.SerializerMethodField()
+    can_restore = serializers.SerializerMethodField()
+
+    def _user(self):
+        request = self.context.get("request")
+        return getattr(request, "user", None)
+
+    def get_can_delete(self, obj) -> bool:
+        """
+        Whether the current user may HARD delete this property — owner or staff
+        AND holding the delete_property capability. Gates the red delete button.
+        """
+        user = self._user()
+        if user is None:
+            return False
+        return user_can_access_crm_property(user, obj) and crm_user_has_capability(
+            user, "delete_property"
+        )
+
+    def get_can_archive(self, obj) -> bool:
+        """
+        Whether the current user may archive (soft delete) this property: access
+        + delete_property capability, and the property is not already archived.
+        Gates the grey archive button.
+        """
+        user = self._user()
+        if user is None:
+            return False
+        return (
+            obj.status != PropertyStatus.ARCHIVED
+            and user_can_access_crm_property(user, obj)
+            and crm_user_has_capability(user, "delete_property")
+        )
+
+    def get_can_restore(self, obj) -> bool:
+        """
+        Whether the current user may restore this property from archive (status
+        -> draft via to_draft): access + edit_property capability, and the
+        property is currently archived. Gates the "Восстановить" button.
+        """
+        user = self._user()
+        if user is None:
+            return False
+        return (
+            obj.status == PropertyStatus.ARCHIVED
+            and user_can_access_crm_property(user, obj)
+            and crm_user_has_capability(user, "edit_property")
+        )
+
+    def get_has_owner(self, obj) -> bool:
+        return obj.owner_id is not None
 
     class Meta:
         model = Property
@@ -253,6 +364,11 @@ class CrmPropertyListSerializer(serializers.ModelSerializer):
             "agency",
             "created_by",
             "assigned_realtor",
+            "has_owner",
+            "owner_name",
+            "can_delete",
+            "can_archive",
+            "can_restore",
         ]
 
 
@@ -327,6 +443,8 @@ class CrmPropertyDetailSerializer(serializers.ModelSerializer):
     assigned_realtor = RealtorShortSerializer(read_only=True, allow_null=True)
     created_by = RealtorShortSerializer(read_only=True, allow_null=True)
     agency = AgencyShortSerializer(read_only=True, allow_null=True)
+    # Owner (собственник) — CRM-only nested read. Never in any public serializer.
+    owner = OwnerShortSerializer(read_only=True, allow_null=True)
     apartment_details = CrmApartmentDetailsSerializer(
         read_only=True, allow_null=True
     )
@@ -376,6 +494,7 @@ class CrmPropertyDetailSerializer(serializers.ModelSerializer):
             "agency",
             "created_by",
             "assigned_realtor",
+            "owner",
             "apartment_details",
             "house_details",
             "land_plot_details",
@@ -396,6 +515,13 @@ class CrmPropertyWriteSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=False,
     )
+    # Owner link — optional (nullable). Standard FK write; the Owner record itself
+    # is created/edited via /api/crm/owners/ (the modal), then linked here by id.
+    owner = serializers.PrimaryKeyRelatedField(
+        queryset=Owner.objects.all(),
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = Property
@@ -404,6 +530,7 @@ class CrmPropertyWriteSerializer(serializers.ModelSerializer):
             "crm_property_id",
             "agency",
             "assigned_realtor",
+            "owner",
             "deal_type",
             "property_type",
             "market_type",

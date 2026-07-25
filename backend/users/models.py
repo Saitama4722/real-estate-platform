@@ -8,11 +8,34 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models
 
+from common.image_compression import compress_avatar
 from common.models import BaseTimestampedModel
 
 from .managers import UserManager
 
 _CRM_ID_PATTERN = re.compile(r"^RID(\d{6})$")
+
+
+def _compress_avatar_field(field_file) -> None:
+    """
+    Compress an avatar ImageField in place to a 400x400 square JPEG (q85), but
+    only when it holds a *new, uncommitted* upload — so re-saving a row that
+    already has a stored avatar never re-processes the existing file.
+
+    ``FieldFile._committed`` is False exactly while an unsaved upload is assigned;
+    once written to storage it flips True. ``compress_avatar`` returns None when
+    the image is already a square at the target size, leaving the upload as-is.
+    """
+    if not field_file:
+        return
+    if getattr(field_file, "_committed", True):
+        return
+    try:
+        compressed = compress_avatar(field_file)
+    except Exception:  # noqa: BLE001 — never let compression break the save
+        return
+    if compressed is not None:
+        field_file.save(compressed.name, compressed, save=False)
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -101,6 +124,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"RID{best + 1:06d}"
 
     def save(self, *args, **kwargs):
+        _compress_avatar_field(self.avatar)
         if self._state.adding and not self.crm_id:
             max_attempts = 12
             for attempt in range(max_attempts):
@@ -229,3 +253,7 @@ class RealtorProfile(BaseTimestampedModel):
                     "user": "Профиль риэлтора можно привязать только к пользователю с ролью «Риэлтор»."
                 }
             )
+
+    def save(self, *args, **kwargs):
+        _compress_avatar_field(self.photo)
+        return super().save(*args, **kwargs)

@@ -100,9 +100,11 @@ INSTALLED_APPS = [
     "users",
     "agencies",
     "locations",
+    "owners",
     "properties",
     "leads",
     "articles",
+    "submissions",
     "seo",
     "common",
 ]
@@ -127,10 +129,20 @@ ROOT_URLCONF = "config.urls"
 
 WSGI_APPLICATION = "config.wsgi.application"
 
+# Persistent-connection lifetime (seconds). Production keeps 600 (default); local
+# dev sets a smaller value via CONN_MAX_AGE in backend/.env so the threaded dev
+# server doesn't hoard idle connections toward Postgres' max_connections limit.
+# Keep this at or below Postgres' idle_session_timeout so Django recycles a
+# connection before Postgres force-closes an abandoned one.
+try:
+    _conn_max_age = int(os.environ.get("CONN_MAX_AGE", "600"))
+except ValueError:
+    _conn_max_age = 600
+
 _database_url = os.environ.get("DATABASE_URL", "").strip()
 if _database_url:
     DATABASES = {
-        "default": dj_database_url.parse(_database_url, conn_max_age=600),
+        "default": dj_database_url.parse(_database_url, conn_max_age=_conn_max_age),
     }
 else:
     DATABASES = {
@@ -141,6 +153,7 @@ else:
             "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "postgres"),
             "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
             "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+            "CONN_MAX_AGE": _conn_max_age,
         }
     }
 
@@ -231,6 +244,21 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+
+# --- Public site URL (used to build absolute links in notifications, etc.) ---
+# No trailing slash. Override per environment via the SITE_URL env var.
+SITE_URL = os.environ.get("SITE_URL", "https://centreal.ru").rstrip("/")
+
+# --- Lead notifications (Telegram) ---
+# Master switch for outbound lead notifications. When False, no notification is
+# sent regardless of the Telegram credentials below.
+LEADS_NOTIFICATIONS_ENABLED = os.environ.get(
+    "LEADS_NOTIFICATIONS_ENABLED", "True"
+).strip().lower() in ("1", "true", "yes")
+# When enabled AND both are set, a new public-form lead triggers a Telegram
+# message (see leads.tasks.send_lead_telegram_notification). Leave empty to disable.
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 
 # Кэш по умолчанию (локальная память процесса; для публичных справочников и cache_page)
 CACHES = {

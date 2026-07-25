@@ -138,16 +138,31 @@ class PublicLeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     def perform_create(self, serializer):
         prop = serializer.validated_data.get("property")
         agency = prop.agency if prop is not None else None
-        # Публичная заявка по объекту: ответственный риэлтор лида = ответственный объекта (если задан).
-        assigned_realtor = (
-            prop.assigned_realtor if prop is not None else None
-        )
+        # Публичная заявка по объекту: ответственный риэлтор лида = ответственный
+        # объекта (если задан). Заявка со страницы риэлтора (без объекта): берём
+        # риэлтора, переданного через assigned_realtor_crm_id (уже резолвлен в
+        # объект User валидатором сериализатора).
+        if prop is not None:
+            assigned_realtor = prop.assigned_realtor
+        else:
+            assigned_realtor = serializer.validated_data.get(
+                "assigned_realtor_crm_id"
+            )
         lead = serializer.save(agency=agency, assigned_realtor=assigned_realtor)
         LeadStatusHistory.record(
             lead=lead,
             previous_status=None,
             new_status=lead.status,
             changed_by=None,
+        )
+        # Notify the Telegram group — only after the DB transaction commits, so
+        # the task never runs against a rolled-back lead. A failed send is
+        # swallowed inside the task and never affects lead creation.
+        from leads.tasks import send_lead_telegram_notification
+
+        lead_id = lead.pk
+        transaction.on_commit(
+            lambda: send_lead_telegram_notification.delay(lead_id)
         )
 
 

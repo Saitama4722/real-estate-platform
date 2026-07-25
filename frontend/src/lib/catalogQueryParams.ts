@@ -63,6 +63,10 @@ export function publicPropertiesParamsFromSearchParams(
   const districtSlug = catalogSearchParamFirst(sp, "district_slug");
   if (districtSlug) out.district_slug = districtSlug;
 
+  // Микрорайон filter — matches Property.neighborhood on the Django side.
+  const neighborhoodSlug = catalogSearchParamFirst(sp, "neighborhood_slug");
+  if (neighborhoodSlug) out.neighborhood_slug = neighborhoodSlug;
+
   const rooms = catalogOptionalInt(sp, "rooms");
   if (rooms !== undefined) out.rooms = rooms;
 
@@ -118,6 +122,7 @@ const SEARCH_BAR_SYNC_KEYS = [
   "property_type",
   "city_slug",
   "district_slug",
+  "neighborhood_slug",
   "search",
   "rooms",
   "rooms_min",

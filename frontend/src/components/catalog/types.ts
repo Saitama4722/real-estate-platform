@@ -34,6 +34,10 @@ export interface CatalogPropertyItem {
   description?: string;
   realtorName?: string;
   realtorAvatar?: string;
+  /** Chronological price points (ascending). Numbers, ready for the chart. */
+  priceHistory?: { price: number; changedAt: string }[];
+  /** Current price is below the peak recorded price. */
+  isPriceReduced?: boolean;
   /** Публичный CRM ID риэлтора (RID######) для ссылки на страницу /realtors/... */
   realtorCrmId?: string;
   details?: {

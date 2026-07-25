@@ -42,6 +42,7 @@ export interface PublicPropertyListItemRaw {
     floors_total: number | null;
   } | null;
   preview_image: string | null;
+  is_price_reduced?: boolean;
 }
 
 function formatListPrice(price: string, currency: string): string {
@@ -125,6 +126,7 @@ export function mapPublicListItemToCatalogItem(row: PublicPropertyListItemRaw): 
       row.house_details?.floors_total ??
       undefined,
     district: row.district?.name,
+    isPriceReduced: row.is_price_reduced === true,
   };
 }
 

@@ -2,9 +2,10 @@ import logging
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
-from django.db.models import F, Max, Prefetch
+from django.db.models import F, Max, Prefetch, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from locations.choices import CommercialType
 from rest_framework import filters, mixins, status, viewsets
 from rest_framework.decorators import action
@@ -200,6 +201,10 @@ class PropertyViewSet(ReadOnlyModelViewSet):
                 "house_details",
                 "land_plot_details",
                 "commercial_details",
+            ).annotate(
+                # Peak historical price per row via a single aggregate join (no
+                # N+1) — the list serializer's is_price_reduced reads this.
+                peak_price=Max("price_history__price"),
             ).prefetch_related(
                 Prefetch(
                     "photos",
@@ -212,7 +217,7 @@ class PropertyViewSet(ReadOnlyModelViewSet):
                 "house_details",
                 "land_plot_details",
                 "commercial_details",
-            ).prefetch_related("photos", "videos")
+            ).prefetch_related("photos", "videos", "price_history")
 
         return qs
 
@@ -342,16 +347,23 @@ class CrmPropertyViewSet(
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
     """
-    Internal CRM CRUD for properties (no DELETE).
+    Internal CRM CRUD for properties.
+
+    Soft delete: POST .../archive/  (status -> archived, recoverable).
+    Restore:     POST .../to_draft/ (status -> draft).
+    Hard delete: DELETE .../{id}/   (permanent; requires delete_property).
     Publication workflow: POST .../publish/, .../to_draft/, .../archive/.
     """
 
     permission_classes = [IsCrmUser, IsCrmPropertyStaffOrOwner]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["crm_property_id", "title_generated", "public_address_text"]
+    # `search` is handled manually in get_queryset() (see below) so a pure-integer
+    # query can also match the numeric primary key, which DRF's SearchFilter cannot
+    # do. OrderingFilter is still applied for ?ordering=.
+    filter_backends = [filters.OrderingFilter]
     ordering_fields = ["created_at", "updated_at", "price", "published_at"]
     ordering = ["-created_at"]
 
@@ -364,11 +376,25 @@ class CrmPropertyViewSet(
             "assigned_realtor",
             "created_by",
             "agency",
+            "owner",
             "apartment_details",
             "house_details",
             "land_plot_details",
             "commercial_details",
         )
+
+        search = (self.request.query_params.get("search") or "").strip()
+        if search:
+            # Match PID / title / public address (case-insensitive substring),
+            # plus an exact numeric primary-key match when the query is an integer.
+            search_q = (
+                Q(crm_property_id__icontains=search)
+                | Q(title_generated__icontains=search)
+                | Q(public_address_text__icontains=search)
+            )
+            if search.isdigit():
+                search_q |= Q(id=int(search))
+            qs = qs.filter(search_q)
 
         status = self.request.query_params.get("status")
         if status:
@@ -411,6 +437,28 @@ class CrmPropertyViewSet(
     def partial_update(self, request, *args, **kwargs):
         require_crm_capability(request, "edit_property")
         return super().partial_update(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        # New CRM properties go live immediately: published on create.
+        serializer.save(
+            status=PropertyStatus.PUBLISHED,
+            is_published=True,
+            published_at=timezone.now(),
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        # Hard delete — permanent. Gated by the same capability as archiving.
+        require_crm_capability(request, "delete_property")
+        return super().destroy(request, *args, **kwargs)
+
+    def perform_destroy(self, instance):
+        logger.info(
+            "crm_property_hard_deleted property_id=%s crm_property_id=%s user_id=%s",
+            instance.pk,
+            getattr(instance, "crm_property_id", None),
+            getattr(self.request.user, "pk", None),
+        )
+        instance.delete()
 
     def get_serializer_class(self):
         if self.action == "list":

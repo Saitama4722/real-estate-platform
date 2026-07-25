@@ -16,25 +16,22 @@ interface ArticlePreviewCardProps {
 
 export function ArticlePreviewCard({ article }: ArticlePreviewCardProps) {
   const href = `/articles/${article.slug}`;
+  const hasCover = Boolean(article.coverImage && isPropertyImageUrl(article.coverImage));
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <div className="aspect-[16/10] w-full bg-gray-200">
-        {article.coverImage && isPropertyImageUrl(article.coverImage) ? (
+      {hasCover && (
+        <div className="aspect-[16/10] w-full bg-gray-200">
           <img
-            src={article.coverImage}
+            src={article.coverImage as string}
             alt=""
             className="h-full w-full object-cover"
             loading="lazy"
             decoding="async"
           />
-        ) : (
-          <div className="flex h-full items-center justify-center px-4 text-center text-sm text-gray-500">
-            Статья
-          </div>
-        )}
-      </div>
-      <div className="flex flex-1 flex-col p-4">
+        </div>
+      )}
+      <div className="flex flex-1 flex-col p-5">
         <time className="text-xs text-gray-500" dateTime={article.publishedAt}>
           {formatDate(article.publishedAt)}
         </time>

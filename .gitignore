@@ -73,3 +73,10 @@ Thumbs.db
 # Misc
 *.log
 .cache/
+
+# Native local development (no Docker) — never commit venvs or local DBs
+backend/venv/
+backend/.venv/
+backend/db.sqlite3
+**/__pycache__/
+*.pyc

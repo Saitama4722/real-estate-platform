@@ -1,9 +1,14 @@
 "use client";
 
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
+import dynamic from "next/dynamic";
 
-const PropertyMapLazy = lazy(() =>
-  import("./PropertyMap").then((mod) => ({ default: mod.PropertyMap })),
+// Leaflet/react-leaflet touch `window` at module-eval time, so this map must be
+// client-only — `next/dynamic({ ssr: false })`, not `React.lazy` (which still
+// runs on the server and throws "window is not defined").
+const PropertyMapLazy = dynamic(
+  () => import("./PropertyMap").then((mod) => ({ default: mod.PropertyMap })),
+  { ssr: false },
 );
 
 interface PropertyMapWrapperProps {

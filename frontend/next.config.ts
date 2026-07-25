@@ -96,22 +96,26 @@ function resolveDjangoBaseForApiRewrites(): string {
  * `/api/*` → Django at `resolveDjangoBaseForApiRewrites()` (build/start time).
  * `/media/*` → Django media root (dev: FileSystem, prod: proxied through Next.js).
  *
- * Auth routes have explicit slash-normalized rules so Django APPEND_SLASH does not
- * 301-redirect when the framework strips a trailing slash.
+ * Two wildcard rules cover every path in both slash and slash-less form, always
+ * forwarding to Django with a trailing slash. This prevents the redirect loop:
+ *   Next.js 308 strips slash → generic rule hits Django without slash →
+ *   Django APPEND_SLASH 301 adds slash → Next.js 308 again → ERR_TOO_MANY_REDIRECTS.
+ * Placing these in `beforeFiles` ensures they run before Next.js page routing so
+ * the trailing-slash normalisation redirect never fires for /api/* paths.
  */
 const nextConfig: NextConfig = {
   async rewrites() {
     const backend = resolveDjangoBaseForApiRewrites();
     const apiBase = `${backend}/api`;
-    return [
-      { source: "/api/auth/login", destination: `${apiBase}/auth/login/` },
-      { source: "/api/auth/logout", destination: `${apiBase}/auth/logout/` },
-      { source: "/api/auth/refresh", destination: `${apiBase}/auth/refresh/` },
-      { source: "/api/auth/me", destination: `${apiBase}/auth/me/` },
-      { source: "/api/auth/me/", destination: `${apiBase}/auth/me/` },
-      { source: "/api/:path*", destination: `${apiBase}/:path*` },
-      { source: "/media/:path*", destination: `${backend}/media/:path*` },
-    ];
+    return {
+      beforeFiles: [
+        // Slash form: forward as-is (already has slash Django expects).
+        { source: "/api/:path*/", destination: `${apiBase}/:path*/` },
+        // Slash-less form: append slash so Django APPEND_SLASH never needs to redirect.
+        { source: "/api/:path*", destination: `${apiBase}/:path*/` },
+        { source: "/media/:path*", destination: `${backend}/media/:path*` },
+      ],
+    };
   },
 };
 

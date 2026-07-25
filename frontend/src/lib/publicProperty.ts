@@ -1,5 +1,11 @@
-import type { CatalogPropertyItem } from "@/components/catalog/types";
+import type { CatalogCitySlug, CatalogPropertyItem } from "@/components/catalog/types";
 import { formatPropertyPrice } from "@/lib/propertySeo";
+
+/** Narrow an arbitrary city slug to the two known landing-city slugs. */
+function asCitySlug(slug: string | undefined): CatalogCitySlug | undefined {
+  if (slug === "krasnodar" || slug === "gelendzhik") return slug;
+  return undefined;
+}
 
 export interface PublicLocationShort {
   id: number;
@@ -43,6 +49,10 @@ export interface PublicPropertyDetail {
   } | null;
   photos: { url: string | null; sort_order: number; is_main: boolean }[];
   videos: { video_url: string }[];
+  /** Chronological (ascending) price points; each price is a decimal string. */
+  price_history?: { price: string; changed_at: string }[];
+  /** True when current price is below the peak recorded price (see serializer). */
+  is_price_reduced?: boolean;
   assigned_realtor: {
     id: number;
     crm_id: string;
@@ -149,6 +159,8 @@ export function mapPublicDetailToCatalogItem(
   return {
     id: p.id,
     slug,
+    citySlug: asCitySlug(p.city?.slug),
+    districtSlug: p.district?.slug,
     image: main,
     price: formatPropertyPrice(p),
     title: p.title_generated,
@@ -182,5 +194,11 @@ export function mapPublicDetailToCatalogItem(
     realtorName,
     realtorAvatar,
     realtorCrmId,
+    priceHistory: Array.isArray(p.price_history)
+      ? p.price_history
+          .map((h) => ({ price: Number(h.price), changedAt: h.changed_at }))
+          .filter((h) => Number.isFinite(h.price))
+      : undefined,
+    isPriceReduced: p.is_price_reduced === true,
   };
 }

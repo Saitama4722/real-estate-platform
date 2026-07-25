@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import L from "leaflet";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { AttributionControl, MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import "leaflet/dist/leaflet.css";
 import "react-leaflet-cluster/dist/assets/MarkerCluster.css";
@@ -44,10 +44,17 @@ export function CatalogMap({ properties }: CatalogMapProps) {
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200">
-      <MapContainer center={center} zoom={11} scrollWheelZoom className="h-[440px] w-full">
+      <MapContainer
+        center={center}
+        zoom={11}
+        scrollWheelZoom
+        attributionControl={false}
+        className="h-[440px] w-full"
+      >
+        <AttributionControl position="bottomright" prefix={false} />
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution="&copy; 2GIS"
+          url="https://tile2.maps.2gis.com/tiles?x={x}&y={y}&z={z}&v=1"
         />
 
         <MarkerClusterGroup
@@ -70,7 +77,7 @@ export function CatalogMap({ properties }: CatalogMapProps) {
                   <p className="mt-1 text-xs text-gray-600">{property.location}</p>
                   <Link
                     href={property.href}
-                    className="mt-3 inline-flex h-8 items-center rounded-md bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700"
+                    className="mt-3 inline-flex h-8 items-center rounded-md bg-blue-600 px-3 text-xs font-medium text-white! hover:bg-blue-700"
                   >
                     Открыть объект
                   </Link>

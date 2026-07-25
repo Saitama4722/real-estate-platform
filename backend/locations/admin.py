@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import City, District, Neighborhood, ResidentialComplex
+from .models import (
+    City,
+    District,
+    DistrictGuide,
+    Neighborhood,
+    ResidentialComplex,
+)
 
 
 @admin.register(City)
@@ -21,6 +27,7 @@ class DistrictAdmin(admin.ModelAdmin):
     list_display = ["name", "city", "sort_order"]
     list_filter = ["city"]
     ordering = ["city", "sort_order"]
+    search_fields = ["name", "slug"]
     prepopulated_fields = {"slug": ("name",)}
     fieldsets = (
         (None, {"fields": ("city", "name", "slug", "sort_order")}),
@@ -33,6 +40,7 @@ class DistrictAdmin(admin.ModelAdmin):
 class NeighborhoodAdmin(admin.ModelAdmin):
     list_display = ["name", "city", "district", "sort_order"]
     list_filter = ["city", "district"]
+    search_fields = ["name", "slug"]
     prepopulated_fields = {"slug": ("name",)}
     fieldsets = (
         (None, {"fields": ("city", "district", "name", "slug", "sort_order")}),
@@ -57,3 +65,27 @@ class ResidentialComplexAdmin(admin.ModelAdmin):
         ("Даты", {"fields": ("created_at", "updated_at")}),
     )
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(DistrictGuide)
+class DistrictGuideAdmin(admin.ModelAdmin):
+    list_display = ("id", "title", "target_label", "status", "published_at", "updated_at")
+    list_filter = ("status", "district__city")
+    search_fields = ("title", "slug", "excerpt")
+    autocomplete_fields = ("district", "neighborhood")
+    prepopulated_fields = {"slug": ("title",)}
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        (
+            "Привязка (заполните ТОЛЬКО одно поле — район ИЛИ микрорайон)",
+            {"fields": ("district", "neighborhood")},
+        ),
+        ("Содержание", {"fields": ("title", "slug", "excerpt", "body", "cover_image")}),
+        ("Публикация", {"fields": ("status", "published_at")}),
+        ("Даты", {"fields": ("created_at", "updated_at")}),
+    )
+
+    @admin.display(description="Привязан к")
+    def target_label(self, obj):
+        target = obj.district or obj.neighborhood
+        return str(target) if target else "—"

@@ -18,6 +18,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/account", label: "Панель" },
   { href: "/account/properties", label: "Объекты" },
   { href: "/account/inquiries", label: "Заявки" },
+  { href: "/account/sale-requests", label: "Заявки на продажу" },
+  { href: "/account/owners", label: "Собственники" },
   { href: "/account/profile", label: "Профиль" },
   { href: "/account/staff", label: "Сотрудники", adminOnly: true },
   { href: "/account/activity-logs", label: "Журнал активности", adminOnly: true },

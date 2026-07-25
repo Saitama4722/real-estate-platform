@@ -1,8 +1,10 @@
-from rest_framework import filters
+from rest_framework import filters, mixins, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
+
+from users.permissions import IsCrmUser
 
 from .choices import (
     BathroomType,
@@ -14,11 +16,16 @@ from .choices import (
     PermittedUse,
     RenovationType,
 )
-from .models import City, District, Neighborhood, ResidentialComplex
+from .models import City, District, DistrictGuide, Neighborhood, ResidentialComplex
 from .serializers import (
     CitySerializer,
+    DistrictCreateSerializer,
+    DistrictGuideDetailSerializer,
+    DistrictGuideListSerializer,
     DistrictSerializer,
+    NeighborhoodCreateSerializer,
     NeighborhoodSerializer,
+    ResidentialComplexCreateSerializer,
     ResidentialComplexSerializer,
 )
 
@@ -31,24 +38,47 @@ class CityViewSet(ReadOnlyModelViewSet):
         return City.objects.filter(is_active=True)
 
 
-class DistrictViewSet(ReadOnlyModelViewSet):
-    serializer_class = DistrictSerializer
+class DistrictViewSet(
+    mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericViewSet
+):
     permission_classes = [AllowAny]
 
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return DistrictCreateSerializer
+        return DistrictSerializer
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsCrmUser()]
+        return [AllowAny()]
+
     def get_queryset(self):
-        queryset = District.objects.all()
+        # select_related("guide") so the guide_slug field never fires N+1.
+        queryset = District.objects.select_related("guide")
         city_id = self.request.query_params.get("city")
         if city_id:
             queryset = queryset.filter(city_id=city_id)
         return queryset
 
 
-class NeighborhoodViewSet(ReadOnlyModelViewSet):
-    serializer_class = NeighborhoodSerializer
+class NeighborhoodViewSet(
+    mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericViewSet
+):
     permission_classes = [AllowAny]
 
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return NeighborhoodCreateSerializer
+        return NeighborhoodSerializer
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsCrmUser()]
+        return [AllowAny()]
+
     def get_queryset(self):
-        queryset = Neighborhood.objects.all()
+        queryset = Neighborhood.objects.select_related("guide")
         city_id = self.request.query_params.get("city")
         if city_id:
             queryset = queryset.filter(city_id=city_id)
@@ -58,11 +88,21 @@ class NeighborhoodViewSet(ReadOnlyModelViewSet):
         return queryset
 
 
-class ResidentialComplexViewSet(ReadOnlyModelViewSet):
-    serializer_class = ResidentialComplexSerializer
-    permission_classes = [AllowAny]
+class ResidentialComplexViewSet(
+    mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericViewSet
+):
     filter_backends = [filters.SearchFilter]
     search_fields = ["name"]
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return ResidentialComplexCreateSerializer
+        return ResidentialComplexSerializer
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsCrmUser()]
+        return [AllowAny()]
 
     def get_queryset(self):
         queryset = ResidentialComplex.objects.all()
@@ -73,6 +113,32 @@ class ResidentialComplexViewSet(ReadOnlyModelViewSet):
         if district_id:
             queryset = queryset.filter(district_id=district_id)
         return queryset
+
+
+class DistrictGuidePublicViewSet(ReadOnlyModelViewSet):
+    """Public read-only guides: list (published) + retrieve by slug."""
+
+    permission_classes = [AllowAny]
+    lookup_field = "slug"
+    # Guide slugs may contain non-ASCII (allow_unicode) — match anything but "/".
+    lookup_value_regex = "[^/]+"
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return DistrictGuideDetailSerializer
+        return DistrictGuideListSerializer
+
+    def get_queryset(self):
+        return (
+            DistrictGuide.objects.filter(
+                status=DistrictGuide.GuideStatus.PUBLISHED,
+                published_at__isnull=False,
+            )
+            .select_related(
+                "district", "district__city", "neighborhood", "neighborhood__city"
+            )
+            .order_by("-published_at", "-created_at")
+        )
 
 
 class choices_view(APIView):

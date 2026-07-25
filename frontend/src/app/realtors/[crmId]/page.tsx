@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PropertyCard } from "@/components/home/PropertyCard";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Container } from "@/components/layout/container";
 import { Card, CardContent } from "@/components/ui/card";
+import { RealtorContactModal } from "@/components/realtor/RealtorContactModal";
+import { RealtorPropertiesToggle } from "@/components/realtor/RealtorPropertiesToggle";
 import { siteOrigin } from "@/lib/articleSeo";
 import { isPropertyImageUrl } from "@/lib/propertyMedia";
 import { fetchPublicPropertiesList } from "@/lib/publicPropertyList";
@@ -72,8 +72,6 @@ export default async function PublicRealtorPage({ params }: RealtorPageProps) {
     searchParams: { assigned_realtor_crm_id: realtor.crm_id },
   });
 
-  const telHref = realtor.phone ? `tel:${realtor.phone.replace(/\s+/g, "")}` : null;
-
   return (
     <div className="py-6 md:py-8">
       <Container>
@@ -109,14 +107,10 @@ export default async function PublicRealtorPage({ params }: RealtorPageProps) {
                     <p className="mt-1 text-sm text-gray-500">Телефон уточняйте по объектам.</p>
                   )}
                 </div>
-                {telHref ? (
-                  <Link
-                    href={telHref}
-                    className="inline-flex h-10 w-full items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 sm:w-auto"
-                  >
-                    Связаться
-                  </Link>
-                ) : null}
+                <RealtorContactModal
+                  crmId={realtor.crm_id}
+                  displayName={realtor.display_name}
+                />
               </CardContent>
             </Card>
           </div>
@@ -124,24 +118,7 @@ export default async function PublicRealtorPage({ params }: RealtorPageProps) {
 
         <section className="mt-12 border-t border-gray-200 pt-10">
           <h2 className="text-xl font-semibold text-gray-900">Объекты риэлтора</h2>
-          {properties.length === 0 ? (
-            <p className="mt-4 text-sm text-gray-600">Сейчас нет опубликованных объектов у этого риэлтора.</p>
-          ) : (
-            <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {properties.map((p) => (
-                <PropertyCard
-                  key={p.id}
-                  slug={p.slug}
-                  image={p.image}
-                  price={p.price}
-                  title={p.title}
-                  characteristics={p.characteristics}
-                  location={p.location}
-                  href={p.href}
-                />
-              ))}
-            </div>
-          )}
+          <RealtorPropertiesToggle properties={properties} />
         </section>
       </Container>
     </div>

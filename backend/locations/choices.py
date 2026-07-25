@@ -28,6 +28,8 @@ class CommercialType(models.TextChoices):
     PRODUCTION = "production", "Производство"
     FREE_PURPOSE = "free_purpose", "Свободного назначения"
     CATERING = "catering", "Общественное питание"
+    HOTEL = "hotel", "Гостиница"
+    GUESTHOUSE = "guesthouse", "Гостевой дом"
 
 
 class LandCategory(models.TextChoices):

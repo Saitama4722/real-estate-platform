@@ -74,6 +74,55 @@ def _encode_derivative_jpeg(image: Image.Image) -> bytes:
     return buffer.getvalue()
 
 
+def compress_original_file(uploaded_file):
+    """
+    Compress a freshly-uploaded ``original_file`` to longest-side
+    ``DERIVATIVE_LARGE_MAX_EDGE`` (1920) at JPEG quality 85, keeping aspect ratio.
+
+    Returns a Django ``ContentFile`` (``*.jpg``) to assign to the ImageField, or
+    ``None`` when the image already fits within 1920px on both sides AND is
+    already a JPEG (skip-if-small — leave the upload untouched). Returns ``None``
+    on any decode error so a bad upload never breaks the save (it is still
+    validated/processed downstream).
+    """
+    from PIL import UnidentifiedImageError
+
+    try:
+        uploaded_file.seek(0)
+    except (AttributeError, ValueError, OSError):
+        pass
+    try:
+        raw = uploaded_file.read()
+    finally:
+        try:
+            uploaded_file.seek(0)
+        except (AttributeError, ValueError, OSError):
+            pass
+
+    try:
+        with Image.open(BytesIO(raw)) as img:
+            img = ImageOps.exif_transpose(img)
+            img.load()
+            w, h = img.size
+            if w <= 0 or h <= 0:
+                return None
+            already_small = max(w, h) <= DERIVATIVE_LARGE_MAX_EDGE
+            already_jpeg = (img.format or "").upper() == "JPEG"
+            if already_small and already_jpeg:
+                return None
+            rgb = _to_rgb_for_jpeg(img)
+            resized = _resize_to_max_edge(rgb, DERIVATIVE_LARGE_MAX_EDGE)
+            data = _encode_derivative_jpeg(resized)
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        logger.warning("compress_original_file: could not process image (%s); skipping", exc)
+        return None
+
+    name = getattr(uploaded_file, "name", "") or "photo"
+    base = name.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    stem = base.rsplit(".", 1)[0] or "photo"
+    return ContentFile(data, name=f"{stem}.jpg")
+
+
 def build_property_photo_derivatives(original_field_file) -> tuple[bytes, bytes, bytes]:
     """
     Read ``original_field_file`` (FieldFile or UploadedFile) once into memory, then

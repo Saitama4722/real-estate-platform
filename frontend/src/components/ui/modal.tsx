@@ -44,7 +44,9 @@ export function Modal({ isOpen, onClose, children, className }: ModalProps) {
       {/* Content */}
       <div
         className={cn(
-          "relative z-10 bg-white rounded-lg p-6 max-w-lg w-full mx-4",
+          // max-h + overflow-y: on small phones the lead form is taller than
+          // the viewport — without this the modal bottom is unreachable.
+          "relative z-10 max-h-[90dvh] overflow-y-auto bg-white rounded-lg p-6 max-w-lg w-full mx-4",
           className,
         )}
       >

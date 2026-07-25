@@ -3,11 +3,21 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { DuplicateWarningModal } from "@/components/crm/DuplicateWarningModal";
+import { OwnerModal, type OwnerData } from "@/components/crm/OwnerModal";
+import { LocationAutocomplete } from "@/components/crm/LocationAutocomplete";
+import { CrmPropertyPhotosManager } from "@/components/crm/CrmPropertyPhotosManager";
+import {
+  CrmStagedPhotosPicker,
+  makeStagedPhoto,
+  type StagedPhoto,
+} from "@/components/crm/CrmStagedPhotosPicker";
+import { xhrUpload } from "@/lib/xhrUpload";
 import {
   authBearerHeaders,
   fetchWithCrmAuthRetry,
@@ -36,6 +46,17 @@ import {
   parseDetailFromApi,
   validateDetailsForSubmit,
 } from "@/lib/crmPropertyForm";
+
+/** Strip non-digits then insert a narrow-space every 3 digits from the right. */
+function formatPrice(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+/** Return only the digit characters from a formatted price string. */
+function stripPrice(formatted: string): string {
+  return formatted.replace(/\D/g, "");
+}
 
 const CrmPropertyAddressMap = dynamic(
   () =>
@@ -83,6 +104,89 @@ function fkId(v: unknown): string {
 const textareaClass =
   "w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
 
+/** Character limits — kept in sync with the backend model field max_length. */
+const DESCRIPTION_MAX = 3000;
+const SHORT_DESCRIPTION_MAX = 500;
+
+const NEIGHBORHOOD_LABEL_URBAN = "Микрорайон";
+
+/**
+ * Numeric-only input filtering for the property characteristics fields.
+ *
+ * `onKeyDown` blocks a disallowed printable character from ever appearing;
+ * `onChange` sanitizes the resulting value so pastes / IME / autofill can't
+ * slip non-numeric characters in either.
+ *
+ * - integer:  digits only (no decimal point, no sign, no exponent).
+ * - decimal:  digits plus a single "." or "," as decimal separator.
+ */
+const NUMERIC_CONTROL_KEYS = new Set([
+  "Backspace",
+  "Delete",
+  "Tab",
+  "Enter",
+  "Escape",
+  "Home",
+  "End",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+]);
+
+function isEditingShortcut(e: React.KeyboardEvent<HTMLInputElement>) {
+  // Allow Ctrl/Cmd combos (copy, paste, cut, select-all, etc.).
+  return e.ctrlKey || e.metaKey;
+}
+
+function handleIntegerKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  if (NUMERIC_CONTROL_KEYS.has(e.key) || isEditingShortcut(e)) return;
+  if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+}
+
+function sanitizeInteger(value: string) {
+  return value.replace(/[^0-9]/g, "");
+}
+
+function handleDecimalKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  if (NUMERIC_CONTROL_KEYS.has(e.key) || isEditingShortcut(e)) return;
+  // A single "." or "," acts as the decimal separator; block a second one.
+  if (e.key === "." || e.key === ",") {
+    if (/[.,]/.test(e.currentTarget.value)) e.preventDefault();
+    return;
+  }
+  if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+}
+
+function sanitizeDecimal(value: string) {
+  // Keep digits and separators, then collapse to at most one separator.
+  const cleaned = value.replace(/[^0-9.,]/g, "");
+  const firstSep = cleaned.search(/[.,]/);
+  if (firstSep === -1) return cleaned;
+  return (
+    cleaned.slice(0, firstSep + 1) +
+    cleaned.slice(firstSep + 1).replace(/[.,]/g, "")
+  );
+}
+
+/**
+ * Blur-time min enforcement for numeric fields.
+ *
+ * Runs ONLY on blur (never per-keystroke) so multi-digit typing is never
+ * interrupted — e.g. typing "1" then "0" for "10" isn't clamped after the "1".
+ * If the committed value parses to a number strictly below `min`, it is reset
+ * to `min`. A blank value is left blank so required-field validation still
+ * fires normally instead of being auto-filled.
+ */
+function clampToMin(value: string, min: number): string {
+  if (value.trim() === "") return value;
+  const n = Number(value.replace(",", "."));
+  if (!Number.isFinite(n)) return value;
+  return n < min ? String(min) : value;
+}
+
+type DistrictRow = { id: number; name: string; district_type: string };
+
 function SelectChoices({
   label,
   value,
@@ -114,19 +218,26 @@ function SelectChoices({
 export type CrmPropertyFullFormProps = {
   mode: "create" | "edit";
   propertyId?: string;
+  /**
+   * Create-mode only: pre-fill this new property from a "Продать недвижимость"
+   * submission (SaleRequest). On successful create, the submission is marked
+   * converted and linked to the resulting Property.
+   */
+  fromSubmissionId?: string;
 };
 
-export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormProps) {
+export function CrmPropertyFullForm({
+  mode,
+  propertyId,
+  fromSubmissionId,
+}: CrmPropertyFullFormProps) {
+  const router = useRouter();
   const [propertyType, setPropertyType] = useState<CrmPropertyTypeValue>("apartment");
   const [price, setPrice] = useState("");
   const [cityId, setCityId] = useState("");
   const [districtId, setDistrictId] = useState("");
   const [neighborhoodId, setNeighborhoodId] = useState("");
   const [rcId, setRcId] = useState("");
-  const [street, setStreet] = useState("");
-  const [houseNumber, setHouseNumber] = useState("");
-  const [publicAddressText, setPublicAddressText] = useState("");
-  const [hideExactAddress, setHideExactAddress] = useState(false);
   const [latitudeStr, setLatitudeStr] = useState("");
   const [longitudeStr, setLongitudeStr] = useState("");
   const [description, setDescription] = useState("");
@@ -138,7 +249,7 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
   const [comm, setComm] = useState<CommercialDetailsForm>(() => emptyCommercialDetails());
 
   const [cities, setCities] = useState<CityRow[]>([]);
-  const [districts, setDistricts] = useState<{ id: number; name: string }[]>([]);
+  const [districts, setDistricts] = useState<DistrictRow[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<{ id: number; name: string }[]>([]);
   const [rcList, setRcList] = useState<{ id: number; name: string }[]>([]);
   const [choices, setChoices] = useState<LocationsChoicesResponse | null>(null);
@@ -148,11 +259,21 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
   const [saving, setSaving] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState<DuplicateCheckResponse | null>(null);
   const [error, setError] = useState("");
+  const [locationErrors, setLocationErrors] = useState<{ city?: string; district?: string }>({});
   const [success, setSuccess] = useState("");
   const [needsLogin, setNeedsLogin] = useState(false);
   const [meRole, setMeRole] = useState<string | null>(null);
   const [realtors, setRealtors] = useState<CrmRealtorRow[]>([]);
   const [assignedRealtorId, setAssignedRealtorId] = useState("");
+  // Owner (собственник) — optional CRM link. `owner` holds the linked owner (for
+  // display); `owner` id is sent in the payload. `crmPropertyId` is shown for
+  // context in the owner modal (edit mode).
+  const [owner, setOwner] = useState<OwnerData | null>(null);
+  const [ownerModalOpen, setOwnerModalOpen] = useState(false);
+  const [crmPropertyId, setCrmPropertyId] = useState("");
+  // Create mode only: photos picked before the property exists. Uploaded right
+  // after the property is created (see uploadStagedPhotos).
+  const [stagedPhotos, setStagedPhotos] = useState<StagedPhoto[]>([]);
 
   const title = mode === "create" ? "Создать объект недвижимости" : "Редактировать объект";
 
@@ -253,7 +374,11 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
         const raw = await r.json();
         const list = Array.isArray(raw) ? raw : [];
         if (cancelled) return;
-        setDistricts(list.map((d: { id: number; name: string }) => ({ id: d.id, name: d.name })));
+        setDistricts(list.map((d: { id: number; name: string; district_type: string }) => ({
+          id: d.id,
+          name: d.name,
+          district_type: d.district_type ?? "city_district",
+        })));
       } catch (e) {
         console.error("[CrmPropertyFullForm] districts", e);
       }
@@ -269,6 +394,10 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
       setNeighborhoodId("");
       return;
     }
+    // Clear immediately so the "Микрорайон" field (whose visibility now depends
+    // on neighborhoods.length) hides at once on a district switch, then reappears
+    // only if the fresh fetch returns children.
+    setNeighborhoods([]);
     let cancelled = false;
     (async () => {
       try {
@@ -336,17 +465,15 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
       setDistrictId(fkId(row.district));
       setNeighborhoodId(fkId(row.neighborhood));
       setRcId(fkId(row.residential_complex));
-      setStreet(typeof row.street === "string" ? row.street : "");
-      setHouseNumber(typeof row.house_number === "string" ? row.house_number : "");
-      setPublicAddressText(
-        typeof row.public_address_text === "string" ? row.public_address_text : "",
-      );
-      setHideExactAddress(Boolean(row.hide_exact_address));
       setLatitudeStr(row.public_latitude != null ? String(row.public_latitude) : "");
       setLongitudeStr(row.public_longitude != null ? String(row.public_longitude) : "");
       setDescription(typeof row.description === "string" ? row.description : "");
       setShortDescription(typeof row.short_description === "string" ? row.short_description : "");
       setAssignedRealtorId(fkId(row.assigned_realtor));
+      setCrmPropertyId(typeof row.crm_property_id === "string" ? row.crm_property_id : "");
+      // Owner is a nested object on the CRM detail serializer (or null).
+      const ownerRow = row.owner as OwnerData | null;
+      setOwner(ownerRow && typeof ownerRow === "object" ? ownerRow : null);
 
       const parsed = parseDetailFromApi(
         (CRM_PROPERTY_TYPE_VALUES.includes(pt) ? pt : "apartment") as CrmPropertyTypeValue,
@@ -368,6 +495,78 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     void loadProperty();
   }, [loadProperty]);
 
+  // Convert flow: pre-fill a NEW property from a "Продать недвижимость" submission.
+  // Seeds city/district/neighborhood (dependent selects self-populate off cityId),
+  // description, type, price, rooms/area, and stages the submission photos as Files.
+  useEffect(() => {
+    if (mode !== "create" || !fromSubmissionId || !getCrmAccessToken()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchWithCrmAuthRetry(
+          `/api/crm/sale-requests/${encodeURIComponent(fromSubmissionId)}/`,
+        );
+        if (!res.ok || cancelled) return;
+        const sr = (await res.json()) as {
+          description?: string;
+          property_type?: string;
+          area?: string | null;
+          rooms?: number | null;
+          asking_price?: string | null;
+          city?: { id: number } | null;
+          district?: { id: number } | null;
+          neighborhood?: { id: number } | null;
+          photos?: { id: number; image: string }[];
+        };
+        if (cancelled) return;
+
+        if (sr.description) setDescription(sr.description);
+        if (sr.property_type) setPropertyType(sr.property_type as CrmPropertyTypeValue);
+        if (sr.asking_price != null && sr.asking_price !== "") {
+          // Backend price is a decimal string like "6500000.00" — keep integer part.
+          setPrice(String(sr.asking_price).split(".")[0]);
+        }
+        if (sr.city?.id) setCityId(String(sr.city.id));
+        if (sr.district?.id) setDistrictId(String(sr.district.id));
+        if (sr.neighborhood?.id) setNeighborhoodId(String(sr.neighborhood.id));
+        // Rooms/area apply to the apartment detail block (the most common case).
+        if (sr.property_type === "apartment") {
+          setApt((a) => ({
+            ...a,
+            ...(sr.rooms != null ? { rooms: String(sr.rooms) } : {}),
+            ...(sr.area != null && sr.area !== ""
+              ? { area_total: String(sr.area).replace(/\.00$/, "") }
+              : {}),
+          }));
+        }
+
+        // Fetch each submission photo as a File and stage it for upload-on-create.
+        const photos = Array.isArray(sr.photos) ? sr.photos : [];
+        const staged: StagedPhoto[] = [];
+        for (const p of photos) {
+          try {
+            const imgRes = await fetch(p.image);
+            if (!imgRes.ok) continue;
+            const blob = await imgRes.blob();
+            const ext = (blob.type.split("/")[1] || "jpg").split(";")[0];
+            const file = new File([blob], `sale-request-${p.id}.${ext}`, {
+              type: blob.type || "image/jpeg",
+            });
+            staged.push(makeStagedPhoto(file));
+          } catch {
+            /* skip a photo that fails to fetch; not fatal */
+          }
+        }
+        if (!cancelled && staged.length > 0) setStagedPhotos(staged);
+      } catch (e) {
+        console.error("[CrmPropertyFullForm] prefill from submission", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, fromSubmissionId]);
+
   const buildBasePayload = useCallback(() => {
     const coords = coordsPayload(latitudeStr, longitudeStr);
     const base: Record<string, unknown> = {
@@ -376,10 +575,6 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
       district: districtId ? parseInt(districtId, 10) : null,
       neighborhood: neighborhoodId ? parseInt(neighborhoodId, 10) : null,
       residential_complex: rcId ? parseInt(rcId, 10) : null,
-      street: street.trim(),
-      house_number: houseNumber.trim(),
-      public_address_text: publicAddressText.trim(),
-      hide_exact_address: hideExactAddress,
       description: description,
       short_description: shortDescription.trim(),
       public_latitude: coords.public_latitude,
@@ -395,6 +590,9 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     if (meRole && isStaffRole(meRole) && assignedRealtorId) {
       base.assigned_realtor = parseInt(assignedRealtorId, 10);
     }
+    // Owner link — optional. Send the id (or null to unlink). Omitting owner
+    // entirely on PATCH would leave it unchanged, so we send it explicitly.
+    base.owner = owner ? owner.id : null;
     Object.assign(base, buildDetailsPayload(propertyType, apt, house, land, comm));
     return base;
   }, [
@@ -403,10 +601,6 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     districtId,
     neighborhoodId,
     rcId,
-    street,
-    houseNumber,
-    publicAddressText,
-    hideExactAddress,
     latitudeStr,
     longitudeStr,
     description,
@@ -419,13 +613,58 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     comm,
     meRole,
     assignedRealtorId,
+    owner,
   ]);
+
+  // Validates the required location fields (city + district). Sets per-field
+  // errors and returns true when both are selected.
+  const validateLocation = (): boolean => {
+    const errs: { city?: string; district?: string } = {};
+    if (!cityId) errs.city = "Обязательное поле";
+    if (!districtId) errs.district = "Обязательное поле";
+    setLocationErrors(errs);
+    return !errs.city && !errs.district;
+  };
+
+  // Upload the create-mode staged photos to a freshly created property.
+  // Sequential so the first file lands first and is flagged as the main photo.
+  // Returns the number of photos that failed to upload.
+  const uploadStagedPhotos = async (newPropertyId: number): Promise<number> => {
+    let failed = 0;
+    for (let i = 0; i < stagedPhotos.length; i++) {
+      const photo = stagedPhotos[i];
+      const fd = new FormData();
+      fd.append("original_file", photo.file);
+      if (i === 0) fd.append("is_main", "true");
+      try {
+        const res = await xhrUpload({
+          url: `/api/crm/properties/${newPropertyId}/photos/`,
+          method: "POST",
+          body: fd,
+        });
+        if (!res.ok) failed += 1;
+      } catch {
+        failed += 1;
+      }
+      URL.revokeObjectURL(photo.previewUrl);
+    }
+    return failed;
+  };
 
   const submitCreate = async () => {
     setError("");
     setSuccess("");
+    if (!validateLocation()) return;
+    if (stagedPhotos.length === 0) {
+      setError("Добавьте хотя бы одно фото");
+      return;
+    }
     if (!price || parseFloat(price) <= 0) {
       setError("Укажите корректную цену");
+      return;
+    }
+    if (!description.trim()) {
+      setError("Заполните полное описание объекта");
       return;
     }
     const detErr = validateDetailsForSubmit(propertyType, apt, house, land, comm);
@@ -449,8 +688,6 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
         price: base.price,
         city: base.city,
         district: base.district,
-        street: base.street,
-        house_number: base.house_number,
         ...buildDuplicateCheckExtras(propertyType, apt, house, land, comm),
       };
 
@@ -481,28 +718,35 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
         throw new Error(msg);
       }
       const created = (await createRes.json()) as { id: number; title_generated?: string };
-      setSuccess(
-        `Объект создан. Заголовок: ${created.title_generated ?? "—"}. Откройте карточку для дальнейшей правки.`,
-      );
-      setPropertyType("apartment");
-      setPrice("");
-      setCityId("");
-      setDistrictId("");
-      setNeighborhoodId("");
-      setRcId("");
-      setStreet("");
-      setHouseNumber("");
-      setPublicAddressText("");
-      setHideExactAddress(false);
-      setLatitudeStr("");
-      setLongitudeStr("");
-      setDescription("");
-      setShortDescription("");
-      setApt(emptyApartmentDetails());
-      setHouse(emptyHouseDetails());
-      setLand(emptyLandDetails());
-      setComm(emptyCommercialDetails());
-      setAssignedRealtorId("");
+      const photoCount = stagedPhotos.length;
+      const failed = photoCount > 0 ? await uploadStagedPhotos(created.id) : 0;
+      // If this property was created from a sell-your-property submission, mark
+      // that submission converted and link it to the new Property (traceability).
+      // A failure here must not block the successful property creation.
+      if (fromSubmissionId) {
+        try {
+          await fetchWithCrmAuthRetry(
+            `/api/crm/sale-requests/${encodeURIComponent(fromSubmissionId)}/mark-converted/`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ property_id: created.id }),
+            },
+          );
+        } catch (e) {
+          console.error("[CrmPropertyFullForm] mark-converted", e);
+        }
+      }
+      // Property created — leave the create page and return to the list. The
+      // form unmounts on navigation, so no in-place reset is needed. If some
+      // photos failed to upload, pass the counts so the list can warn the user.
+      if (failed > 0) {
+        router.push(
+          `/account/properties?photoWarn=1&failed=${failed}&total=${photoCount}`,
+        );
+      } else {
+        router.push("/account/properties");
+      }
     } catch (err) {
       console.error("[CrmPropertyFullForm] create", err);
       setError(err instanceof Error ? err.message : "Ошибка при создании объекта");
@@ -515,8 +759,13 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
     if (!propertyId) return;
     setError("");
     setSuccess("");
+    if (!validateLocation()) return;
     if (!price || parseFloat(price) <= 0) {
       setError("Укажите корректную цену");
+      return;
+    }
+    if (!description.trim()) {
+      setError("Заполните полное описание объекта");
       return;
     }
     const detErr = validateDetailsForSubmit(propertyType, apt, house, land, comm);
@@ -566,6 +815,11 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
   };
 
   const handleConfirmCreate = async () => {
+    if (stagedPhotos.length === 0) {
+      setDuplicateWarning(null);
+      setError("Добавьте хотя бы одно фото");
+      return;
+    }
     setDuplicateWarning(null);
     setSaving(true);
     setError("");
@@ -584,18 +838,22 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
             : "Не удалось создать объект";
         throw new Error(msg);
       }
-      const created = (await createRes.json()) as { title_generated?: string };
-      setSuccess(`Объект создан. Заголовок: ${created.title_generated ?? "—"}.`);
+      const created = (await createRes.json()) as { id: number; title_generated?: string };
+      const photoCount = stagedPhotos.length;
+      const failed = photoCount > 0 ? await uploadStagedPhotos(created.id) : 0;
+      const photoNote =
+        photoCount === 0
+          ? ""
+          : failed === 0
+            ? ` Загружено фотографий: ${photoCount}.`
+            : ` Загружено фотографий: ${photoCount - failed} из ${photoCount} (часть не удалось).`;
+      setSuccess(`Объект создан. Заголовок: ${created.title_generated ?? "—"}.${photoNote}`);
       setPropertyType("apartment");
       setPrice("");
       setCityId("");
       setDistrictId("");
       setNeighborhoodId("");
       setRcId("");
-      setStreet("");
-      setHouseNumber("");
-      setPublicAddressText("");
-      setHideExactAddress(false);
       setLatitudeStr("");
       setLongitudeStr("");
       setDescription("");
@@ -605,6 +863,7 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
       setLand(emptyLandDetails());
       setComm(emptyCommercialDetails());
       setAssignedRealtorId("");
+      setStagedPhotos([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка при создании объекта");
     } finally {
@@ -675,6 +934,46 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
             </div>
           )}
 
+          {/* Owner (собственник) — optional. Fill via the modal (search+reuse or
+              create). A missing owner is allowed but flagged. */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Собственник
+            </label>
+            {owner ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+                <div className="min-w-0 text-sm">
+                  <span className="font-medium text-gray-900">{owner.full_name}</span>
+                  <span className="ml-2 text-gray-600">{owner.phone}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOwnerModalOpen(true)}
+                  className="text-xs font-medium text-blue-600 underline hover:text-blue-800"
+                >
+                  Изменить / заменить
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setOwnerModalOpen(true)}
+                  className="inline-flex items-center rounded-md border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                >
+                  Заполнить данные собственника
+                </button>
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900">
+                  ⚠ Собственник не указан
+                </span>
+              </div>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              Необязательно, но желательно. Данные собственника видны только в CRM и
+              не публикуются на сайте.
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Тип недвижимости <span className="text-red-500">*</span>
@@ -701,12 +1000,38 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
               Цена (₽) <span className="text-red-500">*</span>
             </label>
             <Input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              type="text"
+              inputMode="numeric"
+              value={formatPrice(price)}
+              onChange={(e) => {
+                const el = e.currentTarget;
+                const oldFormatted = el.value;
+                const cursorPos = el.selectionStart ?? oldFormatted.length;
+                const digitsBeforeCursor = oldFormatted.slice(0, cursorPos).replace(/\D/g, "").length;
+                const newRaw = stripPrice(oldFormatted);
+                setPrice(newRaw);
+                requestAnimationFrame(() => {
+                  if (document.activeElement !== el) return;
+                  const newFormatted = formatPrice(newRaw);
+                  let seen = 0;
+                  let newCursor = newFormatted.length;
+                  for (let i = 0; i < newFormatted.length; i++) {
+                    if (/\d/.test(newFormatted[i]) && ++seen === digitsBeforeCursor) {
+                      newCursor = i + 1;
+                      break;
+                    }
+                  }
+                  el.setSelectionRange(newCursor, newCursor);
+                });
+              }}
+              onKeyDown={(e) => {
+                if (/^\d$/.test(e.key) || e.ctrlKey || e.metaKey) return;
+                const nav = ["Backspace","Delete","Tab","Enter","Escape",
+                  "ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Home","End"];
+                if (!nav.includes(e.key)) e.preventDefault();
+              }}
               required
-              min="0"
-              step="0.01"
+              placeholder="0"
             />
           </div>
 
@@ -719,10 +1044,17 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     Комнат <span className="text-red-500">*</span>
                   </label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     min={1}
                     value={apt.rooms}
-                    onChange={(e) => setApt((a) => ({ ...a, rooms: e.target.value }))}
+                    onKeyDown={handleIntegerKeyDown}
+                    onChange={(e) =>
+                      setApt((a) => ({ ...a, rooms: sanitizeInteger(e.target.value) }))
+                    }
+                    onBlur={(e) =>
+                      setApt((a) => ({ ...a, rooms: clampToMin(e.target.value, 1) }))
+                    }
                   />
                 </div>
                 <div>
@@ -733,7 +1065,10 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     type="text"
                     inputMode="decimal"
                     value={apt.area_total}
-                    onChange={(e) => setApt((a) => ({ ...a, area_total: e.target.value }))}
+                    onKeyDown={handleDecimalKeyDown}
+                    onChange={(e) =>
+                      setApt((a) => ({ ...a, area_total: sanitizeDecimal(e.target.value) }))
+                    }
                   />
                 </div>
                 <div>
@@ -744,7 +1079,10 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     type="text"
                     inputMode="decimal"
                     value={apt.area_living}
-                    onChange={(e) => setApt((a) => ({ ...a, area_living: e.target.value }))}
+                    onKeyDown={handleDecimalKeyDown}
+                    onChange={(e) =>
+                      setApt((a) => ({ ...a, area_living: sanitizeDecimal(e.target.value) }))
+                    }
                   />
                 </div>
                 <div>
@@ -755,7 +1093,10 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     type="text"
                     inputMode="decimal"
                     value={apt.area_kitchen}
-                    onChange={(e) => setApt((a) => ({ ...a, area_kitchen: e.target.value }))}
+                    onKeyDown={handleDecimalKeyDown}
+                    onChange={(e) =>
+                      setApt((a) => ({ ...a, area_kitchen: sanitizeDecimal(e.target.value) }))
+                    }
                   />
                 </div>
                 <div>
@@ -763,21 +1104,35 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     Этаж <span className="text-red-500">*</span>
                   </label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     min={0}
                     value={apt.floor}
-                    onChange={(e) => setApt((a) => ({ ...a, floor: e.target.value }))}
+                    onKeyDown={handleIntegerKeyDown}
+                    onChange={(e) =>
+                      setApt((a) => ({ ...a, floor: sanitizeInteger(e.target.value) }))
+                    }
+                    onBlur={(e) =>
+                      setApt((a) => ({ ...a, floor: clampToMin(e.target.value, 0) }))
+                    }
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Этажей в доме <span className="text-red-500">*</span>
+                    Этажей в доме
                   </label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     min={1}
                     value={apt.floors_total}
-                    onChange={(e) => setApt((a) => ({ ...a, floors_total: e.target.value }))}
+                    onKeyDown={handleIntegerKeyDown}
+                    onChange={(e) =>
+                      setApt((a) => ({ ...a, floors_total: sanitizeInteger(e.target.value) }))
+                    }
+                    onBlur={(e) =>
+                      setApt((a) => ({ ...a, floors_total: clampToMin(e.target.value, 1) }))
+                    }
                   />
                 </div>
                 <SelectChoices
@@ -819,7 +1174,10 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     type="text"
                     inputMode="decimal"
                     value={house.house_area}
-                    onChange={(e) => setHouse((h) => ({ ...h, house_area: e.target.value }))}
+                    onKeyDown={handleDecimalKeyDown}
+                    onChange={(e) =>
+                      setHouse((h) => ({ ...h, house_area: sanitizeDecimal(e.target.value) }))
+                    }
                   />
                 </div>
                 <div>
@@ -830,7 +1188,10 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     type="text"
                     inputMode="decimal"
                     value={house.land_area}
-                    onChange={(e) => setHouse((h) => ({ ...h, land_area: e.target.value }))}
+                    onKeyDown={handleDecimalKeyDown}
+                    onChange={(e) =>
+                      setHouse((h) => ({ ...h, land_area: sanitizeDecimal(e.target.value) }))
+                    }
                   />
                 </div>
                 <div>
@@ -838,10 +1199,17 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     Этажей <span className="text-red-500">*</span>
                   </label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     min={1}
                     value={house.floors_total}
-                    onChange={(e) => setHouse((h) => ({ ...h, floors_total: e.target.value }))}
+                    onKeyDown={handleIntegerKeyDown}
+                    onChange={(e) =>
+                      setHouse((h) => ({ ...h, floors_total: sanitizeInteger(e.target.value) }))
+                    }
+                    onBlur={(e) =>
+                      setHouse((h) => ({ ...h, floors_total: clampToMin(e.target.value, 1) }))
+                    }
                   />
                 </div>
                 <SelectChoices
@@ -895,7 +1263,10 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     type="text"
                     inputMode="decimal"
                     value={land.land_area}
-                    onChange={(e) => setLand((l) => ({ ...l, land_area: e.target.value }))}
+                    onKeyDown={handleDecimalKeyDown}
+                    onChange={(e) =>
+                      setLand((l) => ({ ...l, land_area: sanitizeDecimal(e.target.value) }))
+                    }
                   />
                 </div>
                 <SelectChoices
@@ -949,16 +1320,26 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     type="text"
                     inputMode="decimal"
                     value={comm.area_total}
-                    onChange={(e) => setComm((c) => ({ ...c, area_total: e.target.value }))}
+                    onKeyDown={handleDecimalKeyDown}
+                    onChange={(e) =>
+                      setComm((c) => ({ ...c, area_total: sanitizeDecimal(e.target.value) }))
+                    }
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Этаж</label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     min={0}
                     value={comm.floor}
-                    onChange={(e) => setComm((c) => ({ ...c, floor: e.target.value }))}
+                    onKeyDown={handleIntegerKeyDown}
+                    onChange={(e) =>
+                      setComm((c) => ({ ...c, floor: sanitizeInteger(e.target.value) }))
+                    }
+                    onBlur={(e) =>
+                      setComm((c) => ({ ...c, floor: clampToMin(e.target.value, 0) }))
+                    }
                   />
                 </div>
                 <div>
@@ -966,10 +1347,17 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     Этажей в здании
                   </label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     min={0}
                     value={comm.floors_total}
-                    onChange={(e) => setComm((c) => ({ ...c, floors_total: e.target.value }))}
+                    onKeyDown={handleIntegerKeyDown}
+                    onChange={(e) =>
+                      setComm((c) => ({ ...c, floors_total: sanitizeInteger(e.target.value) }))
+                    }
+                    onBlur={(e) =>
+                      setComm((c) => ({ ...c, floors_total: clampToMin(e.target.value, 0) }))
+                    }
                   />
                 </div>
                 <div>
@@ -984,10 +1372,17 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
                     Парковочных мест
                   </label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     min={0}
                     value={comm.parking_spaces}
-                    onChange={(e) => setComm((c) => ({ ...c, parking_spaces: e.target.value }))}
+                    onKeyDown={handleIntegerKeyDown}
+                    onChange={(e) =>
+                      setComm((c) => ({ ...c, parking_spaces: sanitizeInteger(e.target.value) }))
+                    }
+                    onBlur={(e) =>
+                      setComm((c) => ({ ...c, parking_spaces: clampToMin(e.target.value, 0) }))
+                    }
                   />
                 </div>
               </div>
@@ -996,96 +1391,117 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Полное описание
+              Полное описание <span className="text-red-500">*</span>
             </label>
             <textarea
               className={textareaClass}
               rows={6}
+              maxLength={DESCRIPTION_MAX}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Текст описания объекта"
             />
+            <p
+              className={`mt-1 text-right text-xs ${
+                DESCRIPTION_MAX - description.length < 100
+                  ? "text-red-500"
+                  : "text-gray-500"
+              }`}
+            >
+              {description.length} / {DESCRIPTION_MAX}
+            </p>
           </div>
 
           <div className="border-t border-gray-100 pt-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Локация и адрес</h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Город</label>
-                <Select value={cityId} onChange={(e) => setCityId(e.target.value)}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Город<span className="text-red-500"> *</span>
+                </label>
+                <Select
+                  value={cityId}
+                  onChange={(e) => {
+                    setCityId(e.target.value);
+                    if (e.target.value) setLocationErrors((prev) => ({ ...prev, city: undefined }));
+                  }}
+                  className={locationErrors.city ? "border-red-500" : undefined}
+                >
                   <option value="">— выберите —</option>
                   {cities.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </Select>
+                {locationErrors.city && (
+                  <p className="mt-1 text-sm text-red-600">{locationErrors.city}</p>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Район</label>
-                <Select
-                  value={districtId}
-                  onChange={(e) => setDistrictId(e.target.value)}
-                  disabled={!cityId}
-                >
-                  <option value="">— выберите —</option>
-                  {districts.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Микрорайон
-                </label>
-                <Select
-                  value={neighborhoodId}
-                  onChange={(e) => setNeighborhoodId(e.target.value)}
-                  disabled={!cityId}
-                >
-                  <option value="">— выберите —</option>
-                  {neighborhoods.map((n) => (
-                    <option key={n.id} value={n.id}>
-                      {n.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Жилой комплекс
-                </label>
-                <Select value={rcId} onChange={(e) => setRcId(e.target.value)} disabled={!cityId}>
-                  <option value="">— выберите —</option>
-                  {rcList.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Улица</label>
-                <Input value={street} onChange={(e) => setStreet(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Номер дома</label>
-                <Input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} />
-              </div>
+              <LocationAutocomplete
+                label="Район"
+                placeholder="— начните вводить —"
+                value={districtId}
+                options={districts}
+                disabled={!cityId}
+                required
+                error={locationErrors.district}
+                createEndpoint={cityId ? "/api/locations/districts" : undefined}
+                createExtraBody={cityId ? { city_id: parseInt(cityId, 10) } : {}}
+                onChange={(id) => {
+                  setDistrictId(id);
+                  setNeighborhoodId("");
+                  setRcId("");
+                  if (id) setLocationErrors((prev) => ({ ...prev, district: undefined }));
+                }}
+                onCreated={(item) => setDistricts((prev) => [...prev, { ...item, district_type: "city_district" }])}
+              />
+              {(() => {
+                const selectedDistrict = districts.find((d) => String(d.id) === districtId);
+                if (!districtId || !selectedDistrict) return null;
+                // Show the "Микрорайон" sub-field whenever the selected district
+                // actually has neighborhoods — regardless of district_type. This
+                // covers Krasnodar's city_district as well as Gelendzhik suburbs
+                // like "Геленджик" that carry microdistricts, while staying hidden
+                // for flat suburbs (Кабардинка, Бетта, …) that have none.
+                if (neighborhoods.length === 0) return null;
+                return (
+                  <LocationAutocomplete
+                    label={NEIGHBORHOOD_LABEL_URBAN}
+                    placeholder="— начните вводить —"
+                    value={neighborhoodId}
+                    options={neighborhoods}
+                    disabled={!cityId}
+                    createEndpoint={cityId ? "/api/locations/neighborhoods" : undefined}
+                    createExtraBody={{
+                      ...(cityId ? { city_id: parseInt(cityId, 10) } : {}),
+                      ...(districtId ? { district_id: parseInt(districtId, 10) } : {}),
+                    }}
+                    onChange={(id) => {
+                      setNeighborhoodId(id);
+                      setRcId("");
+                    }}
+                    onCreated={(item) => setNeighborhoods((prev) => [...prev, item])}
+                  />
+                );
+              })()}
+              <LocationAutocomplete
+                label="Жилой комплекс"
+                placeholder="— начните вводить —"
+                value={rcId}
+                options={rcList}
+                disabled={!cityId}
+                createEndpoint={cityId ? "/api/locations/residential-complexes" : undefined}
+                createExtraBody={{
+                  ...(cityId ? { city_id: parseInt(cityId, 10) } : {}),
+                  ...(districtId ? { district_id: parseInt(districtId, 10) } : {}),
+                  ...(neighborhoodId ? { neighborhood_id: parseInt(neighborhoodId, 10) } : {}),
+                }}
+                onChange={(id) => setRcId(id)}
+                onCreated={(item) => setRcList((prev) => [...prev, item])}
+              />
             </div>
-            <Checkbox
-              id="hide-exact"
-              label="Скрыть точный адрес на сайте"
-              checked={hideExactAddress}
-              onChange={(e) => setHideExactAddress(e.target.checked)}
-            />
           </div>
 
           <CrmPropertyAddressMap
-            addressText={publicAddressText}
-            onAddressTextChange={setPublicAddressText}
             latitudeStr={latitudeStr}
             longitudeStr={longitudeStr}
             onLatitudeChange={setLatitudeStr}
@@ -1099,10 +1515,20 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
             <textarea
               className={textareaClass}
               rows={3}
+              maxLength={SHORT_DESCRIPTION_MAX}
               value={shortDescription}
               onChange={(e) => setShortDescription(e.target.value)}
               placeholder="Необязательно"
             />
+            <p
+              className={`mt-1 text-right text-xs ${
+                SHORT_DESCRIPTION_MAX - shortDescription.length < 50
+                  ? "text-red-500"
+                  : "text-gray-500"
+              }`}
+            >
+              {shortDescription.length} / {SHORT_DESCRIPTION_MAX}
+            </p>
           </div>
 
           {error && (
@@ -1127,6 +1553,26 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
             </Button>
           </div>
         </form>
+
+        {/* Photos. In edit mode they attach directly (property id exists). In
+            create mode they are staged in memory and uploaded right after the
+            property is created (see uploadStagedPhotos). */}
+        <section className="mt-8 border-t border-slate-200 pt-6">
+          <h2 className="text-base font-semibold text-slate-900">Фотографии</h2>
+          {mode === "edit" && propertyId ? (
+            <div className="mt-4">
+              <CrmPropertyPhotosManager propertyId={propertyId} />
+            </div>
+          ) : (
+            <div className="mt-4">
+              <CrmStagedPhotosPicker
+                items={stagedPhotos}
+                onChange={setStagedPhotos}
+                disabled={saving}
+              />
+            </div>
+          )}
+        </section>
       </div>
 
       {duplicateWarning && (
@@ -1141,6 +1587,17 @@ export function CrmPropertyFullForm({ mode, propertyId }: CrmPropertyFullFormPro
           suspicious={duplicateWarning.suspicious}
         />
       )}
+
+      <OwnerModal
+        isOpen={ownerModalOpen}
+        onClose={() => setOwnerModalOpen(false)}
+        propertyLabel={
+          crmPropertyId || (mode === "create" ? "новый объект" : undefined)
+        }
+        currentOwner={owner}
+        onLinked={(o) => setOwner(o)}
+        onUnlinked={() => setOwner(null)}
+      />
     </>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import L from "leaflet";
-import { MapContainer, Marker, TileLayer } from "react-leaflet";
+import { AttributionControl, MapContainer, Marker, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 interface PropertyMapProps {
@@ -42,11 +42,13 @@ export function PropertyMap({ latitude, longitude, showMap }: PropertyMapProps) 
           center={[latitude, longitude]}
           zoom={14}
           scrollWheelZoom={false}
+          attributionControl={false}
           className="h-[320px] w-full"
         >
+          <AttributionControl position="bottomright" prefix={false} />
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution="&copy; 2GIS"
+            url="https://tile2.maps.2gis.com/tiles?x={x}&y={y}&z={z}&v=1"
           />
           <Marker position={[latitude, longitude]} icon={markerIcon} />
         </MapContainer>

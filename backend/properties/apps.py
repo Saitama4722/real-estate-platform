@@ -11,3 +11,6 @@ class PropertiesConfig(AppConfig):
         from config.celery import app as celery_app
 
         celery_app.autodiscover_tasks(force=True)
+
+        # Register price-history signal handlers.
+        from . import signals  # noqa: F401

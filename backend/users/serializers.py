@@ -5,9 +5,35 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import EmployeeActivityLog
+from .models import EmployeeActivityLog, RealtorProfile
 
 User = get_user_model()
+
+# Максимальная длина публичной «продающей» биографии риэлтора. Ограничение
+# держим синхронным с фронтендом (textarea maxLength).
+SHORT_BIO_MAX = 1500
+
+
+def _realtor_profile_or_none(user):
+    """RealtorProfile пользователя или None (без создания)."""
+    return RealtorProfile.objects.filter(user_id=user.pk).first()
+
+
+def _apply_realtor_profile_fields(user, fields: dict) -> None:
+    """
+    Записать публичные поля профиля риэлтора (`short_bio`, `public_name`,
+    `public_phone`, `is_public`) через get_or_create — профиль создаётся лениво
+    только для пользователей с ролью «Риэлтор» (паттерн get_or_create-by-user,
+    как у PhoneRevealLog). Для не-риэлторов вызов игнорируется.
+    """
+    if not fields:
+        return
+    if user.role != User.Role.REALTOR:
+        return
+    profile, _ = RealtorProfile.objects.get_or_create(user=user)
+    for key, value in fields.items():
+        setattr(profile, key, value)
+    profile.save()
 
 
 def _absolute_media_url(request, file_field):
@@ -27,6 +53,9 @@ class CurrentUserSerializer(serializers.ModelSerializer):
 
     avatar = serializers.SerializerMethodField()
     crm_capabilities = serializers.SerializerMethodField()
+    short_bio = serializers.SerializerMethodField()
+    public_name = serializers.SerializerMethodField()
+    public_phone = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -42,11 +71,26 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "is_active",
             "is_staff",
             "crm_capabilities",
+            "short_bio",
+            "public_name",
+            "public_phone",
         ]
         read_only_fields = fields
 
     def get_avatar(self, obj):
         return _absolute_media_url(self.context.get("request"), obj.avatar)
+
+    def get_short_bio(self, obj):
+        profile = _realtor_profile_or_none(obj)
+        return profile.short_bio if profile else ""
+
+    def get_public_name(self, obj):
+        profile = _realtor_profile_or_none(obj)
+        return profile.public_name if profile else ""
+
+    def get_public_phone(self, obj):
+        profile = _realtor_profile_or_none(obj)
+        return profile.public_phone if profile else ""
 
     def get_crm_capabilities(self, obj):
         from .permissions import CRM_CAPABILITY_FIELD, crm_user_has_capability
@@ -57,17 +101,49 @@ class CurrentUserSerializer(serializers.ModelSerializer):
 
 
 class CurrentUserUpdateSerializer(serializers.ModelSerializer):
-    """PATCH текущего пользователя: только имя, фамилия, телефон, фото (без роли и прав)."""
+    """
+    PATCH текущего пользователя: имя, фамилия, телефон, фото + публичные поля
+    профиля риэлтора (`short_bio`, `public_name`, `public_phone`). Роль и права не
+    редактируются. Поля профиля применяются только для роли «Риэлтор».
+    """
+
+    short_bio = serializers.CharField(
+        required=False, allow_blank=True, max_length=SHORT_BIO_MAX
+    )
+    public_name = serializers.CharField(
+        required=False, allow_blank=True, max_length=255
+    )
+    public_phone = serializers.CharField(
+        required=False, allow_blank=True, max_length=32
+    )
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "phone", "avatar"]
+        fields = [
+            "first_name",
+            "last_name",
+            "phone",
+            "avatar",
+            "short_bio",
+            "public_name",
+            "public_phone",
+        ]
         extra_kwargs = {
             "first_name": {"required": False},
             "last_name": {"required": False},
             "phone": {"required": False, "allow_blank": True},
             "avatar": {"required": False, "allow_null": True},
         }
+
+    def update(self, instance, validated_data):
+        profile_fields = {
+            key: validated_data.pop(key)
+            for key in ("short_bio", "public_name", "public_phone")
+            if key in validated_data
+        }
+        instance = super().update(instance, validated_data)
+        _apply_realtor_profile_fields(instance, profile_fields)
+        return instance
 
 
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -129,6 +205,10 @@ class RealtorCrmReadSerializer(serializers.ModelSerializer):
 
     display_name = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
+    short_bio = serializers.SerializerMethodField()
+    public_name = serializers.SerializerMethodField()
+    public_phone = serializers.SerializerMethodField()
+    is_public = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -150,6 +230,10 @@ class RealtorCrmReadSerializer(serializers.ModelSerializer):
             "perm_view_clients",
             "perm_delete_clients",
             "perm_change_status",
+            "short_bio",
+            "public_name",
+            "public_phone",
+            "is_public",
         ]
         read_only_fields = fields
 
@@ -160,22 +244,59 @@ class RealtorCrmReadSerializer(serializers.ModelSerializer):
     def get_avatar(self, obj):
         return _absolute_media_url(self.context.get("request"), obj.avatar)
 
+    def get_short_bio(self, obj):
+        profile = _realtor_profile_or_none(obj)
+        return profile.short_bio if profile else ""
+
+    def get_public_name(self, obj):
+        profile = _realtor_profile_or_none(obj)
+        return profile.public_name if profile else ""
+
+    def get_public_phone(self, obj):
+        profile = _realtor_profile_or_none(obj)
+        return profile.public_phone if profile else ""
+
+    def get_is_public(self, obj):
+        profile = _realtor_profile_or_none(obj)
+        return bool(profile.is_public) if profile else False
+
 
 class PublicRealtorSerializer(serializers.Serializer):
     """Публичная карточка риэлтора для сайта (без email и внутренних полей)."""
 
     crm_id = serializers.CharField()
     display_name = serializers.CharField()
-    avatar = serializers.URLField(allow_null=True)
+    # CharField (not URLField): `_absolute_media_url` intentionally returns a
+    # relative `/media/...` path so Next.js can proxy it (an absolute URL would
+    # leak the private backend host in prod). URLField rejects relative paths and
+    # would 400 for any realtor that actually has an avatar/photo.
+    avatar = serializers.CharField(allow_null=True)
     phone = serializers.CharField(allow_blank=True)
     published_properties_count = serializers.IntegerField()
     short_bio = serializers.CharField(allow_blank=True, required=False)
 
 
 class RealtorCrmWriteSerializer(serializers.ModelSerializer):
-    """Создание и правка риэлтора (роль всегда realtor)."""
+    """
+    Создание и правка риэлтора (роль всегда realtor). Помимо полей User
+    принимает публичные поля профиля риэлтора (`short_bio`, `public_name`,
+    `public_phone`, `is_public`), которые пишутся в связанный RealtorProfile.
+    """
 
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    short_bio = serializers.CharField(
+        required=False, allow_blank=True, max_length=SHORT_BIO_MAX
+    )
+    public_name = serializers.CharField(
+        required=False, allow_blank=True, max_length=255
+    )
+    public_phone = serializers.CharField(
+        required=False, allow_blank=True, max_length=32
+    )
+    is_public = serializers.BooleanField(required=False)
+
+    #: Поля, уходящие в RealtorProfile, а не в User.
+    _PROFILE_FIELDS = ("short_bio", "public_name", "public_phone", "is_public")
 
     class Meta:
         model = User
@@ -193,6 +314,10 @@ class RealtorCrmWriteSerializer(serializers.ModelSerializer):
             "perm_view_clients",
             "perm_delete_clients",
             "perm_change_status",
+            "short_bio",
+            "public_name",
+            "public_phone",
+            "is_public",
         ]
 
     def validate(self, attrs):
@@ -204,19 +329,30 @@ class RealtorCrmWriteSerializer(serializers.ModelSerializer):
                 )
         return attrs
 
+    def _pop_profile_fields(self, validated_data) -> dict:
+        return {
+            key: validated_data.pop(key)
+            for key in self._PROFILE_FIELDS
+            if key in validated_data
+        }
+
     def create(self, validated_data):
+        profile_fields = self._pop_profile_fields(validated_data)
         password = validated_data.pop("password")
         user = User(**validated_data)
         user.role = User.Role.REALTOR
         user.set_password(password)
         user.save()
+        _apply_realtor_profile_fields(user, profile_fields)
         return user
 
     def update(self, instance, validated_data):
+        profile_fields = self._pop_profile_fields(validated_data)
         password = validated_data.pop("password", None)
         for key, value in validated_data.items():
             setattr(instance, key, value)
         if password and str(password).strip():
             instance.set_password(password)
         instance.save()
+        _apply_realtor_profile_fields(instance, profile_fields)
         return instance

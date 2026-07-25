@@ -113,12 +113,17 @@ services:
       - app
 
   frontend:
-    image: node:20-alpine
+    build: ./frontend
+    image: real-estate-frontend:latest
     container_name: real-estate-frontend
     restart: unless-stopped
     working_dir: /app
     volumes:
       - ./frontend:/app
+      # Anonymous volumes shadow the host node_modules/.next so Linux-built
+      # binaries inside the image are not overwritten by Windows host files.
+      - /app/node_modules
+      - /app/.next
     ports:
       - "3000:3000"
     environment:
@@ -129,7 +134,13 @@ services:
       BACKEND_URL: http://backend:8000
       NEXT_PUBLIC_MAP_PROVIDER: ${NEXT_PUBLIC_MAP_PROVIDER:-yandex}
       NEXT_PUBLIC_YANDEX_MAPS_API_KEY: ${NEXT_PUBLIC_YANDEX_MAPS_API_KEY:-}
-    command: sh -c "npm ci --legacy-peer-deps && npm run dev -- -H 0.0.0.0 -p 3000"
+    command: npm run dev -- -H 0.0.0.0 -p 3000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 90s
     networks:
       - app
 

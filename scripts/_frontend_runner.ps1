@@ -32,9 +32,13 @@ if ($backendRoot) {
     $env:BACKEND_URL = $backendRoot
 }
 
+# Invoke Next.js directly via `npx next dev` instead of `npm run dev -- --port`,
+# whose arg pass-through is unreliable on Windows PowerShell. $env:PORT is set as
+# a belt-and-suspenders fallback (Next.js honours PORT too).
+$env:PORT = "$Port"
 if ($LogFile) {
     try {
-        npm run dev -- --port $Port 2>&1 | Tee-Object -Append -FilePath $LogFile
+        npx next dev --port $Port 2>&1 | Tee-Object -Append -FilePath $LogFile
     } catch {
         Write-Host ""
         Write-Host "  [!!] Ошибка запуска frontend: $_" -ForegroundColor Red
@@ -43,7 +47,7 @@ if ($LogFile) {
         }
     }
 } else {
-    npm run dev -- --port $Port
+    npx next dev --port $Port
 }
 
 Write-Host ""

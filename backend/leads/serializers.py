@@ -6,15 +6,20 @@ from rest_framework import serializers
 from leads.choices import LeadSource, LeadStatus
 from leads.models import Lead, LeadActionLog, LeadComment, LeadNote, LeadStatusHistory
 from properties.choices import PropertyStatus
+from users.models import User
 from properties.serializers import (
     AgencyShortSerializer,
     CrmPropertyListSerializer,
     RealtorShortSerializer,
 )
 
-_CLIENT_MESSAGE_MAX = 4000
+_CLIENT_MESSAGE_MAX = 300
 _PHONE_MAX_LEN = 32
 _PHONE_MIN_DIGITS = 10
+
+# Имя: только буквы (кириллица/латиница) и пробелы — тот же набор, что и маска на
+# фронте. Дефисы и цифры запрещены (defense in depth против прямых вызовов API).
+_NAME_DISALLOWED_RE = re.compile(r"[^a-zA-Zа-яА-ЯёЁ\s]")
 
 
 def mask_client_phone(value: str) -> str:
@@ -41,6 +46,16 @@ class PublicLeadCreateSerializer(serializers.ModelSerializer):
         trim_whitespace=True,
         allow_blank=True,
     )
+    # Публичный CRM ID риэлтора (RID######) — заявка «связаться с риэлтором» со
+    # страницы профиля. Необязателен; резолвится в объект User и в perform_create
+    # проставляется как assigned_realtor, если объект недвижимости не задан.
+    assigned_realtor_crm_id = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        max_length=32,
+    )
 
     class Meta:
         model = Lead
@@ -50,6 +65,7 @@ class PublicLeadCreateSerializer(serializers.ModelSerializer):
             "client_name",
             "client_phone",
             "client_message",
+            "assigned_realtor_crm_id",
             "captcha_id",
             "captcha_answer",
             "source",
@@ -59,7 +75,6 @@ class PublicLeadCreateSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "source", "status", "created_at"]
         extra_kwargs = {
             "property": {"required": False, "allow_null": True},
-            "client_message": {"required": False, "allow_blank": True},
             "client_name": {"max_length": 255},
             "client_phone": {"max_length": _PHONE_MAX_LEN},
         }
@@ -70,6 +85,10 @@ class PublicLeadCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Укажите имя.")
         if len(s) > 255:
             raise serializers.ValidationError("Имя слишком длинное.")
+        if _NAME_DISALLOWED_RE.search(s):
+            raise serializers.ValidationError(
+                "Имя должно содержать только буквы."
+            )
         return s
 
     def validate_client_phone(self, value):
@@ -84,11 +103,15 @@ class PublicLeadCreateSerializer(serializers.ModelSerializer):
         return s
 
     def validate_client_message(self, value):
-        if value is None:
-            return ""
-        s = value.strip()
+        s = (value or "").strip()
+        if not s:
+            raise serializers.ValidationError(
+                "Укажите ваш вопрос или комментарий."
+            )
         if len(s) > _CLIENT_MESSAGE_MAX:
-            raise serializers.ValidationError("Текст сообщения слишком длинный.")
+            raise serializers.ValidationError(
+                "Текст сообщения слишком длинный. Максимум 300 символов."
+            )
         return s
 
     def validate_property(self, value):
@@ -102,6 +125,19 @@ class PublicLeadCreateSerializer(serializers.ModelSerializer):
                 "Указанный объект недвижимости недоступен."
             )
         return value
+
+    def validate_assigned_realtor_crm_id(self, value):
+        raw = (value or "").strip()
+        if not raw:
+            return None
+        realtor = User.objects.filter(
+            role=User.Role.REALTOR,
+            is_active=True,
+            crm_id__iexact=raw,
+        ).first()
+        if realtor is None:
+            raise serializers.ValidationError("Риэлтор не найден.")
+        return realtor
 
     def validate(self, attrs):
         captcha_id = attrs.pop("captcha_id", None)
@@ -134,6 +170,9 @@ class PublicLeadCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        # Не модельное поле — резолвится в perform_create во view; убираем перед
+        # созданием, иначе ModelSerializer.create() передаст его в Lead(**data).
+        validated_data.pop("assigned_realtor_crm_id", None)
         validated_data["source"] = LeadSource.WEBSITE
         validated_data.setdefault("status", LeadStatus.NEW)
         return super().create(validated_data)

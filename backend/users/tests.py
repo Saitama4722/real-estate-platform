@@ -9,6 +9,7 @@ from leads.models import Lead
 from properties.choices import PropertyStatus, PropertyType
 from properties.models import Property
 from users.models import EmployeeActivityLog, RealtorProfile
+from users.serializers import SHORT_BIO_MAX
 from users.permissions import (
     crm_property_queryset_for_user,
     crm_user_has_capability,
@@ -154,6 +155,34 @@ class CurrentUserProfilePatchTests(TestCase):
             format="json",
         )
         self.assertEqual(res.status_code, 405)
+
+    def test_patch_me_updates_short_bio_creating_profile(self):
+        """Риэлтор может задать short_bio через /api/auth/me/ (профиль создаётся)."""
+        self.assertFalse(
+            RealtorProfile.objects.filter(user=self.realtor).exists()
+        )
+        self.client.force_authenticate(user=self.realtor)
+        res = self.client.patch(
+            "/api/auth/me/",
+            {"short_bio": "Помогаю с недвижимостью в Краснодаре."},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(
+            res.data["short_bio"], "Помогаю с недвижимостью в Краснодаре."
+        )
+        profile = RealtorProfile.objects.get(user=self.realtor)
+        self.assertEqual(profile.short_bio, "Помогаю с недвижимостью в Краснодаре.")
+
+    def test_patch_me_short_bio_over_max_returns_400(self):
+        self.client.force_authenticate(user=self.realtor)
+        res = self.client.patch(
+            "/api/auth/me/",
+            {"short_bio": "я" * (SHORT_BIO_MAX + 1)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("short_bio", res.data)
 
 
 class CrmRealtorManagementTests(TestCase):
@@ -325,6 +354,78 @@ class CrmRealtorManagementTests(TestCase):
         res = self.client.delete(f"/api/crm/realtors/{vid}/")
         self.assertEqual(res.status_code, 204)
         self.assertFalse(User.objects.filter(pk=vid).exists())
+
+
+class RealtorProfileBioEditingTests(TestCase):
+    """Редактирование публичных полей RealtorProfile (short_bio, is_public …)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            email="adm-bio@test.local",
+            password="pw",
+            first_name="A",
+            last_name="Admin",
+            role=User.Role.ADMIN,
+        )
+        self.realtor = User.objects.create_user(
+            email="rel-bio@test.local",
+            password="pw",
+            first_name="R",
+            last_name="Realtor",
+            role=User.Role.REALTOR,
+        )
+        self.other_realtor = User.objects.create_user(
+            email="rel2-bio@test.local",
+            password="pw",
+            first_name="O",
+            last_name="Ther",
+            role=User.Role.REALTOR,
+        )
+
+    def test_admin_can_patch_another_realtor_bio_and_is_public(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.patch(
+            f"/api/crm/realtors/{self.realtor.pk}/",
+            {"short_bio": "Продающий текст риэлтора.", "is_public": True},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(res.data["short_bio"], "Продающий текст риэлтора.")
+        self.assertTrue(res.data["is_public"])
+        profile = RealtorProfile.objects.get(user=self.realtor)
+        self.assertEqual(profile.short_bio, "Продающий текст риэлтора.")
+        self.assertTrue(profile.is_public)
+
+    def test_realtor_cannot_edit_another_realtor_bio_via_crm(self):
+        self.client.force_authenticate(user=self.realtor)
+        res = self.client.patch(
+            f"/api/crm/realtors/{self.other_realtor.pk}/",
+            {"short_bio": "Взлом чужого профиля."},
+            format="json",
+        )
+        # CRM realtor management is admin-only → 403 for role=realtor.
+        self.assertEqual(res.status_code, 403)
+        self.assertFalse(
+            RealtorProfile.objects.filter(user=self.other_realtor).exists()
+        )
+
+    def test_realtor_self_patch_only_touches_own_profile(self):
+        self.client.force_authenticate(user=self.realtor)
+        res = self.client.patch(
+            "/api/auth/me/",
+            {"short_bio": "Моя биография."},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(
+            RealtorProfile.objects.get(user=self.realtor).short_bio,
+            "Моя биография.",
+        )
+        # Профиль другого риэлтора не затронут.
+        self.assertFalse(
+            RealtorProfile.objects.filter(user=self.other_realtor).exists()
+        )
 
 
 class CrmRealtorCapabilityFlagsTests(TestCase):

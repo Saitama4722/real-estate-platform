@@ -1,7 +1,11 @@
-/** Keep in sync: localStorage keys, cookie mirror (client + middleware). */
+/** Keep in sync: localStorage keys, cookie mirror (client + server layout gate). */
 export const CRM_ACCESS_LS_KEY = "centreal_access";
 export const CRM_REFRESH_LS_KEY = "centreal_refresh";
-/** Non-HttpOnly cookie set on login so Edge middleware can gate /account. */
+/**
+ * Non-HttpOnly cookie set on login so the server-side `(cabinet)/layout.tsx`
+ * gate can redirect cookie-less visitors to /account/login before any cabinet
+ * page renders (this replaced the former Edge middleware — see that layout).
+ */
 export const CRM_ACCESS_COOKIE_NAME = "centreal_access";
 
 const AUTH_PATHS = {
@@ -25,9 +29,15 @@ export function employeeAuthAbsoluteUrl(endpoint: EmployeeAuthEndpoint): string 
 /**
  * Browser-visible URL for `/api/...` CRM and справочники requests.
  * Same-origin relative paths use Next.js rewrites (never the duplicated public API hostname).
+ *
+ * Trailing slashes are stripped before the query string (or end of string) so that
+ * Next.js never emits a 308 trailing-slash redirect. The beforeFiles rewrite in
+ * next.config.ts then appends the slash when forwarding to Django, preventing the
+ * Next.js-308 ↔ Django-301 infinite redirect loop.
  */
 export function crmBrowserApiUrl(apiPath: string): string {
   const p = apiPath.trim();
   if (!p.startsWith("/api/")) return p;
-  return p;
+  // Strip trailing slash before "?" or end-of-string: "/api/foo/" → "/api/foo", "/api/foo/?x=1" → "/api/foo?x=1"
+  return p.replace(/\/(\?|$)/, "$1");
 }

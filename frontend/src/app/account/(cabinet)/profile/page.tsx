@@ -8,9 +8,14 @@ import { authBearerHeaders } from "@/lib/crmAuth";
 import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 import { parseEmployeeUser } from "@/lib/employeeUser";
 import { useSetEmployeeUser } from "@/components/account/EmployeeAuthContext";
+import { UploadProgressBar, useUploadProgress } from "@/components/ui/upload-progress";
+
+/** Синхронно с бэкендом (users.serializers.SHORT_BIO_MAX). */
+const SHORT_BIO_MAX = 1500;
 
 export default function AccountProfilePage() {
   const setEmployeeUser = useSetEmployeeUser();
+  const upload = useUploadProgress();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +23,7 @@ export default function AccountProfilePage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [shortBio, setShortBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
@@ -32,10 +38,11 @@ export default function AccountProfilePage() {
         setError("Не удалось загрузить профиль.");
         return;
       }
-      const data = (await res.json()) as { first_name?: string; last_name?: string; phone?: string; avatar?: string | null };
+      const data = (await res.json()) as { first_name?: string; last_name?: string; phone?: string; short_bio?: string; avatar?: string | null };
       setFirstName(data.first_name ?? "");
       setLastName(data.last_name ?? "");
       setPhone(data.phone ?? "");
+      setShortBio(data.short_bio ?? "");
       setAvatarUrl(typeof data.avatar === "string" ? data.avatar : null);
     } catch {
       setError("Ошибка соединения при загрузке профиля.");
@@ -64,45 +71,58 @@ export default function AccountProfilePage() {
     setError(null);
     setOk(null);
     try {
-      const headers = authBearerHeaders();
-      let res: Response;
+      const hadAvatarFile = Boolean(file);
+      let raw: unknown;
       if (file) {
+        // Avatar present → upload via XHR so the progress bar can track it.
         const fd = new FormData();
         fd.append("first_name", firstName.trim());
         fd.append("last_name", lastName.trim());
         fd.append("phone", phone.trim());
+        fd.append("short_bio", shortBio.trim());
         fd.append("avatar", file);
-        res = await fetch(employeeAuthAbsoluteUrl("me"), { method: "PATCH", headers, body: fd });
+        const result = await upload.run(
+          { url: employeeAuthAbsoluteUrl("me"), method: "PATCH", body: fd },
+          "Не удалось сохранить изменения.",
+        );
+        if (!result) {
+          // upload.run already set the error state on the progress bar.
+          return;
+        }
+        raw = result.data;
       } else {
-        res = await fetch(employeeAuthAbsoluteUrl("me"), {
+        const headers = authBearerHeaders();
+        const res = await fetch(employeeAuthAbsoluteUrl("me"), {
           method: "PATCH",
           headers: { ...headers, "Content-Type": "application/json" },
           body: JSON.stringify({
             first_name: firstName.trim(),
             last_name: lastName.trim(),
             phone: phone.trim(),
+            short_bio: shortBio.trim(),
           }),
         });
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          const detail =
+            body && typeof body === "object" && "detail" in body
+              ? String((body as { detail?: unknown }).detail)
+              : "Не удалось сохранить изменения.";
+          setError(detail);
+          return;
+        }
+        raw = await res.json();
       }
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        const detail =
-          body && typeof body === "object" && "detail" in body
-            ? String((body as { detail?: unknown }).detail)
-            : "Не удалось сохранить изменения.";
-        setError(detail);
-        return;
-      }
-      const hadAvatarFile = Boolean(file);
-      const raw = await res.json();
+
       const updated = parseEmployeeUser(raw);
       if (updated) {
         setEmployeeUser(updated);
       }
-      const data = raw as { first_name?: string; last_name?: string; phone?: string; avatar?: string | null };
+      const data = raw as { first_name?: string; last_name?: string; phone?: string; short_bio?: string; avatar?: string | null };
       setFirstName(data.first_name ?? "");
       setLastName(data.last_name ?? "");
       setPhone(data.phone ?? "");
+      setShortBio(data.short_bio ?? "");
       setAvatarUrl(typeof data.avatar === "string" ? data.avatar : null);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -182,6 +202,7 @@ export default function AccountProfilePage() {
                 <p className="text-xs text-slate-500">Файл не выбран.</p>
               )}
               <p className="text-xs text-slate-500">Поддерживаются обычные форматы изображений.</p>
+              <UploadProgressBar state={upload.state} className="pt-1" />
             </div>
           </div>
 
@@ -225,8 +246,26 @@ export default function AccountProfilePage() {
             />
           </div>
 
-          <Button type="submit" disabled={saving}>
-            {saving ? "Сохранение…" : "Сохранить"}
+          <div className="space-y-1">
+            <label htmlFor="profile-bio" className="block text-sm font-medium text-slate-700">
+              О себе
+            </label>
+            <textarea
+              id="profile-bio"
+              value={shortBio}
+              onChange={(e) => setShortBio(e.target.value)}
+              maxLength={SHORT_BIO_MAX}
+              rows={6}
+              placeholder="Текст о вас для публичной страницы риэлтора"
+              className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-50"
+            />
+            <p className="text-right text-xs text-gray-400">
+              {shortBio.length}/{SHORT_BIO_MAX}
+            </p>
+          </div>
+
+          <Button type="submit" disabled={saving || upload.state.busy}>
+            {saving || upload.state.busy ? "Сохранение…" : "Сохранить"}
           </Button>
         </form>
       )}

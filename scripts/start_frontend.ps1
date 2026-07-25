@@ -202,7 +202,7 @@ $localUrl = "http://localhost:$port"
 # ================================================================
 Print-Section "Шаг 5 / Запуск Next.js dev сервера"
 
-Log "Команда: npm run dev -- --port $port"
+Log "Команда: npx next dev --port $port"
 Log "URL: $localUrl"
 Log ""
 Log "=== Вывод сервера ==="
@@ -230,7 +230,10 @@ Copy-Item -Path $LogFile -Destination $LatestLog -Force
 # ----------------------------------------------------------------
 try {
     Push-Location $FrontendDir
-    npm run dev -- --port $port 2>&1 | Tee-Object -Append -FilePath $LogFile
+    # Invoke Next.js directly; `npm run dev -- --port` is unreliable on Windows
+    # PowerShell. $env:PORT is a fallback (Next.js honours PORT too).
+    $env:PORT = "$port"
+    npx next dev --port $port 2>&1 | Tee-Object -Append -FilePath $LogFile
 } finally {
     if ((Get-Location).Path -ne $RootDir) {
         try { Pop-Location } catch {}

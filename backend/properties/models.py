@@ -25,7 +25,10 @@ from properties.choices import (
     PropertyType,
     VideoPlatform,
 )
-from properties.property_photo_images import validate_property_photo_original_size
+from properties.property_photo_images import (
+    compress_original_file,
+    validate_property_photo_original_size,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +60,17 @@ class Property(BaseTimestampedModel):
         blank=True,
         related_name="assigned_properties",
         verbose_name="Ответственный риэлтор",
+    )
+    # Property owner (собственник) — INTERNAL CRM record, nullable. One Owner can
+    # be linked to many properties. CRM-only; never exposed in any public
+    # serializer. SET_NULL so deleting an Owner never cascades into properties.
+    owner = models.ForeignKey(
+        "owners.Owner",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="properties",
+        verbose_name="Собственник",
     )
     crm_property_id = models.CharField(
         max_length=10,
@@ -121,7 +135,9 @@ class Property(BaseTimestampedModel):
     short_description = models.CharField(
         max_length=500, blank=True, verbose_name="Краткое описание"
     )
-    description = models.TextField(blank=True, verbose_name="Полное описание")
+    description = models.TextField(
+        blank=True, max_length=3000, verbose_name="Полное описание"
+    )
 
     # --- Price ---
     price = models.DecimalField(
@@ -144,17 +160,13 @@ class Property(BaseTimestampedModel):
     # --- Address & Geography ---
     city = models.ForeignKey(
         "locations.City",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
+        on_delete=models.PROTECT,
         related_name="properties",
         verbose_name="Город",
     )
     district = models.ForeignKey(
         "locations.District",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
+        on_delete=models.PROTECT,
         related_name="properties",
         verbose_name="Район",
     )
@@ -164,7 +176,7 @@ class Property(BaseTimestampedModel):
         null=True,
         blank=True,
         related_name="properties",
-        verbose_name="Микрорайон",
+        verbose_name="Микрорайон / Населённый пункт",
     )
     residential_complex = models.ForeignKey(
         "locations.ResidentialComplex",
@@ -533,6 +545,8 @@ class ApartmentDetails(BaseTimestampedModel):
         verbose_name="Этаж",
     )
     floors_total = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
         verbose_name="Этажей в доме",
     )
     has_balcony = models.BooleanField(
@@ -832,10 +846,29 @@ class PropertyPhoto(BaseTimestampedModel):
                 field.delete(save=False)
                 setattr(self, name, None)
 
+    def _compress_original_if_new(self) -> None:
+        """
+        Shrink a freshly-uploaded ``original_file`` to <=1920px / JPEG q85 before
+        it is written to storage. Only runs for a new, uncommitted upload; an
+        already-stored file (``_committed`` True) is left untouched, and small
+        JPEGs are skipped by ``compress_original_file`` (returns None).
+        """
+        f = self.original_file
+        if not f or getattr(f, "_committed", True):
+            return
+        try:
+            compressed = compress_original_file(f)
+        except Exception:  # noqa: BLE001 — never let compression break the save
+            return
+        if compressed is not None:
+            self.original_file.save(compressed.name, compressed, save=False)
+
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
         if update_fields is not None and "original_file" not in update_fields:
             return super().save(*args, **kwargs)
+
+        self._compress_original_if_new()
 
         prev_original_name = ""
         if self.pk:
@@ -1003,6 +1036,38 @@ class PhoneRevealLog(models.Model):
         if self.pk:
             return f"Раскрытие телефона #{self.pk} (объект #{prop_id})"
         return f"Раскрытие телефона (объект #{prop_id})"
+
+
+class PriceHistory(models.Model):
+    """
+    Append-only log of a property's price over time. A new row is written only
+    when the price actually changes (plus one seed row at creation for a clean
+    first data point). Powers the public "цена снижена" badge and price chart.
+    """
+
+    property = models.ForeignKey(
+        "Property",
+        on_delete=models.CASCADE,
+        related_name="price_history",
+        verbose_name="Объект",
+    )
+    price = models.DecimalField(
+        max_digits=15, decimal_places=2, verbose_name="Цена"
+    )
+    changed_at = models.DateTimeField(
+        auto_now_add=True, db_index=True, verbose_name="Дата изменения"
+    )
+
+    class Meta:
+        verbose_name = "Изменение цены"
+        verbose_name_plural = "История цены"
+        ordering = ["changed_at", "id"]
+        indexes = [
+            models.Index(fields=["property", "changed_at"]),
+        ]
+
+    def __str__(self):
+        return f"Объект #{self.property_id}: {self.price} @ {self.changed_at:%Y-%m-%d}"
 
 
 # Stage 14.6 — import foundation (models live in import_models.py)

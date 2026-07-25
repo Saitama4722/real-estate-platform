@@ -62,11 +62,11 @@ echo Docker is ready.
 :docker_ready
 echo.
 echo Starting project...
-echo Opening browser... ^(after ~5 second delay^)
+echo Opening browser... ^(polls http://localhost:3000 until ready, up to 3 min^)
 echo Press Ctrl+C to stop.
 echo.
 
-start /min "" cmd /c "timeout /t 5 /nobreak >nul && start http://localhost:3000/"
+start /min "" cmd /c "for /L %%i in (1,1,36) do (timeout /t 5 /nobreak >nul & curl -s -o nul -w \"%%{http_code}\" http://localhost:3000/ 2>nul | findstr /r \"[23][0-9][0-9]\" >nul 2>&1 && (start http://localhost:3000/ & exit /b 0))"
 
 docker compose up --build
 set "COMPOSE_EXIT=!ERRORLEVEL!"

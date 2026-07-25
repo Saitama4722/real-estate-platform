@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
 import { playCrmNewInquirySound } from "@/lib/crmInquiryNotifySound";
 import { isCabinetAdminRole } from "@/lib/employeeUser";
@@ -10,6 +11,12 @@ import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
 const INQUIRIES_POLL_INTERVAL_MS = 15_000;
 const NEW_INQUIRY_HIGHLIGHT_MS = 45_000;
 
+type LeadPropertyRef = {
+  id: number;
+  crm_property_id?: string | null;
+  title_generated?: string | null;
+};
+
 type LeadRow = {
   id: number;
   client_name: string;
@@ -17,6 +24,7 @@ type LeadRow = {
   client_message: string;
   status: string;
   created_at: string;
+  property: LeadPropertyRef | null;
   assigned_realtor: { id: number; first_name: string; last_name: string } | null;
 };
 
@@ -91,6 +99,38 @@ function formatPersonName(
   if (!p) return "—";
   const s = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim();
   return s || "—";
+}
+
+/**
+ * Источник заявки: если объект не привязан — заявка пришла с главной страницы;
+ * иначе показываем PID (ссылкой на карточку объекта, как в таблице объектов CRM)
+ * и сгенерированный заголовок.
+ */
+function LeadSourceCell({ property }: { property: LeadPropertyRef | null }) {
+  if (!property) {
+    return (
+      <span className="inline-flex w-fit rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+        Главная страница
+      </span>
+    );
+  }
+  const pid = property.crm_property_id ?? String(property.id);
+  const title = property.title_generated?.trim();
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Link
+        href={`/account/properties/${property.id}`}
+        className="w-fit font-mono text-xs font-medium text-sky-700 hover:underline"
+      >
+        {pid}
+      </Link>
+      {title ? (
+        <span className="max-w-[16rem] truncate text-xs text-slate-500" title={title}>
+          {title}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function LeadNotesHistoryPanel({
@@ -555,6 +595,7 @@ export function AccountInquiriesTable() {
                 <th className="px-3 py-2.5">Имя</th>
                 <th className="px-3 py-2.5">Телефон</th>
                 <th className="px-3 py-2.5">Сообщение</th>
+                <th className="px-3 py-2.5">Источник</th>
                 <th className="px-3 py-2.5">Статус</th>
                 <th className="px-3 py-2.5">Создана</th>
                 <th className="px-3 py-2.5">Действия</th>
@@ -581,11 +622,16 @@ export function AccountInquiriesTable() {
                       ) : null}
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-slate-800">
+                  {/* whitespace-nowrap: без него маскированный номер ломается
+                      на 2–3 строки внутри overflow-x-auto на узких экранах. */}
+                  <td className="whitespace-nowrap px-3 py-2.5 font-mono text-slate-800">
                     {revealed[r.id] ?? r.client_phone}
                   </td>
                   <td className="max-w-xs truncate px-3 py-2.5 text-slate-600" title={r.client_message}>
                     {r.client_message?.trim() ? r.client_message : "—"}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <LeadSourceCell property={r.property} />
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex flex-col gap-1.5">
@@ -655,7 +701,7 @@ export function AccountInquiriesTable() {
                 </tr>
                 {expandedLeadId === r.id ? (
                   <tr className="border-b border-slate-100 bg-slate-50/50">
-                    <td colSpan={7} className="p-0">
+                    <td colSpan={8} className="p-0">
                       <LeadNotesHistoryPanel
                         leadId={r.id}
                         viewer={{

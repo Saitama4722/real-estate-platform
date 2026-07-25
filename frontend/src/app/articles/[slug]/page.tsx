@@ -79,19 +79,15 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </time>
         </p>
 
-        <div className="mt-6 aspect-[16/9] w-full max-w-3xl overflow-hidden rounded-lg bg-gray-200">
-          {article.coverImage && isPropertyImageUrl(article.coverImage) ? (
+        {article.coverImage && isPropertyImageUrl(article.coverImage) && (
+          <div className="mt-6 aspect-[16/9] w-full max-w-3xl overflow-hidden rounded-lg bg-gray-200">
             <img
               src={article.coverImage}
               alt=""
               className="h-full w-full object-cover"
             />
-          ) : (
-            <div className="flex h-full min-h-[200px] items-center justify-center px-4 text-center text-sm text-gray-500">
-              Статья
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="mt-8 max-w-3xl whitespace-pre-line text-base leading-relaxed text-gray-800">
           {article.body}

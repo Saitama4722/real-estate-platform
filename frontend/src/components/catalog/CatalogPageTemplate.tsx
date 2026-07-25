@@ -52,6 +52,7 @@ export function CatalogPageTemplate({
             initialPropertyType={catalogSearchParamFirst(sp, "property_type")}
             initialCitySlug={catalogSearchParamFirst(sp, "city_slug")}
             initialDistrictSlug={catalogSearchParamFirst(sp, "district_slug")}
+            initialNeighborhoodSlug={catalogSearchParamFirst(sp, "neighborhood_slug")}
             initialRooms={catalogSearchParamFirst(sp, "rooms") ?? ""}
             initialRoomsMin={catalogSearchParamFirst(sp, "rooms_min") ?? ""}
             initialSearch={catalogSearchParamFirst(sp, "search") ?? ""}

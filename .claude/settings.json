@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:xn--80afd3bald6a.xn--p1ai)",
+      "WebFetch(domain:ru.ruwiki.ru)",
+      "WebFetch(domain:dvizhenie.ru)",
+      "WebFetch(domain:www.komandirovka.ru)",
+      "WebFetch(domain:www.cian.ru)",
+      "WebFetch(domain:www.kp.ru)",
+      "WebFetch(domain:normativ.kontur.ru)",
+      "WebFetch(domain:www.kayan.ru)",
+      "WebFetch(domain:krasnodarnew.ru)",
+      "WebFetch(domain:oktmorus.ru)",
+      "WebFetch(domain:gid.house)",
+      "WebFetch(domain:www.avito.ru)",
+      "WebFetch(domain:www.dinskoi-raion.ru)",
+      "WebFetch(domain:avadom.ru)",
+      "WebFetch(domain:www.mojgorod.ru)",
+      "WebFetch(domain:edemvkrasnodar.ru)",
+      "WebFetch(domain:bloc-group.ru)",
+      "WebFetch(domain:dvnak.ru)",
+      "WebFetch(domain:krasnodar.cian.ru)",
+      "WebFetch(domain:krasnodar.allestate.pro)",
+      "WebFetch(domain:krd.gorod.space)",
+      "WebFetch(domain:kuban24.tv)",
+      "WebFetch(domain:allardais.github.io)",
+      "WebFetch(domain:classinform.ru)",
+      "WebFetch(domain:savepayment.ru)",
+      "WebFetch(domain:www.krasnoselskoe.ru)",
+      "WebFetch(domain:new-krasnodar.ru)",
+      "WebFetch(domain:www.gos-postavki.ru)",
+      "WebFetch(domain:realty.yandex.ru)",
+      "WebFetch(domain:krasnodar.ginfo.ru)",
+      "WebFetch(domain:kladr-rf.ru)",
+      "WebFetch(domain:www.buhgalteria.ru)",
+      "WebFetch(domain:mapdata.ru)",
+      "WebFetch(domain:okato.regtorg.ru)",
+      "WebFetch(domain:xn--80aaaovgbbdc1amxfegf.xn--p1ai)"
+    ]
+  }
+}

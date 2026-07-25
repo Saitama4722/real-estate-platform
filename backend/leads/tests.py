@@ -9,6 +9,7 @@ from rest_framework.test import APIClient
 from agencies.models import Agency
 from leads.choices import LeadActionType, LeadSource, LeadStatus
 from leads.models import Lead, LeadActionLog, LeadPhoneRevealLog, LeadStatusHistory
+from locations.models import City, District
 from properties.choices import PropertyStatus, PropertyType
 from properties.models import Property
 
@@ -29,11 +30,25 @@ class PublicLeadCaptchaAndCreateTests(TestCase):
             role=User.Role.REALTOR,
         )
         self.agency = Agency.objects.create(name="Lead Test Agency")
+        # city/district обязательны на модели Property (миграция 0023), поэтому
+        # создаём минимальную географию для фикстур объектов.
+        self.city = City.objects.create(
+            name="Краснодар",
+            slug="krasnodar",
+            region_name="Краснодарский край",
+        )
+        self.district = District.objects.create(
+            city=self.city,
+            name="Центральный",
+            slug="centralnyy",
+        )
         self.published = Property.objects.create(
             property_type=PropertyType.APARTMENT,
             price=Decimal("100.00"),
             agency=self.agency,
             assigned_realtor=self.realtor,
+            city=self.city,
+            district=self.district,
             status=PropertyStatus.PUBLISHED,
             is_published=True,
         )
@@ -43,6 +58,8 @@ class PublicLeadCaptchaAndCreateTests(TestCase):
             property_type=PropertyType.APARTMENT,
             price=Decimal("200.00"),
             assigned_realtor=self.realtor,
+            city=self.city,
+            district=self.district,
             status=PropertyStatus.PUBLISHED,
             is_published=True,
         )
@@ -124,7 +141,7 @@ class PublicLeadCaptchaAndCreateTests(TestCase):
                 "property": self.published.pk,
                 "client_name": "Пётр",
                 "client_phone": "+79997654321",
-                "client_message": "",
+                "client_message": "Интересует этот объект",
                 "captcha_id": captcha_id,
                 "captcha_answer": str(a + b),
             },
@@ -147,7 +164,7 @@ class PublicLeadCaptchaAndCreateTests(TestCase):
                 "property": self.published_no_realtor.pk,
                 "client_name": "Мария",
                 "client_phone": "+79995551122",
-                "client_message": "",
+                "client_message": "Хочу узнать подробности",
                 "captcha_id": captcha_id,
                 "captcha_answer": str(a + b),
             },
@@ -160,6 +177,61 @@ class PublicLeadCaptchaAndCreateTests(TestCase):
         self.assertEqual(lead.property_id, self.published_no_realtor.pk)
         self.assertIsNone(lead.assigned_realtor_id)
 
+    def test_create_without_message_returns_400(self):
+        captcha_id, q = self._fetch_captcha()
+        a, b = self._parse_sum(q)
+        r = self.client.post(
+            "/api/leads/",
+            {
+                "client_name": "Иван",
+                "client_phone": "+79991234567",
+                "client_message": "",
+                "captcha_id": captcha_id,
+                "captcha_answer": str(a + b),
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("client_message", r.data)
+
+    def test_create_with_message_over_300_chars_returns_400(self):
+        captcha_id, q = self._fetch_captcha()
+        a, b = self._parse_sum(q)
+        r = self.client.post(
+            "/api/leads/",
+            {
+                "client_name": "Иван",
+                "client_phone": "+79991234567",
+                "client_message": "я" * 301,
+                "captcha_id": captcha_id,
+                "captcha_answer": str(a + b),
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("client_message", r.data)
+
+    def test_create_with_message_exactly_300_chars_succeeds(self):
+        captcha_id, q = self._fetch_captcha()
+        a, b = self._parse_sum(q)
+        message = "я" * 300
+        r = self.client.post(
+            "/api/leads/",
+            {
+                "client_name": "Иван",
+                "client_phone": "+79991234567",
+                "client_message": message,
+                "captcha_id": captcha_id,
+                "captcha_answer": str(a + b),
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 201, r.data)
+        lead = Lead.objects.order_by("-pk").first()
+        self.assertIsNotNone(lead)
+        assert lead is not None
+        self.assertEqual(lead.client_message, message)
+
     def test_create_missing_client_name_returns_400(self):
         captcha_id, q = self._fetch_captcha()
         a, b = self._parse_sum(q)
@@ -168,6 +240,7 @@ class PublicLeadCaptchaAndCreateTests(TestCase):
             {
                 "client_name": "   ",
                 "client_phone": "+79991234567",
+                "client_message": "Вопрос",
                 "captcha_id": captcha_id,
                 "captcha_answer": str(a + b),
             },
@@ -175,6 +248,82 @@ class PublicLeadCaptchaAndCreateTests(TestCase):
         )
         self.assertEqual(r.status_code, 400)
         self.assertIn("client_name", r.data)
+
+    def test_create_with_name_containing_digits_returns_400(self):
+        captcha_id, q = self._fetch_captcha()
+        a, b = self._parse_sum(q)
+        r = self.client.post(
+            "/api/leads/",
+            {
+                "client_name": "Иван123",
+                "client_phone": "+79991234567",
+                "client_message": "Вопрос",
+                "captcha_id": captcha_id,
+                "captcha_answer": str(a + b),
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("client_name", r.data)
+
+    def test_create_with_name_containing_hyphen_returns_400(self):
+        captcha_id, q = self._fetch_captcha()
+        a, b = self._parse_sum(q)
+        r = self.client.post(
+            "/api/leads/",
+            {
+                "client_name": "Анна-Мария",
+                "client_phone": "+79991234567",
+                "client_message": "Вопрос",
+                "captcha_id": captcha_id,
+                "captcha_answer": str(a + b),
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("client_name", r.data)
+
+    def test_create_with_name_with_space_succeeds(self):
+        captcha_id, q = self._fetch_captcha()
+        a, b = self._parse_sum(q)
+        r = self.client.post(
+            "/api/leads/",
+            {
+                "client_name": "Мария Ивановна",
+                "client_phone": "+79991234567",
+                "client_message": "Вопрос",
+                "captcha_id": captcha_id,
+                "captcha_answer": str(a + b),
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 201, r.data)
+        lead = Lead.objects.order_by("-pk").first()
+        self.assertIsNotNone(lead)
+        assert lead is not None
+        self.assertEqual(lead.client_name, "Мария Ивановна")
+
+    def test_create_with_formatted_phone_succeeds(self):
+        # Телефон в новом формате маски «+7 (XXX) XXX-XX-XX»: скобки/пробелы/
+        # дефисы должны корректно отбрасываться существующей проверкой цифр.
+        captcha_id, q = self._fetch_captcha()
+        a, b = self._parse_sum(q)
+        r = self.client.post(
+            "/api/leads/",
+            {
+                "client_name": "Иван",
+                "client_phone": "+7 (958) 206-88-16",
+                "client_message": "Вопрос",
+                "captcha_id": captcha_id,
+                "captcha_answer": str(a + b),
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 201, r.data)
+        lead = Lead.objects.order_by("-pk").first()
+        self.assertIsNotNone(lead)
+        assert lead is not None
+        self.assertEqual(lead.client_phone, "+7 (958) 206-88-16")
 
     def test_create_short_phone_returns_400(self):
         captcha_id, q = self._fetch_captcha()
@@ -184,6 +333,7 @@ class PublicLeadCaptchaAndCreateTests(TestCase):
             {
                 "client_name": "Иван",
                 "client_phone": "123",
+                "client_message": "Вопрос",
                 "captcha_id": captcha_id,
                 "captcha_answer": str(a + b),
             },
@@ -200,6 +350,7 @@ class PublicLeadCaptchaAndCreateTests(TestCase):
             {
                 "client_name": "A",
                 "client_phone": "+79991112233",
+                "client_message": "Вопрос",
                 "captcha_id": captcha_id,
                 "captcha_answer": ans,
             },
@@ -211,6 +362,7 @@ class PublicLeadCaptchaAndCreateTests(TestCase):
             {
                 "client_name": "B",
                 "client_phone": "+79991112244",
+                "client_message": "Вопрос",
                 "captcha_id": captcha_id,
                 "captcha_answer": ans,
             },
