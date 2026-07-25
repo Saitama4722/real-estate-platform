@@ -1,50 +1,60 @@
 "use client";
 
 import { forwardRef } from "react";
-import { cn } from "@/lib/utils";
+import type { LucideIcon } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import {
+  buttonClasses,
+  type ButtonSize,
+  type ButtonVariant,
+} from "@/components/ui/button-classes";
 
-type ButtonVariant = "primary" | "secondary" | "outline" | "ghost";
-type ButtonSize = "sm" | "md" | "lg";
+export type { ButtonSize, ButtonVariant };
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  fullWidth?: boolean;
+  /** Lucide glyph rendered before the label, sized to match the button. */
+  icon?: LucideIcon;
+  /** Lucide glyph rendered after the label (e.g. a chevron). */
+  iconRight?: LucideIcon;
 }
 
-const variantClasses: Record<ButtonVariant, string> = {
-  primary: "bg-blue-600 text-white hover:bg-blue-700 border-transparent",
-  secondary: "bg-gray-100 text-gray-900 hover:bg-gray-200 border-transparent",
-  outline:
-    "bg-white text-gray-900 border-gray-300 hover:bg-gray-50",
-  ghost: "bg-transparent text-gray-700 hover:bg-gray-100 border-transparent",
-};
-
-const sizeClasses: Record<ButtonSize, string> = {
-  sm: "px-3 py-1.5 text-sm",
-  md: "px-4 py-2 text-sm",
-  lg: "px-6 py-3 text-base",
-};
-
+/**
+ * Shared button. See button-classes.ts for the variant/size matrix AND for the
+ * (counter-intuitive) rules on how a className override actually resolves —
+ * never express height, padding or text size through className.
+ */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   (
-    { variant = "primary", size = "md", className, children, ...props },
+    {
+      variant = "primary",
+      size = "md",
+      fullWidth = false,
+      icon,
+      iconRight,
+      className,
+      children,
+      type = "button",
+      ...props
+    },
     ref,
   ) => {
+    const glyphSize = size === "sm" ? 16 : 20;
     return (
       <button
         ref={ref}
-        className={cn(
-          "inline-flex items-center justify-center font-medium rounded-md border transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1",
-          "disabled:pointer-events-none disabled:opacity-50",
-          variantClasses[variant],
-          sizeClasses[size],
-          className,
-        )}
+        type={type}
+        className={buttonClasses({ variant, size, fullWidth, className })}
         {...props}
       >
+        {icon && <Icon icon={icon} size={glyphSize} className="shrink-0" />}
         {children}
+        {iconRight && (
+          <Icon icon={iconRight} size={glyphSize} className="shrink-0" />
+        )}
       </button>
     );
   },
