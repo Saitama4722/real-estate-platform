@@ -1,6 +1,7 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { CatalogControls } from "@/components/catalog/CatalogControls";
 import { CatalogPropertyItem } from "@/components/catalog/types";
@@ -8,8 +9,12 @@ import { PropertyCard } from "@/components/home/PropertyCard";
 import { sortCatalogProperties } from "@/lib/sortCatalogProperties";
 import { hasCatalogItemMapCoords } from "@/lib/mapCoordinates";
 
-const CatalogMapLazy = lazy(() =>
-  import("@/components/catalog/CatalogMap").then((mod) => ({ default: mod.CatalogMap })),
+// Leaflet/react-leaflet touch `window` at module-eval time, so this map must be
+// client-only — `next/dynamic({ ssr: false })`, not `React.lazy` (which still
+// runs on the server and throws "window is not defined").
+const CatalogMapLazy = dynamic(
+  () => import("@/components/catalog/CatalogMap").then((mod) => ({ default: mod.CatalogMap })),
+  { ssr: false },
 );
 
 const PAGE_SIZE = 12;
@@ -65,7 +70,6 @@ export function CatalogResultsSection({
           <Button
             size="sm"
             variant={viewMode === "list" ? "primary" : "ghost"}
-            className="h-8"
             onClick={() => setViewMode("list")}
           >
             Списком
@@ -73,7 +77,6 @@ export function CatalogResultsSection({
           <Button
             size="sm"
             variant={viewMode === "map" ? "primary" : "ghost"}
-            className="h-8"
             onClick={() => setViewMode("map")}
           >
             На карте
@@ -100,8 +103,16 @@ export function CatalogResultsSection({
                 price={property.price}
                 title={property.title}
                 characteristics={property.characteristics}
+                rooms={property.rooms}
+                area={property.area}
+                floor={property.floor}
+                totalFloors={property.totalFloors}
                 location={property.location}
                 href={property.href}
+                favoriteId={property.slug}
+                isPriceReduced={property.isPriceReduced}
+                compareId={property.slug}
+                compareType={property.propertyType}
               />
             ))}
           </div>
