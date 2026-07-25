@@ -1,0 +1,31 @@
+<!-- @dsCard group="Components" viewport="700x420" subtitle="Кросс-фейд 300ms, миниатюры, стрелки по hover" name="Галерея объекта" -->
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Галерея</title>
+<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../../components/components.css"><style>
+body{background:var(--bg-page);padding:20px;box-sizing:border-box;margin:0}
+svg.lucide{width:20px;height:20px}
+.ctr-btn--sm svg.lucide,.ctr-card__specs svg.lucide,.ic16 svg.lucide{width:16px;height:16px}
+.ctr-card__addr svg.lucide{width:14px;height:14px}
+.ctr-iconbtn svg.lucide{width:18px;height:18px}
+.lbl{font:var(--type-caption);letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin:0 0 10px}
+.cap{font:11px/15px var(--font-sans);color:var(--text-muted);margin:8px 0 0;text-align:center}
+.ctr-gallery{max-width:520px} .ctr-gallery__nav svg.lucide{width:20px;height:20px}</style></head><body>
+<div class="ctr-gallery" id="g">
+<div class="ctr-gallery__stage">
+<div class="ctr-gallery__slide is-current"><img src="../../assets/photos/listing-severny.png" alt="Фото объекта 1"></div>
+<div class="ctr-gallery__slide"><img src="../../assets/photos/map-krasnodar.png" alt="Фото объекта 2"></div>
+<button class="ctr-gallery__nav ctr-gallery__nav--prev" aria-label="Предыдущее фото"><i data-lucide="chevron-left"></i></button>
+<button class="ctr-gallery__nav ctr-gallery__nav--next" aria-label="Следующее фото"><i data-lucide="chevron-right"></i></button>
+</div>
+<div class="ctr-gallery__thumbs">
+<button class="ctr-gallery__thumb is-current" aria-label="Фото 1"><img src="../../assets/photos/listing-severny.png" alt=""></button>
+<button class="ctr-gallery__thumb" aria-label="Фото 2"><img src="../../assets/photos/map-krasnodar.png" alt=""></button>
+</div></div>
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<script>
+lucide.createIcons();
+var g=document.getElementById('g'),sl=g.querySelectorAll('.ctr-gallery__slide'),th=g.querySelectorAll('.ctr-gallery__thumb'),i=0;
+function show(n){i=(n+sl.length)%sl.length;sl.forEach(function(s,k){s.classList.toggle('is-current',k===i);});th.forEach(function(t,k){t.classList.toggle('is-current',k===i);});}
+th.forEach(function(t,k){t.addEventListener('click',function(){show(k);});});
+g.querySelector('.ctr-gallery__nav--prev').addEventListener('click',function(){show(i-1);});
+g.querySelector('.ctr-gallery__nav--next').addEventListener('click',function(){show(i+1);});
+</script></body></html>

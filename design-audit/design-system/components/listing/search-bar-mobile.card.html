@@ -1,0 +1,29 @@
+<!-- @dsCard group="Components" viewport="390x780" subtitle="Мобильная раскладка в одну колонку" name="Панель поиска (мобильная)" -->
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Поиск моб.</title>
+<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../components.css"><style>
+body{background:#fff;padding:20px;box-sizing:border-box}
+svg.lucide{width:20px;height:20px}
+.ctr-btn--sm svg.lucide,.ctr-card__specs svg.lucide,.ctr-field__error svg.lucide,.ic16 svg.lucide{width:16px;height:16px}
+.ctr-field__error svg.lucide{width:13px;height:13px}
+.ctr-card__addr svg.lucide{width:14px;height:14px}
+.ic18 svg.lucide{width:18px;height:18px}.ic24 svg.lucide{width:24px;height:24px}.ic28 svg.lucide{width:28px;height:28px}
+.ctr-iconbtn svg.lucide{width:18px;height:18px}
+.lbl{font:var(--type-caption);letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin:0 0 10px}
+body{background:var(--blue-950);padding:16px} .ctr-search__footer .ctr-btn--lg{width:100%}</style></head><body>
+<div class="ctr-search ctr-search--stacked">
+<div class="ctr-seg" role="tablist"><button class="ctr-seg__btn is-active">Продажа</button><button class="ctr-seg__btn">Аренда</button></div>
+<div class="ctr-search__grid">
+<label class="ctr-field"><span class="ctr-field__label">Тип недвижимости</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Квартиры</option><option>Дома</option><option>Участки</option><option>Коммерция</option></select></span></label>
+<label class="ctr-field"><span class="ctr-field__label">Город</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Все города</option><option>Краснодар</option><option>Геленджик</option></select></span></label>
+<label class="ctr-field"><span class="ctr-field__label">Район</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Все районы</option></select></span></label>
+<div class="ctr-field"><span class="ctr-field__label">Цена, ₽</span><div class="ctr-search__range"><input class="ctr-input" placeholder="от" inputmode="numeric"><input class="ctr-input" placeholder="до" inputmode="numeric"></div></div>
+</div>
+<div class="ctr-search__row2">
+<label class="ctr-field"><span class="ctr-field__label">Комнат</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Любое</option><option>1</option><option>2</option><option>3</option><option>4+</option></select></span></label>
+<label class="ctr-field"><span class="ctr-field__label">Рынок</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Любой</option><option>Вторичный</option><option>Новостройка</option></select></span></label>
+<label class="ctr-field"><span class="ctr-field__label">Поиск по тексту</span><span class="ctr-inputwrap"><i data-lucide="search"></i><input class="ctr-input" placeholder="Адрес, улица или ключевые слова"></span></label>
+</div>
+<div class="ctr-search__footer">
+<button class="ctr-btn ctr-btn--outline"><i data-lucide="map"></i>На карте</button>
+<button class="ctr-btn ctr-btn--primary ctr-btn--lg" style="min-width:160px"><i data-lucide="search"></i>Найти</button>
+</div></div><script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script><script>lucide.createIcons();</script></body></html>

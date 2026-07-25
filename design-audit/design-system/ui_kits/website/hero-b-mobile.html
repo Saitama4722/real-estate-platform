@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=390, initial-scale=1">
+<title>Хиро B — мобильная</title>
+<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../../components/components.css">
+<script src="./image-slot.js"></script>
+<style>
+body{margin:0;background:var(--bg-page)}
+svg.lucide{width:20px;height:20px}
+.ctr-btn--sm svg.lucide{width:16px;height:16px}
+.wrap{max-width:none;margin:0 auto;padding:0 16px}
+.hero{padding:40px 0 120px}
+.hero h1{font:700 30px/38px var(--font-sans);letter-spacing:-0.014em;color:#fff;margin:0 0 10px;max-width:none;text-wrap:pretty}
+.hero p{font:400 15px/22px var(--font-sans);color:var(--text-inverse-dim);margin:0}
+.pullup{position:relative;z-index:2;margin-top:-92px}
+.after{padding:32px 0 40px;font:var(--type-caption);letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+.ctr-search{padding:16px}.ctr-search__footer .ctr-btn--lg{width:100%}
+
+</style></head><body>
+<header class="ctr-header ctr-header--mobile"><div class="ctr-header__in">
+  <a class="ctr-logo" href="#">Centreal<i></i></a>
+  <button class="ctr-burger" aria-label="Открыть меню"><i data-lucide="menu"></i></button>
+</div></header>
+<section class="hero ctr-hero ctr-hero--photo">
+    <div class="ctr-hero__photo">
+      <image-slot id="hero-photo-mobile" shape="rect" fit="cover" src="../../assets/photos/hero-placeholder.png" placeholder="Фото: жилой квартал Краснодара / современный ЖК"></image-slot>
+    </div>
+    <div class="ctr-hero__scrim" aria-hidden="true"></div>
+  <div class="wrap">
+    <h1>Найдите недвижимость вашей мечты</h1>
+    <p>Квартиры, дома, участки и коммерция в Краснодаре и Геленджике</p>
+  </div>
+</section>
+<div class="wrap pullup">
+  <div class="ctr-search ctr-search--stacked">
+      <div class="ctr-seg" role="tablist"><button class="ctr-seg__btn is-active">Продажа</button><button class="ctr-seg__btn">Аренда</button></div>
+      <div class="ctr-search__grid">
+        <label class="ctr-field"><span class="ctr-field__label">Тип недвижимости</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Квартиры</option><option>Дома</option><option>Участки</option><option>Коммерция</option></select></span></label>
+        <label class="ctr-field"><span class="ctr-field__label">Город</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Все города</option><option>Краснодар</option><option>Геленджик</option></select></span></label>
+        <label class="ctr-field"><span class="ctr-field__label">Район</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Все районы</option></select></span></label>
+        <div class="ctr-field"><span class="ctr-field__label">Цена, ₽</span><div class="ctr-search__range"><input class="ctr-input" placeholder="от" inputmode="numeric"><input class="ctr-input" placeholder="до" inputmode="numeric"></div></div>
+      </div>
+      <div class="ctr-search__row2">
+        <label class="ctr-field"><span class="ctr-field__label">Комнат</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Любое</option><option>1</option><option>2</option><option>3</option><option>4+</option></select></span></label>
+        <label class="ctr-field"><span class="ctr-field__label">Рынок</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Любой</option><option>Вторичный</option><option>Новостройка</option></select></span></label>
+        <label class="ctr-field"><span class="ctr-field__label">Поиск по тексту</span><span class="ctr-inputwrap"><i data-lucide="search"></i><input class="ctr-input" placeholder="Адрес, улица или ключевые слова"></span></label>
+      </div>
+      <div class="ctr-search__footer">
+        <button class="ctr-btn ctr-btn--outline"><i data-lucide="map"></i>На карте</button>
+        <button class="ctr-btn ctr-btn--primary ctr-btn--lg"><i data-lucide="search"></i>Найти</button>
+      </div>
+    </div>
+</div>
+<div class="wrap after">Категории</div>
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<script>
+lucide.createIcons();
+var layers = document.querySelectorAll('.ctr-hero__layer');
+if (layers.length && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var ticking = false;
+  var move = function () { var y = window.scrollY; layers.forEach(function (l) { l.style.transform = 'translate3d(0,' + (y * parseFloat(l.dataset.parallax)).toFixed(1) + 'px,0)'; }); ticking = false; };
+  window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(move); } }, { passive: true });
+}
+document.querySelectorAll('.ctr-seg').forEach(function (s) { s.querySelectorAll('.ctr-seg__btn').forEach(function (b) { b.addEventListener('click', function () { s.querySelectorAll('.ctr-seg__btn').forEach(function (x) { x.classList.remove('is-active'); }); b.classList.add('is-active'); }); }); });
+</script></body></html>

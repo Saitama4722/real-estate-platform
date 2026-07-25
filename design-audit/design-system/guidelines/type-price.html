@@ -1,0 +1,15 @@
+<!-- @dsCard group="Type" viewport="700x170" subtitle="Цены: 700, табличные цифры, узкие пробелы" name="Цены" -->
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Цены</title><link rel="stylesheet" href="../styles.css"><style>
+body{background:#fff;padding:20px;box-sizing:border-box}
+.row{display:flex;gap:8px}
+.sw{flex:1;height:96px;border-radius:8px;display:flex;flex-direction:column;justify-content:flex-end;padding:10px;box-sizing:border-box}
+.sw b{font:var(--type-caption);letter-spacing:var(--ls-caption)}
+.sw code{font-size:11px;opacity:.75;font-family:ui-monospace,monospace}
+.lt{color:var(--text-primary)} .dk{color:#fff}
+.lbl{font:var(--type-caption);letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin:0 0 8px}
+</style></head><body>
+<div style="display:flex;align-items:baseline;gap:40px">
+<div><p class="lbl">price-lg 24/30 — страница объекта</p><div style="font:var(--type-price-lg);font-variant-numeric:tabular-nums">12 450 000 ₽</div></div>
+<div><p class="lbl">price 20/26 — карточка</p><div style="font:var(--type-price);font-variant-numeric:tabular-nums">5 000 000 ₽</div></div>
+<div><p class="lbl">снижение</p><div style="font:var(--type-price);font-variant-numeric:tabular-nums">4 750 000 ₽ <span style="font:var(--type-small);color:var(--text-muted);text-decoration:line-through">5 000 000 ₽</span></div></div>
+</div></body></html>

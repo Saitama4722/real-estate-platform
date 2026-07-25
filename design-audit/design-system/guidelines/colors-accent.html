@@ -1,0 +1,19 @@
+<!-- @dsCard group="Colors" viewport="700x200" subtitle="Акцентный красный ≠ красный ошибок" name="Красный: акцент и ошибки" -->
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Красный</title><link rel="stylesheet" href="../styles.css"><style>
+body{background:#fff;padding:20px;box-sizing:border-box}
+.row{display:flex;gap:8px}
+.sw{flex:1;height:96px;border-radius:8px;display:flex;flex-direction:column;justify-content:flex-end;padding:10px;box-sizing:border-box}
+.sw b{font:var(--type-caption);letter-spacing:var(--ls-caption)}
+.sw code{font-size:11px;opacity:.75;font-family:ui-monospace,monospace}
+.lt{color:var(--text-primary)} .dk{color:#fff}
+.lbl{font:var(--type-caption);letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin:0 0 8px}
+</style></head><body>
+<div style="display:grid;grid-template-columns:3fr 2fr;gap:24px">
+<div><p class="lbl">Акцент — «Цена снижена», избранное, горячие объекты</p><div class="row">
+<div class="sw lt" style="background:#FDEEEF"><b>red-50</b><code>#FDEEEF</code></div><div class="sw lt" style="background:#FADCDE"><b>red-100</b><code>#FADCDE</code></div><div class="sw dk" style="background:#DE2B37"><b>red-500 · accent</b><code>#DE2B37</code></div><div class="sw dk" style="background:#C21F2C"><b>red-600 · hover</b><code>#C21F2C</code></div>
+</div></div>
+<div><p class="lbl">Ошибки и деструктив — только этот</p><div class="row">
+<div class="sw dk" style="background:#A1272F"><b>carmine-600 · danger</b><code>#A1272F</code></div><div class="sw dk" style="background:#86212A"><b>carmine-700</b><code>#86212A</code></div>
+</div></div>
+</div>
+<p style="font:var(--type-small);color:var(--text-secondary);margin:12px 0 0">Красный никогда не используется для обычных кнопок.</p></body></html>

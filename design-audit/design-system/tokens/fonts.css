@@ -1,0 +1,7 @@
+/* Golos Text — интерфейсная гротеска с полной кириллицей (400/500/600/700).
+   Загружается с Google Fonts; при самостоятельном хостинге заменить на локальные @font-face. */
+@import url('https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap');
+
+:root {
+  --font-sans: 'Golos Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}

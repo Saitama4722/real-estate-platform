@@ -1,0 +1,298 @@
+<!-- @dsCard group="Сайт" viewport="1440x960" subtitle="Главная страница, десктоп 1440" name="Главная (десктоп)" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Centreal — недвижимость в Краснодаре и Геленджике</title>
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="../../components/components.css">
+<script src="./image-slot.js"></script>
+<style>
+svg.lucide{width:20px;height:20px}
+.ctr-btn--sm svg.lucide,.ctr-card__specs svg.lucide,.ic16 svg.lucide{width:16px;height:16px}
+.ctr-card__addr svg.lucide{width:14px;height:14px}
+.ctr-iconbtn svg.lucide{width:18px;height:18px}
+.ic28 svg.lucide{width:28px;height:28px}
+.wrap{max-width:var(--container-max);margin:0 auto;padding:0 24px}
+.sec{padding:76px 0 0}
+.sech{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:0 0 28px}
+.sech h2{font:var(--type-h2);letter-spacing:var(--ls-h2);margin:0}
+.more{display:inline-flex;align-items:center;gap:6px;font:500 15px/20px var(--font-sans)}
+.hero{padding:76px 0 168px}
+.hero h1{font:var(--type-display);letter-spacing:var(--ls-display);color:#fff;margin:0 0 14px;max-width:760px;text-wrap:pretty}
+.hero p{font:var(--type-body-lg);color:var(--text-inverse-dim);margin:0}
+.pullup{position:relative;z-index:2;margin-top:-118px}
+.cats{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.cat{display:flex;flex-direction:column;gap:16px;padding:24px;background:var(--bg-surface);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);text-decoration:none;color:inherit;transition:box-shadow var(--transition-base),transform var(--transition-base)}
+.cat:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);color:inherit}
+.cat i{width:48px;height:48px;border-radius:12px;background:var(--color-primary-tint);color:var(--color-primary);display:flex;align-items:center;justify-content:center;font-style:normal}
+.cat b{font:600 17px/24px var(--font-sans)}
+.cat span{font:13px/18px var(--font-sans);color:var(--text-muted)}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.mapbox{position:relative;height:440px;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm);background:url('../../assets/photos/map-krasnodar.png') center/cover no-repeat}
+.mapzoom{position:absolute;top:16px;left:16px;display:flex;flex-direction:column;gap:8px}
+.mapzoom button{width:36px;height:36px;border:none;border-radius:var(--radius-sm);background:#fff;box-shadow:var(--shadow-md);font:500 20px/1 var(--font-sans);color:var(--text-primary);cursor:pointer}
+.mapzoom button:hover{background:var(--blue-50);color:var(--blue-700)}
+.mapseg{position:absolute;top:16px;right:16px;background:#fff;border-radius:var(--radius-full);box-shadow:var(--shadow-md);padding:4px}
+.marker{position:absolute;transform:translate(-50%,-100%)}
+.band{background:linear-gradient(120deg,var(--blue-600),var(--blue-800));border-radius:var(--radius-lg);padding:44px 48px;display:flex;align-items:center;justify-content:space-between;gap:40px}
+.band h2{font:var(--type-h2);letter-spacing:var(--ls-h2);color:#fff;margin:0 0 10px}
+.band p{font:var(--type-small);color:rgba(255,255,255,0.8);margin:0;max-width:560px}
+.arts{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.art{display:flex;flex-direction:column;gap:12px;padding:26px;background:var(--bg-surface);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);text-decoration:none;color:inherit;transition:box-shadow var(--transition-base),transform var(--transition-base)}
+.art:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);color:inherit}
+.art h3{font:600 18px/26px var(--font-sans);margin:0;text-wrap:pretty}
+.art:hover h3{color:var(--color-primary)}
+.art p{font:var(--type-small);color:var(--text-secondary);margin:0}
+.art .more{margin-top:auto;padding-top:4px;font-size:14px}
+.seo{display:grid;grid-template-columns:1.6fr 1fr;gap:24px;align-items:start}
+.seo h2{font:var(--type-h2);letter-spacing:var(--ls-h2);margin:0 0 14px}
+.seo p{font:var(--type-body);color:var(--text-secondary);margin:0;max-width:640px}
+.ask{background:var(--bg-surface);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:28px}
+.ask h3{font:var(--type-h3);letter-spacing:var(--ls-h3);margin:0 0 8px}
+.ask p{font:var(--type-small);color:var(--text-secondary);margin:0 0 18px}
+.foot{margin-top:84px}
+</style>
+</head>
+<body>
+
+<header class="ctr-header" data-screen-label="Шапка">
+  <div class="ctr-header__in">
+    <a class="ctr-logo" href="#">Centreal<i></i></a>
+    <nav class="ctr-header__nav">
+      <a class="ctr-header__link" href="#">Каталог</a>
+      <a class="ctr-header__link" href="#">Районы</a>
+      <a class="ctr-header__link" href="#">Статьи</a>
+      <a class="ctr-header__link" href="#">Избранное</a>
+      <a class="ctr-header__link" href="#">Сравнение</a>
+    </nav>
+    <div class="ctr-header__cta">
+      <button class="ctr-btn ctr-btn--primary ctr-btn--sm">Продать недвижимость</button>
+      <button class="ctr-btn ctr-btn--outline ctr-btn--sm"><i data-lucide="user"></i>Вход в личный кабинет</button>
+    </div>
+  </div>
+</header>
+
+<section class="hero ctr-hero" data-screen-label="Хиро">
+      <div class="ctr-hero__field" aria-hidden="true">
+        <div class="ctr-hero__layer" data-parallax="0.10">
+          <span class="ctr-hero__icon ctr-hero__icon--back" style="left:58%;top:-6%;width:168px;height:168px;animation-delay:-3s"><i data-lucide="building-2"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--back alt" style="left:86%;top:46%;width:148px;height:148px;animation-delay:-10s"><i data-lucide="house"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--back" style="left:70%;top:74%;width:132px;height:132px;animation-delay:-0s"><i data-lucide="store"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--back alt" style="left:43%;top:58%;width:138px;height:138px;animation-delay:-11s"><i data-lucide="land-plot"></i></span>
+        </div>
+        <div class="ctr-hero__layer" data-parallax="0.18">
+          <span class="ctr-hero__icon ctr-hero__icon--mid" style="left:52%;top:22%;width:84px;height:84px;animation-delay:-7s"><i data-lucide="building"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--mid alt" style="left:76%;top:10%;width:72px;height:72px;animation-delay:-11s"><i data-lucide="key-round"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--mid" style="left:92%;top:24%;width:76px;height:76px;animation-delay:-10s"><i data-lucide="map-pin"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--mid alt" style="left:64%;top:48%;width:80px;height:80px;animation-delay:-8s"><i data-lucide="house"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--mid" style="left:95%;top:68%;width:70px;height:70px;animation-delay:-4s"><i data-lucide="trees"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--mid alt" style="left:38%;top:82%;width:74px;height:74px;animation-delay:-13s"><i data-lucide="building-2"></i></span>
+        </div>
+        <div class="ctr-hero__layer" data-parallax="0.28">
+          <span class="ctr-hero__icon ctr-hero__icon--front" style="left:67%;top:30%;width:40px;height:40px;animation-delay:-7s"><i data-lucide="map-pin"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--front alt" style="left:84%;top:60%;width:36px;height:36px;animation-delay:-8s"><i data-lucide="ruler"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--front" style="left:57%;top:68%;width:34px;height:34px;animation-delay:-1s"><i data-lucide="key-round"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--front alt" style="left:90%;top:40%;width:38px;height:38px;animation-delay:-10s"><i data-lucide="door-open"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--front" style="left:73%;top:18%;width:32px;height:32px;animation-delay:-10s"><i data-lucide="land-plot"></i></span>
+          <span class="ctr-hero__icon ctr-hero__icon--front alt" style="left:48%;top:38%;width:36px;height:36px;animation-delay:-8s"><i data-lucide="store"></i></span>
+        </div>
+      </div>
+  <div class="wrap">
+    <h1>Найдите недвижимость вашей мечты</h1>
+    <p>Квартиры, дома, участки и коммерция в Краснодаре и Геленджике</p>
+  </div>
+</section>
+
+<div class="wrap pullup" data-screen-label="Поиск">
+  <div class="ctr-search">
+    <div class="ctr-seg" role="tablist">
+      <button class="ctr-seg__btn is-active">Продажа</button>
+      <button class="ctr-seg__btn">Аренда</button>
+    </div>
+    <div class="ctr-search__grid">
+      <label class="ctr-field"><span class="ctr-field__label">Тип недвижимости</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Квартиры</option><option>Дома</option><option>Участки</option><option>Коммерция</option></select></span></label>
+      <label class="ctr-field"><span class="ctr-field__label">Город</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Все города</option><option>Краснодар</option><option>Геленджик</option></select></span></label>
+      <label class="ctr-field"><span class="ctr-field__label">Район</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Все районы</option></select></span></label>
+      <div class="ctr-field"><span class="ctr-field__label">Цена, ₽</span><div class="ctr-search__range"><input class="ctr-input" placeholder="от" inputmode="numeric"><input class="ctr-input" placeholder="до" inputmode="numeric"></div></div>
+    </div>
+    <div class="ctr-search__row2">
+      <label class="ctr-field"><span class="ctr-field__label">Комнат</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Любое</option><option>1</option><option>2</option><option>3</option><option>4+</option></select></span></label>
+      <label class="ctr-field"><span class="ctr-field__label">Рынок</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Любой</option><option>Вторичный</option><option>Новостройка</option></select></span></label>
+      <label class="ctr-field"><span class="ctr-field__label">Поиск по тексту</span><span class="ctr-inputwrap"><i data-lucide="search"></i><input class="ctr-input" placeholder="Адрес, улица или ключевые слова"></span></label>
+    </div>
+    <div class="ctr-search__footer">
+      <button class="ctr-btn ctr-btn--outline"><i data-lucide="map"></i>На карте</button>
+      <button class="ctr-btn ctr-btn--primary ctr-btn--lg" style="min-width:180px"><i data-lucide="search"></i>Найти</button>
+    </div>
+  </div>
+</div>
+
+<section class="sec ctr-reveal" data-screen-label="Категории">
+  <div class="wrap">
+    <div class="sech"><h2>Категории</h2></div>
+    <div class="cats">
+      <a class="cat" href="#"><i class="ic28"><i data-lucide="building-2"></i></i><div><b>Квартиры</b><br><span>Городские варианты</span></div></a>
+      <a class="cat ctr-reveal d1" href="#"><i class="ic28"><i data-lucide="house"></i></i><div><b>Дома</b><br><span>Для семьи и отдыха</span></div></a>
+      <a class="cat ctr-reveal d2" href="#"><i class="ic28"><i data-lucide="land-plot"></i></i><div><b>Участки</b><br><span>Земля под строительство</span></div></a>
+      <a class="cat ctr-reveal d3" href="#"><i class="ic28"><i data-lucide="store"></i></i><div><b>Коммерция</b><br><span>Офисы и помещения</span></div></a>
+    </div>
+  </div>
+</section>
+
+<section class="sec ctr-reveal" data-screen-label="Новые объекты">
+  <div class="wrap">
+    <div class="sech"><h2>Новые объекты</h2><a class="more" href="#">Весь каталог<i class="ic16" style="display:inline-flex"><i data-lucide="chevron-right"></i></i></a></div>
+    <div class="cards">
+      <a class="ctr-card" href="#">
+        <div class="ctr-card__media"><img src="../../assets/photos/listing-severny.png" alt="1-комн. квартира, Краснодар, п. Северный">
+          <div class="ctr-card__badges"><span class="ctr-badge ctr-badge--primary">Новый объект</span></div>
+          <div class="ctr-card__actions"><button class="ctr-iconbtn" aria-label="Сравнить"><i data-lucide="scale"></i></button><button class="ctr-iconbtn" aria-label="В избранное"><i data-lucide="heart"></i></button></div>
+        </div>
+        <div class="ctr-card__body">
+          <div class="ctr-card__price">5 000 000 ₽</div>
+          <div class="ctr-card__specs"><span><i data-lucide="bed-double"></i>1-комн. квартира</span><span><i data-lucide="ruler"></i>45 м²</span><span><i data-lucide="building"></i>8/8 эт.</span></div>
+          <div class="ctr-card__addr"><i data-lucide="map-pin"></i>Краснодар, п. Северный</div>
+        </div>
+      </a>
+      <a class="ctr-card" href="#">
+        <div class="ctr-card__media"><image-slot id="listing-2" shape="rect" placeholder="Фото объекта"></image-slot>
+          <div class="ctr-card__badges"><span class="ctr-badge ctr-badge--accent">Цена снижена</span></div>
+          <div class="ctr-card__actions"><button class="ctr-iconbtn" aria-label="Сравнить"><i data-lucide="scale"></i></button><button class="ctr-iconbtn is-active-fav" aria-label="В избранном"><i data-lucide="heart"></i></button></div>
+        </div>
+        <div class="ctr-card__body">
+          <div class="ctr-card__price">8 900 000 ₽ <span class="ctr-card__oldprice">9 400 000 ₽</span></div>
+          <div class="ctr-card__specs"><span><i data-lucide="bed-double"></i>2-комн. квартира</span><span><i data-lucide="ruler"></i>62 м²</span><span><i data-lucide="building"></i>4/9 эт.</span></div>
+          <div class="ctr-card__addr"><i data-lucide="map-pin"></i>Геленджик, ул. Луначарского</div>
+        </div>
+      </a>
+      <a class="ctr-card" href="#">
+        <div class="ctr-card__media"><image-slot id="listing-3" shape="rect" placeholder="Фото объекта"></image-slot>
+          <div class="ctr-card__actions"><button class="ctr-iconbtn" aria-label="Сравнить"><i data-lucide="scale"></i></button><button class="ctr-iconbtn" aria-label="В избранное"><i data-lucide="heart"></i></button></div>
+        </div>
+        <div class="ctr-card__body">
+          <div class="ctr-card__price">12 300 000 ₽</div>
+          <div class="ctr-card__specs"><span><i data-lucide="house"></i>Дом, 4 комн.</span><span><i data-lucide="ruler"></i>145 м²</span><span><i data-lucide="land-plot"></i>6 сот.</span></div>
+          <div class="ctr-card__addr"><i data-lucide="map-pin"></i>Краснодар, ст. Елизаветинская</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="sec ctr-reveal" data-screen-label="Карта">
+  <div class="wrap">
+    <div class="sech"><h2>Объекты на карте</h2><a class="more" href="#">Открыть карту<i class="ic16" style="display:inline-flex"><i data-lucide="chevron-right"></i></i></a></div>
+    <div class="mapbox">
+      <div class="mapzoom"><button aria-label="Приблизить">+</button><button aria-label="Отдалить">−</button></div>
+      <div class="ctr-seg mapseg"><button class="ctr-seg__btn is-active"><i class="ic16" style="display:inline-flex"><i data-lucide="map"></i></i>Карта</button><button class="ctr-seg__btn"><i class="ic16" style="display:inline-flex"><i data-lucide="list"></i></i>Список</button></div>
+      <div class="marker" style="left:49%;top:44%"><span class="ctr-marker">5 000 000 ₽</span></div>
+      <div class="marker" style="left:63%;top:66%"><span class="ctr-marker ctr-marker--hot">12 300 000 ₽</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec ctr-reveal" data-screen-label="Продать">
+  <div class="wrap">
+    <div class="band">
+      <div>
+        <h2>Хотите продать недвижимость?</h2>
+        <p>Оставьте заявку — наш риэлтор оценит объект, подготовит объявление и поможет продать быстрее и выгоднее. Ваш телефон видят только сотрудники агентства.</p>
+      </div>
+      <button class="ctr-btn ctr-btn--inverse ctr-btn--lg" style="flex:none">Продать недвижимость</button>
+    </div>
+  </div>
+</section>
+
+<section class="sec ctr-reveal" data-screen-label="Статьи">
+  <div class="wrap">
+    <div class="sech"><h2>Статьи</h2><a class="more" href="#">Все статьи<i class="ic16" style="display:inline-flex"><i data-lucide="chevron-right"></i></i></a></div>
+    <div class="arts">
+      <a class="art" href="#">
+        <h3>Оформление сделки купли-продажи квартиры: как всё проходит</h3>
+        <p>Общий разбор того, как проходит сделка купли-продажи квартиры: какие документы обычно нужны, из каких этапов состоит процесс и как устроена регистрация перехода права.</p>
+        <span class="more">Читать статью<i class="ic16" style="display:inline-flex"><i data-lucide="arrow-right"></i></i></span>
+      </a>
+      <a class="art" href="#">
+        <h3>Ипотека: на что обращать внимание при выборе банка и программы</h3>
+        <p>Эвергрин-гид по ипотеке: как сравнивать банки и программы, какие параметры кредита важны помимо ставки и какие шаги проходят при оформлении. Без привязки к конкретным ставкам.</p>
+        <span class="more">Читать статью<i class="ic16" style="display:inline-flex"><i data-lucide="arrow-right"></i></i></span>
+      </a>
+      <a class="art" href="#">
+        <h3>Аренда или покупка жилья: как подойти к выбору</h3>
+        <p>Качественное сравнение аренды и покупки: какие факторы влияют на решение, в каких жизненных ситуациях что уместнее и почему у «выгоднее» нет универсального ответа.</p>
+        <span class="more">Читать статью<i class="ic16" style="display:inline-flex"><i data-lucide="arrow-right"></i></i></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="sec ctr-reveal" data-screen-label="О регионе">
+  <div class="wrap seo">
+    <div>
+      <h2>Недвижимость в Краснодарском крае</h2>
+      <p>Centreal помогает купить недвижимость в Краснодаре и Геленджике: квартиры, дома, участки и коммерческие помещения. На сайте — актуальный каталог опубликованных объектов, статьи для покупателей и форма заявки по выбранному объекту.</p>
+    </div>
+    <div class="ask">
+      <h3>Остались вопросы?</h3>
+      <p>Напишите нам — подскажем по каталогу и подбору объекта.</p>
+      <button class="ctr-btn ctr-btn--secondary"><i data-lucide="message-circle"></i>Задать вопрос</button>
+    </div>
+  </div>
+</section>
+
+<footer class="ctr-footer foot" data-screen-label="Подвал">
+  <div class="ctr-footer__in">
+    <div class="ctr-footer__top">
+      <div><a class="ctr-logo" href="#">Centreal<i></i></a><p class="ctr-footer__note">Недвижимость в Краснодаре и Геленджике: квартиры, дома, участки и коммерческие помещения.</p></div>
+      <div><p class="ctr-footer__h">Популярные запросы</p><a class="ctr-footer__link" href="#">Купить квартиру в Краснодаре</a><a class="ctr-footer__link" href="#">Купить участок в Краснодаре</a><a class="ctr-footer__link" href="#">Купить дом в Геленджике</a></div>
+      <div><p class="ctr-footer__h">&nbsp;</p><a class="ctr-footer__link" href="#">Купить дом в Краснодаре</a><a class="ctr-footer__link" href="#">Купить квартиру в Геленджике</a><a class="ctr-footer__link" href="#">Купить коммерцию в Краснодаре</a></div>
+    </div>
+    <div class="ctr-footer__bottom"><span>© 2026 Centreal. Краснодарский край.</span><span><a href="#">Каталог</a><a href="#">Статьи</a><a href="#">Политика конфиденциальности</a><a href="#">Пользовательское соглашение</a></span></div>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<script>
+lucide.createIcons();
+document.querySelectorAll('.ctr-iconbtn').forEach(function (b) {
+  b.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    var fav = /избран/i.test(b.getAttribute('aria-label') || '');
+    b.classList.toggle(fav ? 'is-active-fav' : 'is-active-cmp');
+    b.classList.remove('is-popping'); void b.offsetWidth; b.classList.add('is-popping');
+  });
+});
+document.querySelectorAll('.ctr-seg').forEach(function (seg) {
+  seg.querySelectorAll('.ctr-seg__btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      seg.querySelectorAll('.ctr-seg__btn').forEach(function (x) { x.classList.remove('is-active'); });
+      btn.classList.add('is-active');
+    });
+  });
+});
+
+var hd = document.querySelector('.ctr-header');
+var syncHeader = function () { hd.classList.toggle('is-compact', window.scrollY > 24); };
+syncHeader();
+window.addEventListener('scroll', syncHeader, { passive: true });
+var io = new IntersectionObserver(function (es) {
+  es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); } });
+}, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+document.querySelectorAll('.ctr-reveal').forEach(function (n) { io.observe(n); });
+
+var layers = document.querySelectorAll('.ctr-hero__layer');
+if (layers.length && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var ticking = false;
+  var moveLayers = function () {
+    var y = window.scrollY;
+    layers.forEach(function (l) { l.style.transform = 'translate3d(0,' + (y * parseFloat(l.dataset.parallax)).toFixed(1) + 'px,0)'; });
+    ticking = false;
+  };
+  window.addEventListener('scroll', function () {
+    if (!ticking) { ticking = true; requestAnimationFrame(moveLayers); }
+  }, { passive: true });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!-- @dsCard group="Motion" viewport="700x400" subtitle="Скелетон карточки и карты: shimmer 1.4s linear, геометрия совпадает с контентом" name="Состояния загрузки" -->
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Скелетоны</title>
+<link rel="stylesheet" href="../styles.css"><link rel="stylesheet" href="../components/components.css"><style>
+body{background:var(--bg-page);padding:20px;box-sizing:border-box;margin:0}
+svg.lucide{width:20px;height:20px}
+.ctr-btn--sm svg.lucide,.ctr-card__specs svg.lucide,.ic16 svg.lucide{width:16px;height:16px}
+.ctr-card__addr svg.lucide{width:14px;height:14px}
+.ctr-iconbtn svg.lucide{width:18px;height:18px}
+.lbl{font:var(--type-caption);letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin:0 0 10px}
+.cap{font:11px/15px var(--font-sans);color:var(--text-muted);margin:8px 0 0;text-align:center}
+.wrap{display:grid;grid-template-columns:250px 250px 1fr;gap:20px;align-items:start}</style></head><body>
+<div class="wrap">
+<div><div class="ctr-card ctr-card--skeleton"><div class="ctr-card__media"><div class="ctr-skeleton ctr-skeleton--media"></div></div>
+<div class="ctr-card__body"><div class="ctr-skeleton ctr-skeleton--price"></div><div class="ctr-skeleton ctr-skeleton--specs"></div><div class="ctr-skeleton ctr-skeleton--addr"></div></div></div>
+<p class="cap">Загрузка</p></div>
+<div><a class="ctr-card" href="#" style="width:250px">
+<div class="ctr-card__media"><img src="../assets/photos/listing-severny.png" alt="">
+<div class="ctr-card__actions"><button class="ctr-iconbtn" aria-label="Сравнить"><i data-lucide="scale"></i></button><button class="ctr-iconbtn" aria-label="В избранное"><i data-lucide="heart"></i></button></div></div>
+<div class="ctr-card__body">
+<div class="ctr-card__price">5 000 000 ₽</div>
+<div class="ctr-card__specs"><span><i data-lucide="bed-double"></i>1-комн.</span><span><i data-lucide="ruler"></i>45 м²</span><span><i data-lucide="building"></i>8/8 эт.</span></div>
+<div class="ctr-card__addr"><i data-lucide="map-pin"></i>Краснодар, п. Северный</div></div></a><p class="cap">Загружено</p></div>
+<div><div style="height:246px"><div class="ctr-skeleton ctr-skeleton--map"></div></div><p class="cap">Карта до ответа API · показывать, если ответ дольше 200 мс</p></div>
+</div><script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script><script>lucide.createIcons();</script></body></html>

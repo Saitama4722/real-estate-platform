@@ -1,0 +1,78 @@
+:root {
+  /* ===== Base scales ===== */
+  /* Blue — фирменный синий */
+  --blue-50:  #F0F5FF;
+  --blue-100: #DFEAFE;
+  --blue-200: #BDD5FC;
+  --blue-300: #8FB6F6;
+  --blue-400: #5B8FEC;
+  --blue-500: #2F73E6;
+  --blue-600: #1A5FE0; /* primary */
+  --blue-700: #124BC0;
+  --blue-800: #0E3C9B;
+  --blue-900: #12306E;
+  --blue-950: #0F1E38; /* navy: hero, footer */
+
+  /* Red — акцентный красный (не для обычных кнопок) */
+  --red-50:  #FDEEEF;
+  --red-100: #FADCDE;
+  --red-500: #DE2B37; /* brand accent: «Цена снижена», избранное */
+  --red-600: #C21F2C; /* hover акцента */
+
+  /* Deep red — ТОЛЬКО ошибки/деструктив, чтобы не путать с акцентом */
+  --carmine-600: #A1272F;
+  --carmine-700: #86212A;
+
+  /* Warm neutrals — тёплые нейтральные */
+  --neutral-0:   #FFFFFF;
+  --neutral-25:  #FBFAF8;
+  --neutral-50:  #F6F5F1;
+  --neutral-100: #EEECE6;
+  --neutral-200: #E4E2DC;
+  --neutral-300: #D3D0C8;
+  --neutral-400: #A9ADB6;
+  --neutral-500: #6A7180;
+  --neutral-600: #4E545F;
+  --neutral-900: #1C1F26;
+
+  --green-600: #1B7A4E;
+  --green-50:  #EAF6EF;
+  --amber-600: #AD5706;
+  --amber-50:  #FBF1E4;
+
+  /* ===== Semantic aliases ===== */
+  --color-primary:        var(--blue-600);
+  --color-primary-hover:  var(--blue-700);
+  --color-primary-active: var(--blue-800);
+  --color-primary-tint:   var(--blue-50);
+  --color-primary-tint-2: var(--blue-100);
+
+  --color-accent:       var(--red-500);  /* внимание, не действие */
+  --color-accent-hover: var(--red-600);
+  --color-accent-tint:  var(--red-50);
+
+  --color-danger:      var(--carmine-600); /* ошибки форм, деструктив */
+  --color-danger-tint: #F7EAEA;
+  --color-success:      var(--green-600);
+  --color-success-tint: var(--green-50);
+  --color-warning:      var(--amber-600);
+  --color-warning-tint: var(--amber-50);
+
+  --bg-page:    var(--neutral-50);
+  --bg-surface: var(--neutral-0);
+  --bg-inset:   var(--neutral-100);
+  --bg-dark:    var(--blue-950);
+
+  --border-default: var(--neutral-200);
+  --border-strong:  var(--neutral-300);
+
+  --text-primary:   var(--neutral-900);
+  --text-secondary: var(--neutral-600);
+  --text-muted:     var(--neutral-500);
+  --text-inverse:   #FFFFFF;
+  --text-inverse-dim: rgba(255,255,255,0.72);
+  --text-link:      var(--blue-600);
+
+  --badge-price-drop-bg: var(--red-500);
+  --badge-price-drop-fg: #FFFFFF;
+}

@@ -1,0 +1,15 @@
+:root {
+  /* 4px base grid; имя = px */
+  --space-4: 4px; --space-8: 8px; --space-12: 12px; --space-16: 16px;
+  --space-20: 20px; --space-24: 24px; --space-32: 32px; --space-40: 40px;
+  --space-48: 48px; --space-64: 64px; --space-80: 80px; --space-96: 96px;
+
+  --radius-xs: 4px;   /* чекбоксы, мелкие чипы */
+  --radius-sm: 8px;   /* кнопки, поля ввода, бейджи */
+  --radius-md: 12px;  /* карточки */
+  --radius-lg: 16px;  /* панели, поиск на хиро */
+  --radius-full: 999px; /* пилюли, тогглы */
+
+  --container-max: 1200px;
+  --header-h: 64px;
+}

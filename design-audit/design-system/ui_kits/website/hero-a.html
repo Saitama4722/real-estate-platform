@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<title>Хиро A — иконное поле</title>
+<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../../components/components.css">
+<script src="./image-slot.js"></script>
+<style>
+body{margin:0;background:var(--bg-page)}
+svg.lucide{width:20px;height:20px}
+.ctr-btn--sm svg.lucide{width:16px;height:16px}
+.wrap{max-width:var(--container-max);margin:0 auto;padding:0 24px}
+.hero{padding:92px 0 176px}
+.hero h1{font:var(--type-display);letter-spacing:-0.014em;color:#fff;margin:0 0 14px;max-width:700px;text-wrap:pretty}
+.hero p{font:var(--type-body-lg);color:var(--text-inverse-dim);margin:0}
+.pullup{position:relative;z-index:2;margin-top:-122px}
+.after{padding:56px 0 64px;font:var(--type-caption);letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+
+
+</style></head><body>
+<header class="ctr-header"><div class="ctr-header__in">
+  <a class="ctr-logo" href="#">Centreal<i></i></a>
+  <nav class="ctr-header__nav"><a class="ctr-header__link" href="#">Каталог</a><a class="ctr-header__link" href="#">Районы</a><a class="ctr-header__link" href="#">Статьи</a><a class="ctr-header__link" href="#">Избранное</a><a class="ctr-header__link" href="#">Сравнение</a></nav>
+  <div class="ctr-header__cta"><button class="ctr-btn ctr-btn--primary ctr-btn--sm">Продать недвижимость</button><button class="ctr-btn ctr-btn--outline ctr-btn--sm"><i data-lucide="user"></i>Вход в личный кабинет</button></div>
+</div></header>
+<section class="hero ctr-hero ctr-hero--bold">
+    <div class="ctr-hero__field" aria-hidden="true">
+      <div class="ctr-hero__layer" data-parallax="0.08">
+        <span class="ctr-hero__icon ctr-hero__icon--back" style="left:50%;top:-12%;width:300px;height:300px;animation-delay:-1s"><i data-lucide="building-2"></i></span>
+        <span class="ctr-hero__icon ctr-hero__icon--back alt" style="left:78%;top:30%;width:250px;height:250px;animation-delay:-9s"><i data-lucide="house"></i></span>
+        <span class="ctr-hero__icon ctr-hero__icon--back" style="left:93%;top:-8%;width:230px;height:230px;animation-delay:-9s"><i data-lucide="land-plot"></i></span>
+      </div>
+      <div class="ctr-hero__layer" data-parallax="0.16">
+        <span class="ctr-hero__icon ctr-hero__icon--mid alt" style="left:66%;top:52%;width:150px;height:150px;animation-delay:-13s"><i data-lucide="store"></i></span>
+        <span class="ctr-hero__icon ctr-hero__icon--mid" style="left:88%;top:56%;width:130px;height:130px;animation-delay:-0s"><i data-lucide="building"></i></span>
+        <span class="ctr-hero__icon ctr-hero__icon--mid alt" style="left:58%;top:8%;width:120px;height:120px;animation-delay:-9s"><i data-lucide="house"></i></span>
+        <span class="ctr-hero__icon ctr-hero__icon--mid" style="left:74%;top:2%;width:96px;height:96px;animation-delay:-5s"><i data-lucide="map-pin"></i></span>
+      </div>
+      <div class="ctr-hero__layer" data-parallax="0.26">
+        <span class="ctr-hero__icon ctr-hero__icon--front alt" style="left:63%;top:36%;width:56px;height:56px;animation-delay:-10s"><i data-lucide="key-round"></i></span>
+        <span class="ctr-hero__icon ctr-hero__icon--front" style="left:96%;top:36%;width:48px;height:48px;animation-delay:-9s"><i data-lucide="map-pin"></i></span>
+        <span class="ctr-hero__icon ctr-hero__icon--front" style="left:83%;top:12%;width:52px;height:52px;animation-delay:-0s"><i data-lucide="door-open"></i></span>
+        <span class="ctr-hero__icon ctr-hero__icon--front alt" style="left:54%;top:66%;width:46px;height:46px;animation-delay:-13s"><i data-lucide="trees"></i></span>
+        <span class="ctr-hero__icon ctr-hero__icon--front" style="left:78%;top:76%;width:42px;height:42px;animation-delay:-3s"><i data-lucide="ruler"></i></span>
+      </div>
+    </div>
+    <div class="ctr-hero__fade" aria-hidden="true"></div>
+  <div class="wrap">
+    <h1>Найдите недвижимость вашей мечты</h1>
+    <p>Квартиры, дома, участки и коммерция в Краснодаре и Геленджике</p>
+  </div>
+</section>
+<div class="wrap pullup">
+  <div class="ctr-search">
+      <div class="ctr-seg" role="tablist"><button class="ctr-seg__btn is-active">Продажа</button><button class="ctr-seg__btn">Аренда</button></div>
+      <div class="ctr-search__grid">
+        <label class="ctr-field"><span class="ctr-field__label">Тип недвижимости</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Квартиры</option><option>Дома</option><option>Участки</option><option>Коммерция</option></select></span></label>
+        <label class="ctr-field"><span class="ctr-field__label">Город</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Все города</option><option>Краснодар</option><option>Геленджик</option></select></span></label>
+        <label class="ctr-field"><span class="ctr-field__label">Район</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Все районы</option></select></span></label>
+        <div class="ctr-field"><span class="ctr-field__label">Цена, ₽</span><div class="ctr-search__range"><input class="ctr-input" placeholder="от" inputmode="numeric"><input class="ctr-input" placeholder="до" inputmode="numeric"></div></div>
+      </div>
+      <div class="ctr-search__row2">
+        <label class="ctr-field"><span class="ctr-field__label">Комнат</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Любое</option><option>1</option><option>2</option><option>3</option><option>4+</option></select></span></label>
+        <label class="ctr-field"><span class="ctr-field__label">Рынок</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Любой</option><option>Вторичный</option><option>Новостройка</option></select></span></label>
+        <label class="ctr-field"><span class="ctr-field__label">Поиск по тексту</span><span class="ctr-inputwrap"><i data-lucide="search"></i><input class="ctr-input" placeholder="Адрес, улица или ключевые слова"></span></label>
+      </div>
+      <div class="ctr-search__footer">
+        <button class="ctr-btn ctr-btn--outline"><i data-lucide="map"></i>На карте</button>
+        <button class="ctr-btn ctr-btn--primary ctr-btn--lg" style="min-width:180px"><i data-lucide="search"></i>Найти</button>
+      </div>
+    </div>
+</div>
+<div class="wrap after">Категории</div>
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<script>
+lucide.createIcons();
+var layers = document.querySelectorAll('.ctr-hero__layer');
+if (layers.length && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var ticking = false;
+  var move = function () { var y = window.scrollY; layers.forEach(function (l) { l.style.transform = 'translate3d(0,' + (y * parseFloat(l.dataset.parallax)).toFixed(1) + 'px,0)'; }); ticking = false; };
+  window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(move); } }, { passive: true });
+}
+document.querySelectorAll('.ctr-seg').forEach(function (s) { s.querySelectorAll('.ctr-seg__btn').forEach(function (b) { b.addEventListener('click', function () { s.querySelectorAll('.ctr-seg__btn').forEach(function (x) { x.classList.remove('is-active'); }); b.classList.add('is-active'); }); }); });
+</script></body></html>

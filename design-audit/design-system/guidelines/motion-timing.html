@@ -1,0 +1,31 @@
+<!-- @dsCard group="Motion" viewport="700x250" subtitle="100 / 150 / 200 / 250 / 360 мс, только ease-out" name="Длительности и кривые" -->
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Тайминги</title>
+<link rel="stylesheet" href="../styles.css"><link rel="stylesheet" href="../components/components.css"><style>
+body{background:var(--bg-page);padding:20px;box-sizing:border-box;margin:0}
+svg.lucide{width:20px;height:20px}
+.ctr-btn--sm svg.lucide,.ctr-card__specs svg.lucide,.ic16 svg.lucide{width:16px;height:16px}
+.ctr-card__addr svg.lucide{width:14px;height:14px}
+.ctr-iconbtn svg.lucide{width:18px;height:18px}
+.lbl{font:var(--type-caption);letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin:0 0 10px}
+.cap{font:11px/15px var(--font-sans);color:var(--text-muted);margin:8px 0 0;text-align:center}
+
+.rows{display:flex;flex-direction:column;gap:8px}
+.r{display:grid;grid-template-columns:130px 1fr 240px;gap:14px;align-items:center;font:var(--type-small)}
+.bar{height:10px;border-radius:var(--radius-full);background:var(--color-primary)}
+code{font-family:ui-monospace,monospace;font-size:12px;color:var(--text-secondary)}
+.ez{display:flex;gap:20px;margin-top:18px}
+.ezb{background:#fff;border-radius:var(--radius-sm);box-shadow:var(--shadow-xs);padding:10px 14px;font:12px/16px var(--font-sans);color:var(--text-secondary)}
+.ezb b{display:block;color:var(--text-primary);font:600 13px/18px var(--font-sans)}</style></head><body>
+<div class="rows">
+<div class="r"><code>--dur-instant</code><div class="bar" style="width:12%"></div><span style="color:var(--text-secondary)">100ms · press / active</span></div>
+<div class="r"><code>--dur-fast</code><div class="bar" style="width:20%"></div><span style="color:var(--text-secondary)">150ms · hover иконок, ссылок, чипов</span></div>
+<div class="r"><code>--dur-base</code><div class="bar" style="width:28%"></div><span style="color:var(--text-secondary)">200ms · кнопки, фокус, тени</span></div>
+<div class="r"><code>--dur-slow</code><div class="bar" style="width:38%"></div><span style="color:var(--text-secondary)">250ms · карточка, шапка, смена вида</span></div>
+<div class="r"><code>--dur-reveal</code><div class="bar" style="width:56%"></div><span style="color:var(--text-secondary)">360ms · появление секций (потолок)</span></div>
+</div>
+<div class="ez">
+<div class="ezb"><b>--ease-out</b>cubic-bezier(0.2, 0, 0, 1) — по умолчанию</div>
+<div class="ezb"><b>--ease-out-soft</b>cubic-bezier(0.16, 1, 0.3, 1) — появление</div>
+<div class="ezb"><b>--stagger-step</b>60ms × индекс, максимум 4 шага</div>
+<div class="ezb" style="color:var(--color-danger)"><b style="color:var(--color-danger)">Запрещено</b>bounce, overshoot, ease-in на входе</div>
+</div><script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script><script>lucide.createIcons();</script></body></html>

@@ -1,0 +1,73 @@
+<!-- @dsCard group="Сайт" viewport="1560x2600" subtitle="Сравнение двух хиро: иконное поле и фотофон, 1440 и 390" name="Хиро A / B" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Хиро: A / B</title>
+<link rel="stylesheet" href="../../styles.css">
+<style>
+body{margin:0;background:var(--neutral-100);font:var(--type-body);color:var(--text-primary)}
+.page{width:1560px;margin:0 auto;padding:40px 40px 64px;box-sizing:border-box}
+.v{margin-bottom:56px}
+.vh{display:flex;align-items:baseline;gap:14px;margin:0 0 6px}
+.badge{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:var(--radius-full);background:var(--color-primary);color:#fff;font:700 15px/1 var(--font-sans)}
+.vh h2{font:var(--type-h2);letter-spacing:var(--ls-h2);margin:0}
+.vh em{font-style:normal;font:var(--type-small);color:var(--text-muted)}
+.meta{font:var(--type-small);color:var(--text-secondary);margin:0 0 18px;max-width:900px;text-wrap:pretty}
+.row{display:flex;gap:32px;align-items:flex-start}
+.frame{background:#fff;border-radius:var(--radius-md);box-shadow:var(--shadow-md);overflow:hidden}
+.fd{width:1000px;height:1040px}
+.fd iframe{width:1440px;height:1498px;border:0;transform:scale(0.6944);transform-origin:0 0;display:block}
+.fm{width:390px;height:1040px}
+.fm iframe{width:390px;height:1040px;border:0;display:block}
+.cap{font:var(--type-caption);letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted);margin:0 0 8px}
+.rec{background:#fff;border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:26px 28px;max-width:1000px}
+.rec h3{font:var(--type-h3);letter-spacing:var(--ls-h3);margin:0 0 10px}
+.rec p{font:var(--type-small);color:var(--text-secondary);margin:0 0 10px;text-wrap:pretty}
+.rec p:last-child{margin:0}
+.rec b{color:var(--text-primary)}
+.terms{background:var(--blue-50);border-radius:var(--radius-sm);padding:14px 16px;font:13px/20px var(--font-sans);color:var(--blue-800);margin-top:10px}
+.terms code{font-family:ui-monospace,monospace;font-size:12px;background:#fff;padding:1px 6px;border-radius:4px;display:inline-block;margin:2px 0}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="v">
+    <div class="vh"><span class="badge">A</span><h2>Иконное поле, выраженное</h2><em>та же концепция, но иконки читаются как элемент дизайна</em></div>
+    <p class="meta">Крупные силуэты Lucide (до 300px) на 16–30% белого, stroke 1.25 — дома, жилые корпуса, участки, коммерция читаются как объекты. Три слоя глубины, дрейф 24–38 с, параллакс 0.08 / 0.16 / 0.26. Чистая зона обеспечена размещением (иконки живут правее 50%) и градиентной растушёвкой к заголовку, а не маской. Мобильная — 6 иконок вместо 12.</p>
+    <div class="row">
+      <div><p class="cap">1440</p><div class="frame fd"><iframe src="./hero-a.html" title="Хиро A, десктоп"></iframe></div></div>
+      <div><p class="cap">390</p><div class="frame fm"><iframe src="./hero-a-mobile.html" title="Хиро A, мобильная"></iframe></div></div>
+    </div>
+  </div>
+
+  <div class="v">
+    <div class="vh"><span class="badge">B</span><h2>Фотофон</h2><em>полноэкранное фото под тёмно-синей заливкой</em></div>
+    <p class="meta">В слоте — временная подложка (не лицензионное фото): перетащите настоящий снимок прямо в макет, он заменит её. Фото во всю ширину + двойной скрим: горизонтальный (95% → 50% непрозрачности слева направо, чтобы текст лежал на плотном участке) и вертикальный для контраста у верхнего и нижнего края. Фото задаёт настроение, но не конкурирует: белая карточка поиска остаётся самым ярким пятном. Перетащите фото в слот прямо в макете.</p>
+    <div class="row">
+      <div><p class="cap">1440</p><div class="frame fd"><iframe src="./hero-b.html" title="Хиро B, десктоп"></iframe></div></div>
+      <div><p class="cap">390</p><div class="frame fm"><iframe src="./hero-b-mobile.html" title="Хиро B, мобильная"></iframe></div></div>
+    </div>
+    <div class="terms" style="max-width:1000px">
+      <b>Поисковые запросы для лицензирования фото</b> (Shutterstock / iStock / Лори — у последнего лучший охват юга России):<br>
+      <code>Краснодар жилой комплекс современный</code>
+      <code>Краснодар панорама города жилые дома</code>
+      <code>Геленджик набережная жилые дома</code>
+      <code>Krasnodar residential district aerial</code>
+      <code>modern apartment building southern Russia facade</code>
+      <code>Russian city skyline new residential blocks</code><br>
+      Что искать в кадре: дневной свет или мягкий закат, современные 9–25-этажные жилые корпуса светлых тонов, зелень, ясное небо; горизонтальный кадр от 3000px, свободное «небо» слева под заголовок. Избегать: американских пригородов с газонами, пальмовых курортов, панельных пятиэтажек, узнаваемых вывесок и людей крупным планом.
+    </div>
+  </div>
+
+  <div class="rec">
+    <h3>Что рекомендую</h3>
+    <p><b>Вариант A.</b> Для сайта, где главное действие — поиск, иконное поле выигрывает по трём причинам. Во-первых, оно предсказуемо: контраст заголовка и карточки не зависит от того, какое фото загрузит контент-менеджер завтра. Во-вторых, оно ничего не весит — 12 инлайновых SVG против 400–800 КБ фотографии на первом экране, а хиро стоит ровно на пути к LCP. В-третьих, оно остаётся вашим: фотосток одинаков у всех региональных агентств, а иконный язык привязан к системе — тот же Lucide, что в карточках и фильтрах.</p>
+    <p><b>Когда брать B.</b> Если появится собственная съёмка объектов или узнаваемый вид Краснодара/Геленджика — фото даёт локальность, которую иконки не дадут. Тогда обязательны: фиксированный кадр (не ротация), проверка контраста на каждом кропе и ленивая подгрузка версии для мобильной.</p>
+    <p>Компромисс, если захочется обоих: A на главной, B — на страницах районов, где фото места оправдано содержанием.</p>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!-- @dsCard group="Components" viewport="700x400" subtitle="Поля, селекты, чекбоксы, радио — default/focus/error/disabled" name="Формы" -->
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Формы</title>
+<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../components.css"><style>
+body{background:#fff;padding:20px;box-sizing:border-box}
+svg.lucide{width:20px;height:20px}
+.ctr-btn--sm svg.lucide,.ctr-card__specs svg.lucide,.ctr-field__error svg.lucide,.ic16 svg.lucide{width:16px;height:16px}
+.ctr-field__error svg.lucide{width:13px;height:13px}
+.ctr-card__addr svg.lucide{width:14px;height:14px}
+.ic18 svg.lucide{width:18px;height:18px}.ic24 svg.lucide{width:24px;height:24px}.ic28 svg.lucide{width:28px;height:28px}
+.ctr-iconbtn svg.lucide{width:18px;height:18px}
+.lbl{font:var(--type-caption);letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin:0 0 10px}
+.g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px 20px}</style></head><body>
+<div class="g">
+<label class="ctr-field"><span class="ctr-field__label">Имя</span><input class="ctr-input" placeholder="Как к вам обращаться"><span class="ctr-field__hint">Видно только сотрудникам агентства</span></label>
+<label class="ctr-field"><span class="ctr-field__label">Телефон · focus</span><input class="ctr-input" value="+7 918" style="border-color:var(--color-primary);box-shadow:var(--focus-ring)"></label>
+<label class="ctr-field"><span class="ctr-field__label">Телефон · error</span><input class="ctr-input is-error" value="+7 9"><span class="ctr-field__error"><i data-lucide="circle-alert"></i>Укажите номер полностью</span></label>
+<label class="ctr-field"><span class="ctr-field__label">Город</span><span class="ctr-selectwrap"><select class="ctr-select"><option>Все города</option><option>Краснодар</option><option>Геленджик</option></select></span></label>
+<label class="ctr-field"><span class="ctr-field__label">Поиск по тексту</span><span class="ctr-inputwrap"><i data-lucide="search"></i><input class="ctr-input" placeholder="Адрес, улица или ключевые слова"></span></label>
+<label class="ctr-field"><span class="ctr-field__label">Район · disabled</span><input class="ctr-input" disabled value="Сначала выберите город"></label>
+</div>
+<div style="display:flex;gap:40px;margin-top:24px">
+<div><p class="lbl">Чекбоксы</p><div style="display:flex;flex-direction:column;gap:10px">
+<label class="ctr-check"><input type="checkbox"><span>Только с фото</span></label>
+<label class="ctr-check"><input type="checkbox" checked><span>Цена снижена</span></label>
+<label class="ctr-check is-disabled"><input type="checkbox" disabled><span>Ипотека одобрена</span></label>
+</div></div>
+<div><p class="lbl">Радио</p><div style="display:flex;flex-direction:column;gap:10px">
+<label class="ctr-radio"><input type="radio" name="m"><span>Новостройка</span></label>
+<label class="ctr-radio"><input type="radio" name="m" checked><span>Вторичный рынок</span></label>
+<label class="ctr-radio is-disabled"><input type="radio" disabled><span>Любой</span></label>
+</div></div>
+</div><script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script><script>lucide.createIcons();</script></body></html>

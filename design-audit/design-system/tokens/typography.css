@@ -1,0 +1,14 @@
+:root {
+  /* size / line-height / weight / letter-spacing */
+  --type-display: 700 44px/52px var(--font-sans); --ls-display: -0.015em;
+  --type-h1:      700 36px/44px var(--font-sans); --ls-h1: -0.01em;
+  --type-h2:      700 28px/36px var(--font-sans); --ls-h2: -0.008em;
+  --type-h3:      600 20px/28px var(--font-sans); --ls-h3: -0.004em;
+  --type-body-lg: 400 18px/28px var(--font-sans);
+  --type-body:    400 16px/24px var(--font-sans);
+  --type-small:   400 14px/20px var(--font-sans);
+  --type-caption: 500 12px/16px var(--font-sans); --ls-caption: 0.01em;
+  /* Цены: всегда полужирные, табличные цифры */
+  --type-price-lg: 700 24px/30px var(--font-sans);
+  --type-price:    700 20px/26px var(--font-sans);
+}
