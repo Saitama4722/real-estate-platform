@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Icons } from "@/components/ui/icon";
 import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 type PropertyType = "apartment" | "house" | "land" | "commercial";
 
@@ -21,6 +23,44 @@ interface DistrictRow {
   name: string;
   slug: string;
   city: { id: number; name: string; slug: string };
+}
+
+/** A row from /api/locations/neighborhoods/ (микрорайоны / urban areas). */
+interface NeighborhoodRow {
+  id: number;
+  name: string;
+  slug: string;
+  city: { id: number; name: string; slug: string } | null;
+  district: { id: number; name: string; slug: string } | null;
+}
+
+/**
+ * "Kind" distinguishes which table (and thus which query param) a location
+ * option maps to: districts → `district_slug`, neighborhoods → `neighborhood_slug`.
+ * Slugs can theoretically collide across the two tables, so the kind is what
+ * disambiguates a selection — never the bare slug alone.
+ */
+type LocationKind = "district" | "neighborhood";
+
+/** A concrete location choice held in state; null = «Все районы». */
+interface LocationSelection {
+  kind: LocationKind;
+  slug: string;
+}
+
+/** Merged, kind-tagged option rendered in the DistrictCombobox list. */
+interface LocationOption {
+  /** Unique across both tables: `${kind}:${slug}`. Used as React key + match id. */
+  key: string;
+  kind: LocationKind;
+  slug: string;
+  name: string;
+  /** City name, shown as a suffix only when no city is selected (mixed list). */
+  cityName?: string;
+}
+
+function selectionKey(sel: LocationSelection | null): string {
+  return sel ? `${sel.kind}:${sel.slug}` : "";
 }
 
 interface ChoiceEntry {
@@ -64,10 +104,29 @@ function normalizeDecimalInput(raw: string): string | undefined {
   return String(n);
 }
 
+/** Keep only 0-9, dropping every other character (letters, spaces, punctuation). */
+function digitsOnly(value: string): string {
+  return value.replace(/\D+/g, "");
+}
+
+/**
+ * Format a raw digit string with a space thousands separator, ru-RU style
+ * ("1000000" → "1 000 000"). We use a plain ASCII space rather than
+ * `Intl.NumberFormat("ru-RU")`'s narrow no-break space (U+202F), which renders
+ * inconsistently and copy-pastes oddly. Empty input → empty string.
+ */
+function groupDigits(rawDigits: string): string {
+  // Drop leading zeros (but keep a lone "0") so "007" shows as "7".
+  const trimmed = rawDigits.replace(/^0+(?=\d)/, "");
+  if (!trimmed) return "";
+  return trimmed.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
 interface BuildQueryInput {
   propertyType: PropertyType;
   citySlug: string;
-  districtSlug: string;
+  /** District or neighborhood choice; null = «Все районы» (no location filter). */
+  location: LocationSelection | null;
   search: string;
   rooms: RoomsSelectValue;
   marketType: string;
@@ -93,7 +152,16 @@ function buildCatalogQuery(p: BuildQueryInput): string {
   if (search) q.set("search", search);
 
   if (p.citySlug) q.set("city_slug", p.citySlug);
-  if (p.districtSlug) q.set("district_slug", p.districtSlug);
+  // Exactly one of district_slug / neighborhood_slug is set — the selected kind
+  // decides which. A neighborhood (микрорайон) matches Property.neighborhood; a
+  // district/suburb matches Property.district (backend supports both params).
+  if (p.location) {
+    if (p.location.kind === "neighborhood") {
+      q.set("neighborhood_slug", p.location.slug);
+    } else {
+      q.set("district_slug", p.location.slug);
+    }
+  }
 
   const pMin = normalizeDecimalInput(p.priceMin);
   const pMax = normalizeDecimalInput(p.priceMax);
@@ -138,6 +206,289 @@ function buildCatalogQuery(p: BuildQueryInput): string {
   return q.toString();
 }
 
+interface DistrictComboboxProps {
+  /** Neighborhood options (микрорайоны) — shown first, under a group header. */
+  neighborhoodOptions: LocationOption[];
+  /** District/suburb options — shown after the neighborhoods. */
+  districtOptions: LocationOption[];
+  value: LocationSelection | null;
+  onChange: (selection: LocationSelection | null) => void;
+  /** Append the city name to each label when no city is selected (mixed list). */
+  showCityName: boolean;
+  className?: string;
+}
+
+/**
+ * Searchable district / microdistrict picker — scoped to this search form only
+ * (not shared). Merges two data sources: neighborhoods (микрорайоны, mapped to
+ * `neighborhood_slug`) and districts/suburbs (mapped to `district_slug`). The
+ * selected value carries its kind so the correct query param is emitted and slug
+ * collisions between the two tables can't confuse the match.
+ *
+ * Looks like a native filter field but opens an in-place, substring-filterable
+ * dropdown. Selection is mouse-click only; typing filters the visible options.
+ */
+function DistrictCombobox({
+  neighborhoodOptions,
+  districtOptions,
+  value,
+  onChange,
+  showCityName,
+  className,
+}: DistrictComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const labelFor = useCallback(
+    (o: LocationOption) =>
+      showCityName && o.cityName ? `${o.name} — ${o.cityName}` : o.name,
+    [showCityName],
+  );
+
+  const selectedKey = selectionKey(value);
+
+  const selectedLabel = useMemo(() => {
+    if (!value) return "Все районы";
+    const all = [...neighborhoodOptions, ...districtOptions];
+    const found = all.find((o) => o.kind === value.kind && o.slug === value.slug);
+    return found ? labelFor(found) : "Все районы";
+  }, [neighborhoodOptions, districtOptions, value, labelFor]);
+
+  // Close on outside click.
+  useEffect(() => {
+    if (!open) return;
+    const onDocMouseDown = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [open]);
+
+  const filterOptions = useCallback(
+    (opts: LocationOption[]) => {
+      const q = query.trim().toLowerCase();
+      if (!q) return opts;
+      return opts.filter((o) => o.name.toLowerCase().includes(q));
+    },
+    [query],
+  );
+
+  const filteredNeighborhoods = useMemo(
+    () => filterOptions(neighborhoodOptions),
+    [filterOptions, neighborhoodOptions],
+  );
+  const filteredDistricts = useMemo(
+    () => filterOptions(districtOptions),
+    [filterOptions, districtOptions],
+  );
+  const hasAnyMatch = filteredNeighborhoods.length > 0 || filteredDistricts.length > 0;
+
+  const openDropdown = () => {
+    setQuery("");
+    setOpen(true);
+  };
+
+  const handleSelect = (selection: LocationSelection | null) => {
+    onChange(selection);
+    setQuery("");
+    setOpen(false);
+  };
+
+  const renderOption = (o: LocationOption) => (
+    <li
+      key={o.key}
+      role="option"
+      aria-selected={selectedKey === o.key}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        handleSelect({ kind: o.kind, slug: o.slug });
+      }}
+      className={cn(
+        "cursor-pointer px-3 py-2 text-gray-900 hover:bg-gray-100",
+        selectedKey === o.key && "font-medium text-blue-600",
+      )}
+    >
+      {labelFor(o)}
+    </li>
+  );
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          role="combobox"
+          aria-expanded={open}
+          aria-label="Район"
+          value={open ? query : selectedLabel}
+          placeholder={open ? selectedLabel : undefined}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={openDropdown}
+          onMouseDown={() => {
+            if (!open) openDropdown();
+          }}
+          className={cn(
+            "w-full rounded-md border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-900",
+            "placeholder:text-gray-400",
+            "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+            className,
+          )}
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            className={cn("transition-transform", open && "rotate-180")}
+          >
+            <path
+              d="M2 4l4 4 4-4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      </div>
+
+      {open && (
+        // z-[1000] MUST use the arbitrary-value form: Tailwind v4's default
+        // z-index scale stops at z-50, so a bare `z-1000` is NOT a real utility
+        // and compiles to nothing (leaving the panel un-raised and letting page
+        // content bleed through). Do NOT let an editor "canonicalize" this back
+        // to `z-1000`. 1000+ is required per the Leaflet-overlay rule in CLAUDE.md.
+        <ul
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-[1000] mt-1 max-h-64 overflow-auto rounded-md border border-gray-200 bg-white py-1 text-sm text-gray-900 shadow-lg"
+        >
+          <li
+            role="option"
+            aria-selected={value === null}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              handleSelect(null);
+            }}
+            className={cn(
+              "cursor-pointer px-3 py-2 text-gray-900 hover:bg-gray-100",
+              value === null && "font-medium text-blue-600",
+            )}
+          >
+            Все районы
+          </li>
+
+          {/* Microdistricts first, under a group header (Krasnodar's
+              «Микрорайоны Краснодара» container and Gelendzhik's urban areas
+              both surface here). Header is non-selectable. */}
+          {filteredNeighborhoods.length > 0 && (
+            <li
+              role="presentation"
+              className="select-none px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400"
+            >
+              Микрорайоны
+            </li>
+          )}
+          {filteredNeighborhoods.map(renderOption)}
+
+          {filteredDistricts.length > 0 && (
+            <li
+              role="presentation"
+              className="select-none px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400"
+            >
+              Районы и населённые пункты
+            </li>
+          )}
+          {filteredDistricts.map(renderOption)}
+
+          {!hasAnyMatch && (
+            <li className="px-3 py-2 text-gray-400">Ничего не найдено</li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+interface PriceInputProps {
+  /** Raw digit string (no spaces) — the source of truth held by the parent. */
+  value: string;
+  /** Called with the sanitized raw digit string on every edit. */
+  onRawChange: (rawDigits: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+  className?: string;
+}
+
+/**
+ * Digit-only price field with live "1 000 000" thousands grouping. Scoped to the
+ * search form's «Цена, ₽» pair only. The parent stores raw digits; this input
+ * displays the grouped form and reports back sanitized digits.
+ *
+ * Cursor handling: after reformatting we restore the caret by digit count (how
+ * many digits sit left of the caret), not raw string offset — so inserted/removed
+ * spaces don't make the caret jump when editing in the middle of the number.
+ */
+function PriceInput({
+  value,
+  onRawChange,
+  placeholder,
+  ariaLabel,
+  className,
+}: PriceInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const display = groupDigits(value);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const el = e.target;
+    const rawTyped = el.value;
+    const selEnd = el.selectionStart ?? rawTyped.length;
+
+    // Count digits to the left of the caret in the just-typed value.
+    const digitsBeforeCaret = digitsOnly(rawTyped.slice(0, selEnd)).length;
+
+    const nextRaw = digitsOnly(rawTyped);
+    const nextDisplay = groupDigits(nextRaw);
+
+    onRawChange(nextRaw);
+
+    // Restore the caret after the same number of digits in the formatted string.
+    requestAnimationFrame(() => {
+      const node = inputRef.current;
+      if (!node) return;
+      let pos = 0;
+      let seen = 0;
+      while (pos < nextDisplay.length && seen < digitsBeforeCaret) {
+        if (/\d/.test(nextDisplay[pos])) seen += 1;
+        pos += 1;
+      }
+      node.setSelectionRange(pos, pos);
+    });
+  };
+
+  return (
+    <Input
+      ref={inputRef}
+      type="text"
+      inputMode="numeric"
+      value={display}
+      onChange={handleChange}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      className={className}
+    />
+  );
+}
+
 export type SearchBarVariant = "hero" | "catalog";
 
 export interface SearchBarProps {
@@ -145,6 +496,7 @@ export interface SearchBarProps {
   initialPropertyType?: string;
   initialCitySlug?: string;
   initialDistrictSlug?: string;
+  initialNeighborhoodSlug?: string;
   initialRooms?: string;
   initialRoomsMin?: string;
   initialSearch?: string;
@@ -167,6 +519,7 @@ export function SearchBar({
   initialPropertyType,
   initialCitySlug,
   initialDistrictSlug,
+  initialNeighborhoodSlug,
   initialRooms,
   initialRoomsMin,
   initialSearch,
@@ -193,9 +546,18 @@ export function SearchBar({
   const [citySlug, setCitySlug] = useState(() =>
     fromCatalog ? (initialCitySlug ?? "").trim() : "",
   );
-  const [districtSlug, setDistrictSlug] = useState(() =>
-    fromCatalog ? (initialDistrictSlug ?? "").trim() : "",
-  );
+  // Location filter: a district/suburb OR a neighborhood (микрорайон), tagged by
+  // kind. Hydrated from whichever URL param is present on the catalog variant
+  // (neighborhood_slug wins if both somehow appear — only one is ever set).
+  const [locationSelection, setLocationSelection] =
+    useState<LocationSelection | null>(() => {
+      if (!fromCatalog) return null;
+      const nb = (initialNeighborhoodSlug ?? "").trim();
+      if (nb) return { kind: "neighborhood", slug: nb };
+      const ds = (initialDistrictSlug ?? "").trim();
+      if (ds) return { kind: "district", slug: ds };
+      return null;
+    });
   const [rooms, setRooms] = useState<RoomsSelectValue>(() =>
     fromCatalog ? roomsSelectFromInitial(initialRooms, initialRoomsMin) : "",
   );
@@ -205,11 +567,14 @@ export function SearchBar({
   const [search, setSearch] = useState(() =>
     fromCatalog ? (initialSearch ?? "") : "",
   );
+  // Price state holds RAW DIGITS only (no spaces); PriceInput renders the grouped
+  // "1 000 000" display. digitsOnly() guards against any formatting arriving via
+  // the URL on the catalog variant.
   const [priceMin, setPriceMin] = useState(() =>
-    fromCatalog ? (initialPriceMin ?? "") : "",
+    fromCatalog ? digitsOnly(initialPriceMin ?? "") : "",
   );
   const [priceMax, setPriceMax] = useState(() =>
-    fromCatalog ? (initialPriceMax ?? "") : "",
+    fromCatalog ? digitsOnly(initialPriceMax ?? "") : "",
   );
   const [houseAreaMin, setHouseAreaMin] = useState(() =>
     fromCatalog ? (initialHouseAreaMin ?? "") : "",
@@ -241,13 +606,14 @@ export function SearchBar({
 
   const [cities, setCities] = useState<CityRow[]>([]);
   const [districts, setDistricts] = useState<DistrictRow[]>([]);
+  const [neighborhoods, setNeighborhoods] = useState<NeighborhoodRow[]>([]);
   const [commercialChoices, setCommercialChoices] = useState<ChoiceEntry[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const list = await fetchJson<CityRow[] | { results: CityRow[] }>(
-        "/api/locations/cities/",
+        "/api/locations/cities",
       );
       if (cancelled) return;
       const rows = Array.isArray(list) ? list : list?.results;
@@ -263,16 +629,26 @@ export function SearchBar({
     return cities.find((c) => c.slug === citySlug)?.id ?? null;
   }, [cities, citySlug]);
 
+  // Fetch districts AND neighborhoods for the selected city. Neighborhoods
+  // (микрорайоны) live in a separate table but must appear in the same picker —
+  // otherwise a buyer can't filter by a microdistrict a realtor tagged in the CRM.
   useEffect(() => {
     let cancelled = false;
+    const qs = selectedCityId != null ? `?city=${selectedCityId}` : "";
     (async () => {
-      const qs = selectedCityId != null ? `?city=${selectedCityId}` : "";
-      const list = await fetchJson<DistrictRow[] | { results: DistrictRow[] }>(
-        `/api/locations/districts/${qs}`,
-      );
+      const [dList, nList] = await Promise.all([
+        fetchJson<DistrictRow[] | { results: DistrictRow[] }>(
+          `/api/locations/districts/${qs}`,
+        ),
+        fetchJson<NeighborhoodRow[] | { results: NeighborhoodRow[] }>(
+          `/api/locations/neighborhoods/${qs}`,
+        ),
+      ]);
       if (cancelled) return;
-      const rows = Array.isArray(list) ? list : list?.results;
-      setDistricts(Array.isArray(rows) ? rows : []);
+      const dRows = Array.isArray(dList) ? dList : dList?.results;
+      const nRows = Array.isArray(nList) ? nList : nList?.results;
+      setDistricts(Array.isArray(dRows) ? dRows : []);
+      setNeighborhoods(Array.isArray(nRows) ? nRows : []);
     })();
     return () => {
       cancelled = true;
@@ -283,7 +659,7 @@ export function SearchBar({
     let cancelled = false;
     (async () => {
       const data = await fetchJson<{ commercial_types?: ChoiceEntry[] }>(
-        "/api/locations/choices/",
+        "/api/locations/choices",
       );
       if (cancelled) return;
       setCommercialChoices(
@@ -295,11 +671,38 @@ export function SearchBar({
     };
   }, []);
 
+  // Kind-tagged option lists for the combobox. Neighborhoods are rendered first
+  // (as microdistricts), districts after. Backend already orders both by
+  // sort_order then name, so we preserve incoming order.
+  const neighborhoodOptions = useMemo<LocationOption[]>(
+    () =>
+      neighborhoods.map((n) => ({
+        key: `neighborhood:${n.slug}`,
+        kind: "neighborhood",
+        slug: n.slug,
+        name: n.name,
+        cityName: n.city?.name,
+      })),
+    [neighborhoods],
+  );
+
+  const districtOptions = useMemo<LocationOption[]>(
+    () =>
+      districts.map((d) => ({
+        key: `district:${d.slug}`,
+        kind: "district",
+        slug: d.slug,
+        name: d.name,
+        cityName: d.city?.name,
+      })),
+    [districts],
+  );
+
   const queryPayload = useCallback(
     (view?: "map"): BuildQueryInput => ({
       propertyType,
       citySlug,
-      districtSlug,
+      location: locationSelection,
       search,
       rooms,
       marketType,
@@ -319,7 +722,7 @@ export function SearchBar({
     [
       propertyType,
       citySlug,
-      districtSlug,
+      locationSelection,
       search,
       rooms,
       marketType,
@@ -348,7 +751,9 @@ export function SearchBar({
 
   const onCityChange = (slug: string) => {
     setCitySlug(slug);
-    setDistrictSlug("");
+    // Reset the location filter — the previous district/neighborhood belongs to
+    // the old city and its options are about to be refetched.
+    setLocationSelection(null);
   };
 
   const onPropertyTypeChange = (next: PropertyType) => {
@@ -360,31 +765,60 @@ export function SearchBar({
   };
 
   return (
-    <div className="rounded-2xl bg-white/95 p-3 shadow-lg shadow-black/20 backdrop-blur-sm md:p-4">
-      <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 pb-3">
-        <Button size="sm" className="h-9">
+    /*
+     * Shared by the hero and catalog variants.
+     *
+     * OPAQUE `bg-surface-raised`, not the old `bg-white/95` + `backdrop-blur-sm`:
+     * on the homepage this panel is now pulled UP so it straddles the hero's
+     * bottom edge, and a translucent panel let the navy show through its top
+     * half and the warm page background through its bottom — a visible seam
+     * across the middle of the card. Opaque also matches "white surfaces" in the
+     * design. `shadow-lg` alone now carries the design's shadow colour; the extra
+     * `shadow-black/20` was overriding the token with plain black.
+     */
+    <div className="rounded-2xl bg-surface-raised p-4 shadow-lg md:p-5">
+      {/*
+       * The design's `.ctr-seg` pill group: a neutral-100 track with a white
+       * "thumb" on the active option. Replaces two full Buttons (a primary + a
+       * disabled outline), which read as two independent actions rather than one
+       * either/or choice. The divider rule that used to sit under them is gone —
+       * the kit has none.
+       *
+       * `role="group"` + `aria-pressed`, NOT the kit's `role="tablist"`: there
+       * are no tabpanels here, and tab roles without them mislead screen readers
+       * into expecting panel switching.
+       */}
+      <div
+        role="group"
+        aria-label="Тип сделки"
+        className="inline-flex gap-0.5 rounded-full bg-gray-100 p-1"
+      >
+        <button
+          type="button"
+          aria-pressed="true"
+          className="h-8 rounded-full bg-white px-4 text-[14px] leading-5 font-medium text-blue-700 shadow-xs"
+        >
           Продажа
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-9"
+        </button>
+        <button
+          type="button"
+          aria-pressed="false"
           disabled
           title="Аренда недоступна в текущем MVP"
-          type="button"
+          className="h-8 rounded-full px-4 text-[14px] leading-5 font-medium text-fg-secondary transition-colors duration-150 ease-out hover:text-fg disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:text-gray-400"
         >
           Аренда
-        </Button>
+        </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-12">
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12">
         <div className="md:col-span-3">
-          <label className="mb-1 block text-xs font-medium text-gray-600">Тип недвижимости</label>
+          <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Тип недвижимости</label>
           <Select
             aria-label="Тип недвижимости"
             value={propertyType}
             onChange={(event) => onPropertyTypeChange(event.target.value as PropertyType)}
-            className="h-11 w-full md:h-12"
+            className="h-11 w-full md:h-10"
           >
             <option value="apartment">Квартиры</option>
             <option value="house">Дома</option>
@@ -394,12 +828,12 @@ export function SearchBar({
         </div>
 
         <div className="md:col-span-3">
-          <label className="mb-1 block text-xs font-medium text-gray-600">Город</label>
+          <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Город</label>
           <Select
             aria-label="Город"
             value={citySlug}
             onChange={(e) => onCityChange(e.target.value)}
-            className="h-11 w-full md:h-12"
+            className="h-11 w-full md:h-10"
           >
             <option value="">Все города</option>
             {cities.map((c) => (
@@ -411,42 +845,33 @@ export function SearchBar({
         </div>
 
         <div className="md:col-span-3">
-          <label className="mb-1 block text-xs font-medium text-gray-600">Район</label>
-          <Select
-            aria-label="Район"
-            value={districtSlug}
-            onChange={(e) => setDistrictSlug(e.target.value)}
-            className="h-11 w-full md:h-12"
-          >
-            <option value="">Все районы</option>
-            {districts.map((d) => (
-              <option key={d.id} value={d.slug}>
-                {!citySlug && d.city?.name ? `${d.name} — ${d.city.name}` : d.name}
-              </option>
-            ))}
-          </Select>
+          <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Район</label>
+          <DistrictCombobox
+            neighborhoodOptions={neighborhoodOptions}
+            districtOptions={districtOptions}
+            value={locationSelection}
+            onChange={setLocationSelection}
+            showCityName={!citySlug}
+            className="h-11 md:h-10"
+          />
         </div>
 
         <div className="md:col-span-3">
-          <label className="mb-1 block text-xs font-medium text-gray-600">Цена, ₽</label>
+          <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Цена, ₽</label>
           <div className="flex gap-2">
-            <Input
-              type="text"
-              inputMode="decimal"
+            <PriceInput
               value={priceMin}
-              onChange={(e) => setPriceMin(e.target.value)}
+              onRawChange={setPriceMin}
               placeholder="от"
-              aria-label="Цена от"
-              className="h-11 md:h-12"
+              ariaLabel="Цена от"
+              className="h-11 md:h-10"
             />
-            <Input
-              type="text"
-              inputMode="decimal"
+            <PriceInput
               value={priceMax}
-              onChange={(e) => setPriceMax(e.target.value)}
+              onRawChange={setPriceMax}
               placeholder="до"
-              aria-label="Цена до"
-              className="h-11 md:h-12"
+              ariaLabel="Цена до"
+              className="h-11 md:h-10"
             />
           </div>
         </div>
@@ -454,12 +879,12 @@ export function SearchBar({
         {propertyType === "apartment" && (
           <>
             <div className="md:col-span-2">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Комнат</label>
+              <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Комнат</label>
               <Select
                 aria-label="Количество комнат"
                 value={rooms}
                 onChange={(e) => setRooms(e.target.value as RoomsSelectValue)}
-                className="h-11 w-full md:h-12"
+                className="h-11 w-full md:h-10"
               >
                 <option value="">Любое</option>
                 <option value="0">Студия</option>
@@ -471,12 +896,12 @@ export function SearchBar({
               </Select>
             </div>
             <div className="md:col-span-2">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Рынок</label>
+              <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Рынок</label>
               <Select
                 aria-label="Сегмент рынка"
                 value={marketType}
                 onChange={(e) => setMarketType(e.target.value)}
-                className="h-11 w-full md:h-12"
+                className="h-11 w-full md:h-10"
               >
                 <option value="">Любой</option>
                 <option value="secondary">Вторичка</option>
@@ -485,14 +910,14 @@ export function SearchBar({
               </Select>
             </div>
             <div className="md:col-span-8">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Поиск по тексту</label>
+              <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Поиск по тексту</label>
               <Input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Адрес, улица или ключевые слова"
                 aria-label="Поиск по тексту объявлений"
-                className="h-11 md:h-12"
+                className="h-11 md:h-10"
               />
             </div>
           </>
@@ -501,7 +926,7 @@ export function SearchBar({
         {propertyType === "house" && (
           <>
             <div className="md:col-span-3">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Площадь дома, м²</label>
+              <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Площадь дома, м²</label>
               <div className="flex gap-2">
                 <Input
                   type="text"
@@ -510,7 +935,7 @@ export function SearchBar({
                   onChange={(e) => setHouseAreaMin(e.target.value)}
                   placeholder="от"
                   aria-label="Площадь дома от"
-                  className="h-11 md:h-12"
+                  className="h-11 md:h-10"
                 />
                 <Input
                   type="text"
@@ -519,12 +944,12 @@ export function SearchBar({
                   onChange={(e) => setHouseAreaMax(e.target.value)}
                   placeholder="до"
                   aria-label="Площадь дома до"
-                  className="h-11 md:h-12"
+                  className="h-11 md:h-10"
                 />
               </div>
             </div>
             <div className="md:col-span-3">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Площадь участка, сот.</label>
+              <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Площадь участка, сот.</label>
               <div className="flex gap-2">
                 <Input
                   type="text"
@@ -533,7 +958,7 @@ export function SearchBar({
                   onChange={(e) => setHouseLandAreaMin(e.target.value)}
                   placeholder="от"
                   aria-label="Площадь участка от"
-                  className="h-11 md:h-12"
+                  className="h-11 md:h-10"
                 />
                 <Input
                   type="text"
@@ -542,19 +967,19 @@ export function SearchBar({
                   onChange={(e) => setHouseLandAreaMax(e.target.value)}
                   placeholder="до"
                   aria-label="Площадь участка до"
-                  className="h-11 md:h-12"
+                  className="h-11 md:h-10"
                 />
               </div>
             </div>
             <div className="md:col-span-6">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Поиск по тексту</label>
+              <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Поиск по тексту</label>
               <Input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Район, населённый пункт или ключевые слова"
                 aria-label="Поиск по тексту объявлений"
-                className="h-11 md:h-12"
+                className="h-11 md:h-10"
               />
             </div>
           </>
@@ -563,7 +988,7 @@ export function SearchBar({
         {propertyType === "land" && (
           <>
             <div className="md:col-span-3">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Площадь участка, сот.</label>
+              <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Площадь участка, сот.</label>
               <div className="flex gap-2">
                 <Input
                   type="text"
@@ -572,7 +997,7 @@ export function SearchBar({
                   onChange={(e) => setLandAreaMin(e.target.value)}
                   placeholder="от"
                   aria-label="Площадь участка от"
-                  className="h-11 md:h-12"
+                  className="h-11 md:h-10"
                 />
                 <Input
                   type="text"
@@ -581,19 +1006,19 @@ export function SearchBar({
                   onChange={(e) => setLandAreaMax(e.target.value)}
                   placeholder="до"
                   aria-label="Площадь участка до"
-                  className="h-11 md:h-12"
+                  className="h-11 md:h-10"
                 />
               </div>
             </div>
             <div className="md:col-span-9">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Поиск по тексту</label>
+              <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Поиск по тексту</label>
               <Input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Район, СНТ или ключевые слова"
                 aria-label="Поиск по тексту объявлений"
-                className="h-11 md:h-12"
+                className="h-11 md:h-10"
               />
             </div>
           </>
@@ -602,12 +1027,12 @@ export function SearchBar({
         {propertyType === "commercial" && (
           <>
             <div className="md:col-span-3">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Тип помещения</label>
+              <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Тип помещения</label>
               <Select
                 aria-label="Тип коммерческого помещения"
                 value={commercialType}
                 onChange={(e) => setCommercialType(e.target.value)}
-                className="h-11 w-full md:h-12"
+                className="h-11 w-full md:h-10"
               >
                 <option value="">Любой</option>
                 {commercialChoices.map((c) => (
@@ -618,7 +1043,7 @@ export function SearchBar({
               </Select>
             </div>
             <div className="md:col-span-3">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Площадь, м²</label>
+              <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Площадь, м²</label>
               <div className="flex gap-2">
                 <Input
                   type="text"
@@ -627,7 +1052,7 @@ export function SearchBar({
                   onChange={(e) => setCommercialAreaMin(e.target.value)}
                   placeholder="от"
                   aria-label="Площадь от"
-                  className="h-11 md:h-12"
+                  className="h-11 md:h-10"
                 />
                 <Input
                   type="text"
@@ -636,19 +1061,19 @@ export function SearchBar({
                   onChange={(e) => setCommercialAreaMax(e.target.value)}
                   placeholder="до"
                   aria-label="Площадь до"
-                  className="h-11 md:h-12"
+                  className="h-11 md:h-10"
                 />
               </div>
             </div>
             <div className="md:col-span-6">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Поиск по тексту</label>
+              <label className="mb-1.5 block text-[13px] leading-4 font-medium text-fg-secondary">Поиск по тексту</label>
               <Input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Район, улица или ключевые слова"
                 aria-label="Поиск по тексту объявлений"
-                className="h-11 md:h-12"
+                className="h-11 md:h-10"
               />
             </div>
           </>
@@ -657,7 +1082,12 @@ export function SearchBar({
 
       <div className="mt-3 flex flex-wrap gap-2">
         {variant === "hero" && (
-          <Button type="button" variant="outline" className="h-10" onClick={scrollToHomeMap}>
+          <Button
+            type="button"
+            variant="outline"
+            icon={Icons.Map}
+            onClick={scrollToHomeMap}
+          >
             На карте
           </Button>
         )}
@@ -665,13 +1095,21 @@ export function SearchBar({
           <Button
             type="button"
             variant="outline"
-            className="h-10"
+            icon={Icons.Map}
             onClick={() => applySearch("map")}
           >
             На карте
           </Button>
         )}
-        <Button type="button" className="h-10 px-8" onClick={() => applySearch()}>
+        {/* Primary search action is the design's `lg` control (48px) — it is the
+            most important button on the page. Height comes from `size`, never
+            from className (see button-classes.ts). */}
+        <Button
+          type="button"
+          size="lg"
+          icon={Icons.Search}
+          onClick={() => applySearch()}
+        >
           Найти
         </Button>
       </div>

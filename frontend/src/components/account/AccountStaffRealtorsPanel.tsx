@@ -25,7 +25,12 @@ export type RealtorRow = {
   perm_view_clients: boolean;
   perm_delete_clients: boolean;
   perm_change_status: boolean;
+  short_bio: string;
+  is_public: boolean;
 };
+
+/** Синхронно с бэкендом (users.serializers.SHORT_BIO_MAX). */
+const SHORT_BIO_MAX = 1500;
 
 type RealtorPermField =
   | "perm_create_property"
@@ -72,6 +77,8 @@ function normalizeRealtorRow(r: RealtorRow): RealtorRow {
     perm_view_clients: Boolean(r.perm_view_clients),
     perm_delete_clients: Boolean(r.perm_delete_clients),
     perm_change_status: Boolean(r.perm_change_status),
+    short_bio: r.short_bio ?? "",
+    is_public: Boolean(r.is_public),
   };
 }
 
@@ -100,6 +107,8 @@ export function AccountStaffRealtorsPanel() {
   const [formLast, setFormLast] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formActive, setFormActive] = useState(true);
+  const [formShortBio, setFormShortBio] = useState("");
+  const [formIsPublic, setFormIsPublic] = useState(false);
   const [formAvatar, setFormAvatar] = useState<File | null>(null);
   const [formPerms, setFormPerms] = useState<Record<RealtorPermField, boolean>>({
     ...DEFAULT_PERMS,
@@ -180,6 +189,8 @@ export function AccountStaffRealtorsPanel() {
     setFormLast("");
     setFormPhone("");
     setFormActive(true);
+    setFormShortBio("");
+    setFormIsPublic(false);
     setFormAvatar(null);
     setPermStatesFromRow(null);
     setModalOpen(true);
@@ -193,6 +204,8 @@ export function AccountStaffRealtorsPanel() {
     setFormLast(row.last_name);
     setFormPhone(row.phone ?? "");
     setFormActive(row.is_active);
+    setFormShortBio(row.short_bio ?? "");
+    setFormIsPublic(Boolean(row.is_public));
     setFormAvatar(null);
     setPermStatesFromRow(row);
     setModalOpen(true);
@@ -223,6 +236,8 @@ export function AccountStaffRealtorsPanel() {
         fd.set("last_name", formLast.trim());
         fd.set("phone", formPhone.trim());
         fd.set("is_active", formActive ? "true" : "false");
+        fd.set("short_bio", formShortBio.trim());
+        fd.set("is_public", formIsPublic ? "true" : "false");
         (Object.keys(formPerms) as RealtorPermField[]).forEach((key) => {
           fd.set(key, formPerms[key] ? "true" : "false");
         });
@@ -241,6 +256,8 @@ export function AccountStaffRealtorsPanel() {
           last_name: formLast.trim(),
           phone: formPhone.trim(),
           is_active: formActive,
+          short_bio: formShortBio.trim(),
+          is_public: formIsPublic,
           ...permPayload,
         };
         if (!editing) {
@@ -416,7 +433,6 @@ export function AccountStaffRealtorsPanel() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="text-xs"
                         onClick={() => openEdit(row)}
                       >
                         Изменить
@@ -425,17 +441,19 @@ export function AccountStaffRealtorsPanel() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="text-xs"
                         disabled={!row.is_active}
                         onClick={() => void disableRealtor(row)}
                       >
                         Отключить
                       </Button>
+                      {/* Destructive → the `danger` variant (carmine), not an
+                          outline button tinted red: `text-red-700` was being
+                          overridden by outline's own `hover:text-blue-700`, so
+                          this control turned BLUE on hover. */}
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="danger"
                         size="sm"
-                        className="text-xs text-red-700"
                         onClick={() => void deleteRealtor(row)}
                       >
                         Удалить
@@ -511,6 +529,28 @@ export function AccountStaffRealtorsPanel() {
               onChange={(e) => setFormActive(e.target.checked)}
             />
             <span className="text-slate-700">Активен</span>
+          </label>
+          <label className="block text-sm">
+            <span className="text-slate-600">О себе (текст для публичной страницы)</span>
+            <textarea
+              className="mt-1 w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={5}
+              maxLength={SHORT_BIO_MAX}
+              value={formShortBio}
+              onChange={(e) => setFormShortBio(e.target.value)}
+              placeholder="Продающий текст риэлтора для публичной страницы"
+            />
+            <span className="mt-1 block text-right text-xs text-gray-400">
+              {formShortBio.length}/{SHORT_BIO_MAX}
+            </span>
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={formIsPublic}
+              onChange={(e) => setFormIsPublic(e.target.checked)}
+            />
+            <span className="text-slate-700">Показывать на сайте (публичная страница риэлтора)</span>
           </label>
           <div className="rounded-md border border-slate-200 bg-slate-50/80 px-3 py-2">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
