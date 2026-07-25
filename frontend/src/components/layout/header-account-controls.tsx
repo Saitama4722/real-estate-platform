@@ -15,6 +15,8 @@ import {
   type EmployeeUser,
 } from "@/lib/employeeUser";
 import { cn } from "@/lib/utils";
+import { ButtonLink } from "@/components/ui/button-link";
+import { Icons } from "@/components/ui/icon";
 
 export function HeaderAccountControls() {
   const pathname = usePathname();
@@ -63,21 +65,20 @@ export function HeaderAccountControls() {
 
   if (!ready) {
     return (
-      <div className="h-9 w-28 animate-pulse rounded-md bg-gray-100" aria-hidden />
+      <div className="h-8 w-28 animate-pulse rounded-lg bg-gray-100" aria-hidden />
     );
   }
 
   if (!user) {
     return (
-      <Link
+      <ButtonLink
         href="/account/login"
-        className={cn(
-          "inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 transition-colors",
-          "hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1",
-        )}
+        variant="outline"
+        size="sm"
+        icon={Icons.User}
       >
         Вход в личный кабинет
-      </Link>
+      </ButtonLink>
     );
   }
 
@@ -96,7 +97,7 @@ export function HeaderAccountControls() {
   return (
     <Link
       href="/account"
-      className="inline-flex max-w-[min(20rem,45vw)] items-center gap-2.5 rounded-md border border-gray-200 bg-white py-1.5 pl-1.5 pr-3 text-left text-sm text-gray-900 transition-colors hover:border-gray-300 hover:bg-gray-50"
+      className="inline-flex max-w-[min(20rem,45vw)] items-center gap-2.5 rounded-lg border border-border bg-surface-raised py-1.5 pl-1.5 pr-3 text-left text-sm text-fg transition-colors duration-150 hover:border-border-strong hover:bg-gray-50"
     >
       {hasPhoto ? (
         // eslint-disable-next-line @next/next/no-img-element -- external or media URL from API
