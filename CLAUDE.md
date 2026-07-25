@@ -466,6 +466,62 @@ Stops the Django and Next.js processes. PostgreSQL and Memurai are left running.
   grep for `opacity-0` / `opacity: 0` and confirm nothing depends on a keyframe
   to become visible.**
 
+## Scroll-gated visibility is invisible to every non-scrolling consumer
+
+- **The end-state-in-base rule above is NECESSARY BUT NOT SUFFICIENT.** The
+  scroll reveal *satisfied* it — sections are visible by default and the hiding
+  rule needs both `prefers-reduced-motion: no-preference` **and** the JS-set
+  `.ctr-reveal-on` marker — and it still produced a mostly-blank page. The
+  failure mode is not "JS broken", which that rule covers. It is **JS working
+  perfectly while the viewer never scrolls.**
+- **Measured `[measured]`:** a full-page capture of the homepage at 1440×900
+  taken **without scrolling** came out **2080px of 3306px blank — 63%** — one
+  flat band `y=940..3020`, colour `rgb(246,245,241)` (the page background),
+  because 5 of the 6 `.ctr-sec` sections were still at `opacity: 0`. Hits
+  screenshot tools, PDF/archive jobs, preview crawlers, link unfurlers.
+- **FIX, in place — do not remove it.** `RevealController` reveals whatever is
+  still pending after `REVEAL_FAILSAFE_MS` (**2500ms**), so nothing can stay
+  hidden longer than that. The trade-off is deliberate and documented at the
+  constant: a reader who lingers past 2.5s on the hero gets no fade-in below the
+  fold. Adjust the number if the balance ever needs to shift; don't delete the
+  failsafe.
+- **A tall viewport was never affected `[measured]`:** at `innerHeight` 3306 the
+  sweep reveals all 6 sections on the first frame — 0% blank, height exactly
+  3306. So Googlebot-style rendering and DevTools' "Capture full size
+  screenshot" always worked; only normal-viewport-without-scrolling consumers
+  broke.
+- **RULE for any future scroll-driven visibility (reveal, lazy sections, count-up
+  numbers):** cap it. Ask "what does this look like to something that renders
+  once and never scrolls?" and give it a time-based failsafe.
+
+### «The homepage renders twice» — it does NOT; that's the screenshot tool
+
+- Reported as a bug: hero, search panel and footer each appearing **twice** in a
+  full-page screenshot with a large empty gap, while normal scrolling looked
+  fine. **Both plausible causes were measured and are false** — there is no
+  duplicate mount and nothing hidden-but-occupying-layout.
+  `header/footer/main/.ctr-hero` count **1/1/1/1** in the SSR HTML *and* in the
+  hydrated DOM at both 900px and 3306px viewports `[measured]`;
+  `scrollHeight` 3306 == `footerBottom` 3306 exactly, with **no** element below
+  the footer.
+- **Cause: naive scroll-and-stitch capture.** Reproduced `[measured]` — a
+  stitcher on the 3306px document at 900px viewport emitted a **4500px** image:
+  1. **the bottom scroll CLAMPS** — tiles at 0/900/1800/2700, but max `scrollY`
+     is 2406, so the last tile re-shoots ~294px already captured → **footer
+     duplicated**;
+  2. most extensions **restore scroll to top and take a final frame** → hero
+     band matched in **2 of 5** tiles → **hero + search panel duplicated**.
+  The `sticky` header lands in every tile by design — true of any sticky-header
+  site, not fixable page-side.
+- **Before investigating this again**, count the DOM nodes first
+  (`document.querySelectorAll('header,footer,main,.ctr-hero').length`) — one
+  command separates a real duplicate mount from a capture artifact. For
+  verification screenshots use **DevTools → ⋮ → Capture full size screenshot**
+  (resizes the viewport, no stitching): 1440×3306, single copy, 0% blank
+  `[measured]`. Playwright's `full_page` uses the same CDP path and is equally
+  safe — which is why the committed captures in `design-audit/screenshots-after/`
+  are correct.
+
 ## Footer: full-bleed, and «Популярные запросы» belongs INSIDE it
 
 - **«Популярные запросы» is a SITEWIDE FOOTER column. This REVERSES the former
