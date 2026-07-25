@@ -38,6 +38,15 @@ export interface CatalogPropertyItem {
   priceHistory?: { price: number; changedAt: string }[];
   /** Current price is below the peak recorded price. */
   isPriceReduced?: boolean;
+  /**
+   * Realtor-entered previous price, as a raw number (format at the render site
+   * with `formatPriceRub`). MANUAL, UNVERIFIED input — it is not derived from
+   * price history and can contradict `isPriceReduced`, so never render it as a
+   * struck-through price on its own. See PropertyCard for the display rule.
+   */
+  oldPrice?: number;
+  /** Published within NEW_LISTING_WINDOW_DAYS (backend constant, currently 14). */
+  isNew?: boolean;
   /** Публичный CRM ID риэлтора (RID######) для ссылки на страницу /realtors/... */
   realtorCrmId?: string;
   details?: {

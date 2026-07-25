@@ -1,6 +1,8 @@
 import json
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from rest_framework import serializers
 
 from users.models import User
@@ -9,6 +11,7 @@ from owners.models import Owner
 from owners.serializers import OwnerShortSerializer
 from locations.choices import CommercialType
 from properties.choices import PropertyStatus, PropertyType
+from properties.constants import NEW_LISTING_WINDOW_DAYS
 from properties.import_choices import ImportSourceFormat
 from properties.models import (
     ApartmentDetails,
@@ -120,6 +123,22 @@ class PropertyVideoPublicSerializer(serializers.ModelSerializer):
         fields = ["video_url"]
 
 
+def _is_new_listing(obj) -> bool:
+    """
+    True while a listing is within NEW_LISTING_WINDOW_DAYS of `published_at`.
+
+    Derived on read, not stored: no model field, no flag to go stale or be
+    cleared by hand. `published_at` is a plain column on the row (neither public
+    queryset uses .only()/.defer()), so this costs ZERO extra queries — unlike
+    `is_price_reduced`, which needs the price_history join. Unpublished rows have
+    published_at=NULL and are never "new".
+    """
+    published_at = getattr(obj, "published_at", None)
+    if published_at is None:
+        return False
+    return published_at >= timezone.now() - timedelta(days=NEW_LISTING_WINDOW_DAYS)
+
+
 class PropertyListSerializer(serializers.ModelSerializer):
     city = CityShortSerializer(read_only=True, allow_null=True)
     district = DistrictShortSerializer(read_only=True, allow_null=True)
@@ -139,6 +158,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
     )
     preview_image = serializers.SerializerMethodField()
     is_price_reduced = serializers.SerializerMethodField()
+    is_new = serializers.SerializerMethodField()
 
     class Meta:
         model = Property
@@ -149,6 +169,10 @@ class PropertyListSerializer(serializers.ModelSerializer):
             "property_type",
             "deal_type",
             "price",
+            # Realtor-entered previous price. UNVERIFIED input — unlike
+            # `is_price_reduced`, nothing derives or checks it. Render it only
+            # alongside that flag; see the card's comment for why.
+            "old_price",
             "currency",
             "city",
             "district",
@@ -164,7 +188,11 @@ class PropertyListSerializer(serializers.ModelSerializer):
             "commercial_details",
             "preview_image",
             "is_price_reduced",
+            "is_new",
         ]
+
+    def get_is_new(self, obj) -> bool:
+        return _is_new_listing(obj)
 
     def get_is_price_reduced(self, obj) -> bool:
         """
@@ -209,6 +237,7 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
     assigned_realtor = RealtorShortSerializer(read_only=True, allow_null=True)
     price_history = serializers.SerializerMethodField()
     is_price_reduced = serializers.SerializerMethodField()
+    is_new = serializers.SerializerMethodField()
     apartment_details = ApartmentDetailsPublicSerializer(
         read_only=True, allow_null=True
     )
@@ -243,6 +272,9 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
         peak = max(h.price for h in history)
         return obj.price < peak
 
+    def get_is_new(self, obj) -> bool:
+        return _is_new_listing(obj)
+
     class Meta:
         model = Property
         fields = [
@@ -252,6 +284,8 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
             "property_type",
             "deal_type",
             "price",
+            # See the note on PropertyListSerializer: manually entered, unverified.
+            "old_price",
             "currency",
             "city",
             "district",
@@ -272,6 +306,7 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
             "videos",
             "price_history",
             "is_price_reduced",
+            "is_new",
         ]
 
 

@@ -14,6 +14,8 @@ export interface PublicPropertyListItemRaw {
   property_type: "apartment" | "house" | "land" | "commercial";
   deal_type: string;
   price: string;
+  /** Decimal string, or null when the realtor left it blank. Manual, unverified. */
+  old_price?: string | null;
   currency: string;
   public_address_text: string;
   public_latitude: string | null;
@@ -43,6 +45,14 @@ export interface PublicPropertyListItemRaw {
   } | null;
   preview_image: string | null;
   is_price_reduced?: boolean;
+  is_new?: boolean;
+}
+
+/** Decimal string → number, or undefined when absent/blank/unparseable. */
+function optionalDecimal(v: string | null | undefined): number | undefined {
+  if (v == null || v === "") return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 function formatListPrice(price: string, currency: string): string {
@@ -127,6 +137,8 @@ export function mapPublicListItemToCatalogItem(row: PublicPropertyListItemRaw): 
       undefined,
     district: row.district?.name,
     isPriceReduced: row.is_price_reduced === true,
+    oldPrice: optionalDecimal(row.old_price),
+    isNew: row.is_new === true,
   };
 }
 

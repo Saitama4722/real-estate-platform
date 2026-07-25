@@ -20,6 +20,8 @@ export interface PublicPropertyDetail {
   property_type: "apartment" | "house" | "land" | "commercial";
   deal_type: string;
   price: string;
+  /** Decimal string, or null when the realtor left it blank. Manual, unverified. */
+  old_price?: string | null;
   currency: string;
   public_address_text: string;
   public_latitude: string | null;
@@ -53,6 +55,8 @@ export interface PublicPropertyDetail {
   price_history?: { price: string; changed_at: string }[];
   /** True when current price is below the peak recorded price (see serializer). */
   is_price_reduced?: boolean;
+  /** Published within NEW_LISTING_WINDOW_DAYS (backend constant, currently 14). */
+  is_new?: boolean;
   assigned_realtor: {
     id: number;
     crm_id: string;
@@ -200,5 +204,12 @@ export function mapPublicDetailToCatalogItem(
           .filter((h) => Number.isFinite(h.price))
       : undefined,
     isPriceReduced: p.is_price_reduced === true,
+    oldPrice: (() => {
+      // Decimal string → number; undefined when absent/blank/unparseable.
+      if (p.old_price == null || p.old_price === "") return undefined;
+      const n = Number(p.old_price);
+      return Number.isFinite(n) ? n : undefined;
+    })(),
+    isNew: p.is_new === true,
   };
 }
