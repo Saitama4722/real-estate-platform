@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 /**
  * Drives the section scroll-reveal and the header's compact-on-scroll state.
  *
- * Renders nothing. Mounted once from the root layout.
+ * Renders nothing. Mounted once from the root layout, but its effect RE-ARMS on
+ * every route change — the root layout survives client-side navigation, so a
+ * once-only effect would leave every soft-navigated page's sections hidden. See
+ * the pathname note on the component below.
  *
  * ── Reveal ───────────────────────────────────────────────────────────────────
  * Adds `ctr-reveal-on` to <html>, which is what ARMS the CSS in globals.css —
@@ -63,6 +67,28 @@ const COMPACT_AFTER_PX = 24;
 const REVEAL_FAILSAFE_MS = 2500;
 
 export function RevealController() {
+  /**
+   * ⚠ THE EFFECT BELOW IS KEYED ON PATHNAME, NOT `[]`. Do not "simplify" it back.
+   *
+   * This component is mounted from the ROOT LAYOUT, which Next.js keeps mounted
+   * across client-side navigations. With an empty dependency array the effect ran
+   * exactly ONCE per full page load: it armed `ctr-reveal-on` on <html> and
+   * snapshotted the `.ctr-sec` list of whichever page happened to be first. Every
+   * soft navigation afterwards swapped in a NEW set of sections that were never in
+   * `pending`, never reached by the failsafe timer (long since fired), and still
+   * hidden by the CSS — which stays armed because the controller never unmounted.
+   *
+   * Result `[measured]`: reaching the homepage by clicking a link (e.g. the header
+   * logo, the usual way back after landing on /account post-login) left all 6
+   * sections at opacity 0 permanently, with content fully present in the DOM
+   * (heights 298-580px, cards rendered) and zero console errors. Scrolling could
+   * not fix it — the shared scroll handler was still alive and toggling the
+   * compact header, but `pending` was empty — while a manual F5 remounted the
+   * controller and rendered correctly, which is what made it look auth-related.
+   * It never was: it reproduces logged out.
+   */
+  const pathname = usePathname();
+
   useEffect(() => {
     const root = document.documentElement;
     const header = document.querySelector("header");
@@ -78,9 +104,16 @@ export function RevealController() {
     // Reveal everything still waiting, in one pass. Idempotent: `is-in` is a
     // class add, and draining `pending` means the sweep skips the work forever
     // after (same "drops to header-only" path as reading the page through).
+    //
+    // Re-queries the DOM rather than draining only the snapshot taken above, so
+    // the "nothing stays hidden longer than REVEAL_FAILSAFE_MS" invariant also
+    // covers sections that appeared AFTER this effect ran (streamed/Suspense
+    // content). Today's homepage awaits all its data and commits in one pass, so
+    // the snapshot is complete — this keeps the guarantee true if that changes.
     const revealAll = () => {
-      if (!pending.length) return;
-      for (const el of pending) el.classList.add("is-in");
+      for (const el of document.querySelectorAll(".ctr-sec:not(.is-in)")) {
+        el.classList.add("is-in");
+      }
       pending = [];
     };
 
@@ -131,7 +164,10 @@ export function RevealController() {
       if (failsafe) clearTimeout(failsafe);
       root.classList.remove("ctr-reveal-on");
     };
-  }, []);
+    // Re-arm per route: see the note on `pathname` above. React runs this
+    // cleanup and the next setup in the same commit, with no paint in between,
+    // so disarming and re-arming `ctr-reveal-on` cannot flash the page.
+  }, [pathname]);
 
   return null;
 }

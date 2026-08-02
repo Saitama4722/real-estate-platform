@@ -534,6 +534,54 @@ itself now — **there is no manual `-p 3001` / `.env.local` step any more.**
   numbers):** cap it. Ask "what does this look like to something that renders
   once and never scrolls?" and give it a time-based failsafe.
 
+### …and a once-only effect in the ROOT LAYOUT misses every soft navigation
+
+- **Second failure of the same mechanism, different cause — fixed 2026-08-03.**
+  Reported as "after logging in as a realtor the homepage's Категории and Новые
+  объекты are missing; F5 fixes it". **It is not auth-related and not a data
+  problem** — it reproduces logged out, and the sections are fully present in the
+  DOM the whole time.
+- **Root cause:** `RevealController` is mounted from `app/layout.tsx`, and the
+  root layout **survives client-side navigation**. Its effect used `[]`, so it
+  ran exactly once per full page load: it armed `ctr-reveal-on` on `<html>` and
+  snapshotted `.ctr-sec` **for whatever page happened to be first**. Every soft
+  navigation afterwards swapped in new sections that were never in `pending`,
+  never reached by the already-fired failsafe, and still hidden by the
+  still-armed CSS → `opacity: 0` **forever**. F5 remounted the controller, which
+  is exactly why a refresh "fixed" it and why it looked like a login race.
+- **Evidence `[measured]`:** soft-navigating `/catalog` → `/` left **6/6 sections
+  at `opacity: 0`, `is-in=false`**, with content present (heights 298–580px,
+  «Новые объекты» rendering 2 cards) and **zero console errors / failed
+  requests**. Scrolling top-to-bottom did **not** help, while `is-compact` on the
+  header toggled correctly throughout — proving the shared scroll handler was
+  alive and that it was `pending` that was empty. A/B on the dependency array
+  alone: `[]` → **0/5** fresh realtor logins rendered the sections, `[pathname]`
+  → **5/5**.
+- **Fix:** key the effect on `usePathname()` so it re-snapshots and re-arms per
+  route, and make the failsafe re-query `.ctr-sec:not(.is-in)` instead of
+  draining only the mount-time snapshot (keeps the "never hidden longer than
+  `REVEAL_FAILSAFE_MS`" invariant true for anything that arrives late, e.g. if
+  the homepage ever streams). Cleanup + setup run in the same commit with no
+  paint between, so re-arming cannot flash the page `[measured]`.
+- **RULE: any effect in the root layout that touches PAGE content must be keyed
+  on the route, not `[]`.** `[]` there means "once per full page load", which is
+  almost never what page-level DOM work wants. The tell for this class of bug is
+  **"a manual refresh fixes it"** — that means state is being set up once per
+  document rather than once per page. Only genuinely document-scoped work
+  (analytics boot, a global listener with no page-specific state) belongs in `[]`.
+- **Verified after the fix `[measured]`:** 10/10 checks — soft nav home from
+  `/catalog`, `/articles`, `/favorites`, browser Back, 3 repeated round-trips,
+  reduced-motion on both load paths, compact header still toggling, and the
+  animation itself still intact (6/6 hidden immediately after arming, revealed by
+  the failsafe). Plus 5/5 fresh realtor logins and a 46-check responsive sweep
+  (23 routes × 390/768px) with zero horizontal overflow.
+- **Testing gotcha that cost a false alarm:** sampling section opacity at a fixed
+  ~400ms after `domcontentloaded` reports "nothing hidden" and looks like the
+  animation is dead. It isn't — in dev, hydration had not armed
+  `ctr-reveal-on` yet, and the base state is deliberately visible. **Poll for
+  `ctr-reveal-on` before asserting anything about reveal state**, never a fixed
+  sleep.
+
 ### «The homepage renders twice» — it does NOT; that's the screenshot tool
 
 - Reported as a bug: hero, search panel and footer each appearing **twice** in a
