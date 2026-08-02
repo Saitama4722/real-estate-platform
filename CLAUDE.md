@@ -1318,9 +1318,17 @@ Index of what changed this session; details live in the linked sections above.
 - **Property #18** (`PID000001`, «1-комн. квартира, 45.00 м², Краснодар», created by
   realtor `vl@vl.ru`) is currently the **single real, production-meaningful**
   property in the database.
-- **Its correct state (as of 2026-07-04):** price **4 500 000 ₽**, **TWO**
-  `PriceHistory` rows (**1 100 000 @ 2026-06-29** → **4 500 000 @ 2026-07-04**),
-  **3 real photos**, a real description, **1 lead + 8 phone-reveals** attached.
+- **Its correct state, re-read from the DB on 2026-08-03 `[measured]`:** price
+  **5 000 000 ₽**, **THREE** `PriceHistory` rows (**1 100 000 @ 2026-06-29** →
+  **4 500 000 @ 2026-07-04 01:44** → **5 000 000 @ 2026-07-04 01:56**), **3 real
+  photos**, a real description (1464 chars), **1 lead + 11 phone-reveals**
+  attached, `is_published=True`.
+  - **This entry used to say 4 500 000 and TWO rows.** That was not wrong when
+    written — it was written *twelve minutes* before the user bumped the price
+    again in the same CRM session, and then went stale. Which is the whole point
+    of the rule below: a hardcoded "canonical" number in a doc decays, so
+    **re-read the DB rather than trusting this line.** Both the price and the
+    phone-reveal count (was 8) had drifted by the time it was next checked.
 - **⚠️ DO NOT "restore" #18 to the old 1 100 000 «baseline» — that value is STALE.**
   The user edited the price to **4 500 000** through the CRM. During earlier
   price-history/compare testing this real edit was **twice mistaken for test
@@ -1334,10 +1342,10 @@ Index of what changed this session; details live in the linked sections above.
   signals/migrations — **even if #18 wasn't the intended target** — verify #18's
   integrity, but **before "restoring" anything, check whether the current price
   reflects a real, intentional user edit:**
-  - The current canonical price is **4 500 000**; `photos.count()` must be **3**;
-    lead/phone-reveal counts unchanged. Quick check:
+  - The last-observed canonical price is **5 000 000** (2026-08-03 `[measured]`);
+    `photos.count()` must be **3**. Quick check:
     `Property.objects.get(pk=18)` → `price`, `photos.count()`.
-  - **If the price differs from 4 500 000, do NOT blindly reset it.** A different
+  - **If the price differs from 5 000 000, do NOT blindly reset it.** A different
     value with a clean, signal-generated `PriceHistory` row is very likely another
     **real user edit** — treat it as the new canonical value and **ASK** before
     changing it. Only treat it as corruption if there's clear evidence it came from
