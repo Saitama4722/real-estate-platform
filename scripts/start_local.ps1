@@ -3,12 +3,16 @@
 #  Centreal - Native local development launcher (no Docker)
 #  ------------------------------------------------------------------------
 #  1. Ensures the PostgreSQL 18 and Memurai (Redis) Windows services run
-#  2. Opens three separate PowerShell windows:
-#       - Django  (runserver on 127.0.0.1:8001, via the venv's python.exe)
-#       - Next.js (dev server on :3000)
+#  2. Picks free ports (preferring 8001 / 3000, walking upward if busy) and
+#     rewrites frontend/.env.local so the site always names the real ports
+#  3. Opens three separate PowerShell windows:
+#       - Django  (runserver on 127.0.0.1:<backend port>, via the venv's python.exe)
+#       - Next.js (dev server on <frontend port>)
 #       - Celery worker (-P solo, via the venv's python.exe)
-#  3. Waits for the dev server to answer, then opens the browser
-#  4. Prints the local URLs
+#  4. Confirms the port Next.js really bound, re-syncing/restarting if it drifted
+#  5. Waits for the servers to answer, then opens the browser
+#  6. Prints the local URLs - ALWAYS read the actual frontend URL from the
+#     summary at the end; it is not guaranteed to be :3000
 # ============================================================================
 
 $ErrorActionPreference = "Continue"
@@ -53,14 +57,27 @@ function Find-FreePort {
         if (-not $inUse) {
             # Double-check by actually trying to bind it, in case a listener
             # appeared on an interface Get-NetTCPConnection didn't surface.
-            try {
-                $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $port)
-                $listener.Start()
-                $listener.Stop()
-                return $port
-            } catch {
-                # Could not bind - treat as busy and keep walking.
+            # We bind BOTH loopback and 0.0.0.0 (Any): `next dev` binds all
+            # interfaces, so a listener on a non-loopback address would let a
+            # loopback-only probe succeed and still collide at launch. Each probe
+            # sets ExclusiveAddressUse so Windows' SO_REUSEADDR behaviour cannot
+            # hand us a port another process is already serving on.
+            $bindOk = $true
+            foreach ($addr in @([System.Net.IPAddress]::Loopback, [System.Net.IPAddress]::Any)) {
+                $listener = $null
+                try {
+                    $listener = [System.Net.Sockets.TcpListener]::new($addr, $port)
+                    try { $listener.ExclusiveAddressUse = $true } catch { }
+                    $listener.Start()
+                } catch {
+                    # Could not bind - treat as busy and keep walking.
+                    $bindOk = $false
+                } finally {
+                    if ($listener) { try { $listener.Stop() } catch { } }
+                }
+                if (-not $bindOk) { break }
             }
+            if ($bindOk) { return $port }
         }
     }
     return $null
@@ -171,27 +188,58 @@ $backendUrl  = "http://${BackendHost}:${BackendPort}"
 
 # Next.js reads .env.local at process start, so we must rewrite the port-bearing
 # URLs BEFORE launching `npm run dev`. We only touch the four URL lines and leave
-# the rest of the file (comments, map keys) untouched.
+# the rest of the file (comments, map keys) untouched. A key that is missing
+# entirely is APPENDED rather than skipped, so the file can never end up naming
+# only some of the ports. Called again later if Next.js drifts to another port.
 $envLocalPath = Join-Path $FrontendDir ".env.local"
-if (Test-Path $envLocalPath) {
+
+function Sync-FrontendEnv {
+    param([string]$SiteUrl, [string]$ApiBaseUrl)
+
+    if (-not (Test-Path $envLocalPath)) {
+        Write-Warn "frontend/.env.local not found - skipping URL sync."
+        return $false
+    }
+
+    $wanted = [ordered]@{
+        "NEXT_PUBLIC_SITE_URL"  = $SiteUrl
+        "NEXT_PUBLIC_API_URL"   = "$SiteUrl/api"
+        "BACKEND_URL"           = $ApiBaseUrl
+        "BACKEND_INTERNAL_URL"  = $ApiBaseUrl
+    }
+
     try {
-        $envLines = Get-Content -LiteralPath $envLocalPath
+        $envLines = @(Get-Content -LiteralPath $envLocalPath)
+        $seen = @{}
         $envLines = $envLines | ForEach-Object {
-            if     ($_ -match '^\s*NEXT_PUBLIC_SITE_URL=')   { "NEXT_PUBLIC_SITE_URL=$frontendUrl" }
-            elseif ($_ -match '^\s*NEXT_PUBLIC_API_URL=')    { "NEXT_PUBLIC_API_URL=$frontendUrl/api" }
-            elseif ($_ -match '^\s*BACKEND_URL=')            { "BACKEND_URL=$backendUrl" }
-            elseif ($_ -match '^\s*BACKEND_INTERNAL_URL=')   { "BACKEND_INTERNAL_URL=$backendUrl" }
-            else { $_ }
+            $line = $_
+            foreach ($key in $wanted.Keys) {
+                if ($line -match "^\s*$key=") {
+                    $seen[$key] = $true
+                    $line = "$key=$($wanted[$key])"
+                    break
+                }
+            }
+            $line
+        }
+        # Append any key the file did not already define.
+        foreach ($key in $wanted.Keys) {
+            if (-not $seen.ContainsKey($key)) {
+                $envLines += "$key=$($wanted[$key])"
+                Write-Info "Added missing $key to frontend/.env.local"
+            }
         }
         Set-Content -LiteralPath $envLocalPath -Value $envLines -Encoding UTF8
-        Write-OK "Synced frontend/.env.local (site -> $frontendUrl, backend -> $backendUrl)"
+        Write-OK "Synced frontend/.env.local (site -> $SiteUrl, backend -> $ApiBaseUrl)"
+        return $true
     } catch {
         Write-Warn "Could not update frontend/.env.local: $($_.Exception.Message)"
         Write-Warn "The site may use a stale port - check NEXT_PUBLIC_SITE_URL / BACKEND_URL."
+        return $false
     }
-} else {
-    Write-Warn "frontend/.env.local not found - skipping URL sync."
 }
+
+Sync-FrontendEnv -SiteUrl $frontendUrl -ApiBaseUrl $backendUrl | Out-Null
 
 # --- 3-4b. Launch the three services -------------------------------------
 # Django (backend), Next.js (frontend), and a Celery worker (background tasks),
@@ -216,7 +264,18 @@ $backendCmd  = "`$host.UI.RawUI.WindowTitle = 'Centreal Backend (Django :$Backen
 # PowerShell, `npm run dev -- --port` is unreliable because npm's arg pass-through
 # gets mangled, so we invoke Next.js directly with `npx next dev --port`. We also
 # set $env:PORT as a belt-and-suspenders fallback (Next.js honours PORT too).
-$frontendCmd = "`$host.UI.RawUI.WindowTitle = 'Centreal Frontend (Next.js :$FrontendPort)'; Set-Location -LiteralPath '$FrontendDir'; `$env:PORT = '$FrontendPort'; npx next dev --port $FrontendPort"
+function New-FrontendCmd {
+    param([int]$Port)
+    # NODE_ENV is forced to 'development' because these windows INHERIT the
+    # environment of whoever launched the script. A shell carrying
+    # NODE_ENV=production puts `next dev` into a state where the CSS/PostCSS
+    # loader chain is not wired up, and every page 500s with
+    # "Module parse failed: Unexpected character '@'" from globals.css - which
+    # looks like a broken build, not an env var. See the NODE_ENV section in
+    # CLAUDE.md, which prescribes exactly this guard.
+    return "`$host.UI.RawUI.WindowTitle = 'Centreal Frontend (Next.js :$Port)'; Set-Location -LiteralPath '$FrontendDir'; `$env:NODE_ENV = 'development'; `$env:PORT = '$Port'; npx next dev --port $Port"
+}
+$frontendCmd = New-FrontendCmd -Port $FrontendPort
 $workerCmd   = "`$host.UI.RawUI.WindowTitle = 'Centreal Celery worker'; Set-Location -LiteralPath '$BackendDir'; & '$venvPython' -m celery -A config.celery worker -l info -P solo"
 
 # Duplicate guard for the worker: a worker has no listening port, so we detect an
@@ -255,6 +314,85 @@ if ($startWorker) {
         "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $workerCmd
     ) | Out-Null
     Write-OK "Celery worker window opened (background tasks)"
+}
+
+# --- 4c. Verify the port Next.js ACTUALLY bound --------------------------
+# Find-FreePort probes the port immediately BEFORE launch, but `next dev` has its
+# own silent fallback: if the port is taken in the meantime - or by a listener the
+# probe could not see - it prints "Port X is in use, trying X+1" and binds the
+# next one WITHOUT failing. .env.local would then still name the old port, so
+# every browser-side call to NEXT_PUBLIC_API_URL would hit a dead origin. That is
+# the silent breakage this step exists to prevent, so we read the port back from
+# the running process instead of trusting our own pre-check.
+
+# One shared matcher for "a node process belonging to OUR Next.js dev server".
+# It must cover every process in the chain, because they are different command
+# lines and only the LAST one actually owns the port:
+#   npx-cli.js next dev --port N        <- the launcher wrapper
+#   node_modules\next\dist\bin\next dev <- the CLI
+#   next\dist\server\lib\start-server.js <- the process that BINDS the port
+# Missing that third form is why an earlier version of this check reported
+# "could not read the port back" even though the server was up. `\next\dist\`
+# covers the last two; it is specific enough not to match node processes from
+# other projects on this machine.
+$NextDevProcPattern = 'next(\.js)?\s+dev|next-server|\\next\\dist\\'
+
+function Get-NextDevPort {
+    param([int]$TimeoutSec = 90)
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while ((Get-Date) -lt $deadline) {
+        # NOTE: do not name the loop variable $pid - that is an automatic
+        # PowerShell variable (this shell's own process id).
+        $nodePids = @(
+            Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+                Where-Object { $_.CommandLine -and $_.CommandLine -match $NextDevProcPattern } |
+                Select-Object -ExpandProperty ProcessId
+        )
+        foreach ($procId in $nodePids) {
+            $conn = Get-NetTCPConnection -State Listen -OwningProcess $procId -ErrorAction SilentlyContinue |
+                Where-Object { $_.LocalPort -ge $FrontendPortPreferred -and $_.LocalPort -lt ($FrontendPortPreferred + 50) } |
+                Select-Object -First 1
+            if ($conn) { return [int]$conn.LocalPort }
+        }
+        Start-Sleep -Milliseconds 750
+    }
+    return $null
+}
+
+Write-Host ""
+Write-Host "  --- Confirming the frontend port ---" -ForegroundColor White
+$actualFrontendPort = Get-NextDevPort -TimeoutSec 90
+
+if (-not $actualFrontendPort) {
+    Write-Warn "Could not read the port back from the Next.js process - assuming $FrontendPort."
+} elseif ($actualFrontendPort -ne $FrontendPort) {
+    # Next.js drifted. NEXT_PUBLIC_* values are read at process start, so
+    # rewriting .env.local is not enough on its own - the dev server has to be
+    # restarted to pick them up. We do that exactly ONCE, then carry on with
+    # whatever port it lands on rather than looping.
+    Write-Warn "Next.js bound port $actualFrontendPort, not the $FrontendPort we picked."
+    Write-Info "Re-syncing frontend/.env.local and restarting the frontend on $actualFrontendPort..."
+
+    $FrontendPort = $actualFrontendPort
+    $frontendUrl  = "http://localhost:$FrontendPort"
+    Sync-FrontendEnv -SiteUrl $frontendUrl -ApiBaseUrl $backendUrl | Out-Null
+
+    # Stop only the drifted dev server, then relaunch it pinned to that same port
+    # (it is the port Next.js already proved it can bind).
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine -match $NextDevProcPattern } |
+        ForEach-Object {
+            try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch { }
+        }
+    Start-Sleep -Seconds 2
+
+    Start-Process powershell -ArgumentList @(
+        "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", (New-FrontendCmd -Port $FrontendPort)
+    ) | Out-Null
+    Write-OK "Frontend restarted on $frontendUrl with matching .env.local"
+} else {
+    Write-OK "Next.js is on port $FrontendPort, as picked"
 }
 
 # --- 5. Wait for BOTH servers to answer over HTTP, then open the browser --

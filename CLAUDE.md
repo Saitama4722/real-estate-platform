@@ -113,7 +113,9 @@ scripts\stop_local.ps1
 Stops the Django and Next.js processes. PostgreSQL and Memurai are left running.
 
 ### Local URLs
-- Frontend: http://localhost:3000
+- Frontend: http://localhost:3000 — **preferred, not guaranteed.** If 3000 is
+  held the launcher moves to 3001/3002/… and prints the real URL in its summary.
+  See **Frontend port is auto-selected** below.
 - Backend:  http://localhost:8001
 - API:      http://localhost:8001/api
 - Admin:    http://localhost:8001/admin
@@ -121,6 +123,44 @@ Stops the Django and Next.js processes. PostgreSQL and Memurai are left running.
 > Django runs on **8001** locally because **8000 is occupied by another process**
 > on this machine. `scripts\start_local.ps1` binds `runserver` to `127.0.0.1:8001`
 > and `frontend/.env.local` (`BACKEND_URL`) already proxies `/api` there.
+
+### Frontend port is auto-selected — do not assume 3000
+
+Port 3000 on this machine is intermittently held by an unrelated **java** process
+that accepts TCP but never responds. `scripts\start_local.ps1` handles this by
+itself now — **there is no manual `-p 3001` / `.env.local` step any more.**
+
+- **Port choice:** prefers **3000**, and if it is held walks upward (3001, 3002,
+  …) to the first genuinely free port. Same idea for the backend (prefers 8001).
+  `[measured]` — holding 3000 gave "Frontend port 3000 is busy - using 3001
+  instead"; holding 3000 **and** 3001 landed on 3002; holding nothing still
+  picked 3000. The preferred port is unchanged — the walk is a fallback only.
+- **`frontend/.env.local` is rewritten on every launch** to match the chosen
+  ports (`NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_API_URL`, `BACKEND_URL`,
+  `BACKEND_INTERNAL_URL`); a missing key is appended rather than skipped. **Stop
+  hand-editing those four lines** — the launcher owns them and overwrites them on
+  the next start.
+- **The launcher reads the port back from the running Next.js process**, because
+  `next dev` has its own silent fallback: if the port is taken between our check
+  and its bind, it moves to the next port and merely prints a notice — which
+  would leave `.env.local` naming a dead origin for every browser-side API call.
+  On a mismatch the launcher re-syncs `.env.local` and restarts the frontend
+  **once**. `[measured]` — stealing the chosen port right after selection made
+  Next.js land on 3002; the launcher reported the drift, re-synced, restarted,
+  and `http://localhost:3002/api/properties/` then returned HTTP 200 with real
+  data through the proxy.
+- **Read the actual URL from the launcher's summary block** (`Frontend : http://…`)
+  instead of assuming 3000.
+- **Gotcha if you touch this detection:** the process that actually owns the port
+  is `next\dist\server\lib\start-server.js`, **not** `next dev` or
+  `bin\next` — those are its parents and hold no socket `[measured]`. Matching
+  only the parents is why an earlier version reported "could not read the port
+  back" while the server was plainly up; the pattern must include `\next\dist\`.
+- **`NODE_ENV` is now forced to `development` for the Next.js window**, since
+  these windows inherit the launching shell's environment and a shell carrying
+  `NODE_ENV=production` 500s every page via the CSS `@` error (see the NODE_ENV
+  section below). `[measured]` — reproduced from a `NODE_ENV=production` shell:
+  500s before the guard, HTTP 200 after.
 
 ### Common issues
 - **`password authentication failed for user "postgres"`** — `backend/.env` must
@@ -1370,8 +1410,12 @@ Index of what changed this session; details live in the linked sections above.
   pristine `.next`), which is the clue that it's environmental, not cache.
 - **THE FIX:** run the dev server with `NODE_ENV=development` (or unset the
   `production` override). `NODE_ENV=development npm run dev` → every page renders 200,
-  CSS compiles, EvalError gone. **`Start Centreal.bat` / `scripts\start_local.ps1`
-  should ensure `NODE_ENV` is unset or `development` before `next dev`.** If pages
+  CSS compiles, EvalError gone. **DONE — `scripts\start_local.ps1` now sets
+  `$env:NODE_ENV = 'development'` in the Next.js window before `next dev`**
+  (the windows inherit the launching shell's env, so a `production` value used to
+  leak straight through) `[measured]`. This guard covers the launcher path only —
+  if you run `npm run dev` by hand from a shell that has it set, you still get the
+  500s. If pages
   500 with the CSS `@` error, run `echo $NODE_ENV` (or check the "non-standard
   NODE_ENV" warning) BEFORE touching `.next` or any config.
 - **Full saga order for future recognition:** (1) an Edge-middleware EvalError 500'd
