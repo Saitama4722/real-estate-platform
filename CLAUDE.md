@@ -992,6 +992,32 @@ consistency):
     `AccountStaffRealtorsPanel.tsx`, realtor create/edit) are **explicitly NOT
     covered** and keep free-form input unless a separate decision changes that.
 
+- **152-ФЗ consent checkbox lives in ONE shared component —
+  `components/legal/ConsentCheckbox.tsx`.** Both public data-collecting forms use
+  it: `PublicLeadInquiryForm` (itself shared by the homepage card, the
+  property-detail modal and the realtor contact modal) and `SellPropertyForm`.
+  Those are the **only two** public forms that collect personal data — verified by
+  grepping for `client_phone`/`owner_phone`/`api/leads`/`api/sale-requests`; every
+  other hit is a staff-facing CRM table.
+  - **Unchecked by default, and the submit button is disabled until it is
+    ticked** (`disabled={… || !consent}`), with a matching `validate()` entry as
+    belt-and-braces for programmatic submits. Verified `[measured]`: 31/31
+    browser checks across all four surfaces — including that a forced
+    `form.requestSubmit()` without consent fires **no** POST to `/api/leads`.
+  - **Never add wording claiming the data is not stored.** It IS stored for the
+    realtor to act on (see `/privacy` §2/§5/§7); such a claim would be false and
+    legally worse than saying nothing.
+  - The policy link opens in a **new tab** on purpose (these forms live in
+    modals; navigating away would discard everything typed) and calls
+    `stopPropagation()` — it sits inside the `<label>`, so without that a click
+    would silently toggle consent while opening the policy.
+  - `ui/checkbox.tsx` gained `label?: React.ReactNode` (so a label can contain a
+    link) plus `alignTop` / `wrapperClassName`. **`alignTop` is a prop, not a
+    class**, because `cn()` in `lib/utils.ts` is a **naive join, NOT
+    tailwind-merge** — passing `items-start` alongside the hardcoded
+    `items-center` would emit BOTH and let stylesheet order pick the winner.
+    Existing CRM call sites are unaffected (both new props default to falsy).
+
 - **Breadcrumb link hierarchy: type vs. city must NOT collapse to the same URL.**
   When building breadcrumbs that combine a **type-level** segment and a
   **city-level** segment (e.g. «Квартиры > Краснодар» on a property detail page),

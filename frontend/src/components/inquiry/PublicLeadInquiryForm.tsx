@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  ConsentCheckbox,
+  CONSENT_REQUIRED_ERROR,
+} from "@/components/legal/ConsentCheckbox";
 
 const PHONE_MIN_DIGITS = 10;
 const MESSAGE_MAX_LENGTH = 300;
@@ -78,6 +82,8 @@ export function PublicLeadInquiryForm({
   const [captchaId, setCaptchaId] = useState<string | null>(null);
   const [captchaQuestion, setCaptchaQuestion] = useState<string | null>(null);
   const [captchaAnswer, setCaptchaAnswer] = useState("");
+  // 152-ФЗ consent. MUST start false — an opt-out default is not valid consent.
+  const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [captchaLoading, setCaptchaLoading] = useState(true);
@@ -156,6 +162,11 @@ export function PublicLeadInquiryForm({
     }
     if (!String(captchaAnswer).trim()) {
       e.captcha_answer = "Введите ответ на пример.";
+    }
+    // Belt-and-braces alongside the disabled submit button: the button covers
+    // the pointer/Enter path, this covers any programmatic submit.
+    if (!consent) {
+      e.consent = CONSENT_REQUIRED_ERROR;
     }
     return e;
   };
@@ -353,8 +364,27 @@ export function PublicLeadInquiryForm({
         <p className="text-sm text-red-600">{errors.general}</p>
       )}
 
+      <ConsentCheckbox
+        checked={consent}
+        onCheckedChange={(next) => {
+          setConsent(next);
+          // Clear the consent error as soon as it stops being true, so the
+          // message does not linger next to a now-ticked box.
+          if (next) {
+            setErrors((e) => {
+              const rest = { ...e };
+              delete rest.consent;
+              return rest;
+            });
+          }
+        }}
+        disabled={loading}
+        error={errors.consent}
+      />
+
       <div className="flex justify-end">
-        <Button type="submit" disabled={loading || captchaLoading}>
+        {/* Submit stays disabled until consent is given (152-ФЗ). */}
+        <Button type="submit" disabled={loading || captchaLoading || !consent}>
           {loading ? "Отправка..." : "Отправить"}
         </Button>
       </div>

@@ -5,17 +5,35 @@ import { cn } from "@/lib/utils";
 
 export interface CheckboxProps
   extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
+  /**
+   * ReactNode rather than string so a label can contain a link (e.g. the
+   * personal-data consent pointing at the policy). Plain strings still work.
+   */
+  label?: React.ReactNode;
+  /**
+   * Top-align the box with the first line instead of centring it. Use for any
+   * label that wraps to more than one line — centring against a 2-3 line block
+   * leaves the box floating in the middle of the text.
+   *
+   * ⚠ A prop rather than `className`, because `cn()` here is a naive join, NOT
+   * tailwind-merge: passing `items-start` alongside the hardcoded `items-center`
+   * would emit BOTH and let stylesheet order decide the winner.
+   */
+  alignTop?: boolean;
+  /** Extra classes for the wrapping <label> (the `className` prop targets the input). */
+  wrapperClassName?: string;
 }
 
 export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, label, id, ...props }, ref) => {
+  ({ className, label, id, alignTop, wrapperClassName, ...props }, ref) => {
     return (
       <label
         htmlFor={id}
         className={cn(
-          "inline-flex items-center gap-2",
+          "inline-flex gap-2",
+          alignTop ? "items-start" : "items-center",
           props.disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+          wrapperClassName,
         )}
       >
         <input

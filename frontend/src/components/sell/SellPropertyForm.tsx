@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LocationAutocomplete } from "@/components/crm/LocationAutocomplete";
+import {
+  ConsentCheckbox,
+  CONSENT_REQUIRED_ERROR,
+} from "@/components/legal/ConsentCheckbox";
 import type { SellCity } from "@/lib/saleRequest";
 
 const PHONE_EMPTY = "+7 ";
@@ -68,6 +72,8 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
 
   const [locationRows, setLocationRows] = useState<LocationRow[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
+  // 152-ФЗ consent. MUST start false — an opt-out default is not valid consent.
+  const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -206,6 +212,9 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
     if (photos.length < 1) e.photos = "Добавьте хотя бы одно фото.";
     if (!captchaId) e.captcha = "Подождите загрузки проверки или обновите задачу.";
     if (!captchaAnswer.trim()) e.captcha_answer = "Введите ответ на пример.";
+    // Belt-and-braces alongside the disabled submit button: the button covers
+    // the pointer/Enter path, this covers any programmatic submit.
+    if (!consent) e.consent = CONSENT_REQUIRED_ERROR;
     return e;
   };
 
@@ -543,8 +552,25 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
 
       {errors.general && <p className="text-sm text-red-600">{errors.general}</p>}
 
+      <ConsentCheckbox
+        checked={consent}
+        onCheckedChange={(next) => {
+          setConsent(next);
+          if (next) {
+            setErrors((e) => {
+              const rest = { ...e };
+              delete rest.consent;
+              return rest;
+            });
+          }
+        }}
+        disabled={submitting}
+        error={errors.consent}
+      />
+
       <div className="flex justify-end">
-        <Button type="submit" disabled={submitting || captchaLoading}>
+        {/* Submit stays disabled until consent is given (152-ФЗ). */}
+        <Button type="submit" disabled={submitting || captchaLoading || !consent}>
           {submitting ? "Отправка…" : "Отправить заявку"}
         </Button>
       </div>
