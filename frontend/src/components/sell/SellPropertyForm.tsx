@@ -1,8 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Clock,
+  ImageUp,
+  Lock,
+  RotateCw,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { LocationAutocomplete } from "@/components/crm/LocationAutocomplete";
 import {
   ConsentCheckbox,
@@ -14,6 +23,39 @@ const PHONE_EMPTY = "+7 ";
 const PHONE_MIN_DIGITS = 10;
 const MAX_PHOTOS = 10;
 const DESC_MAX = 3000;
+
+/** Card-header reassurance row. Static copy — no behaviour. */
+const SELLING_POINTS = [
+  { icon: Sparkles, text: "Бесплатная оценка объекта" },
+  { icon: Clock, text: "Ответим за 1 рабочий день" },
+  { icon: Lock, text: "Данные не публикуются" },
+] as const;
+
+/**
+ * How many required answers the progress bar counts.
+ *
+ * ⚠ DISPLAY ONLY. This is a read-only mirror of what `validate()` already
+ * requires — it never gates submission and `validate()` remains the single
+ * source of truth. If a required field is ever added, update this number too,
+ * or the bar will just read "N из 8" slightly wrong; nothing will break.
+ */
+const REQUIRED_STEPS = 8;
+
+/** Russian plural for «поле» after a numeral (1 поле / 2 поля / 5 полей). */
+function pluralFields(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return "полей";
+  switch (n % 10) {
+    case 1:
+      return "поле";
+    case 2:
+    case 3:
+    case 4:
+      return "поля";
+    default:
+      return "полей";
+  }
+}
 
 /** Phone mask "+7 (XXX) XXX-XX-XX" — same behavior as the lead form. */
 function formatPhoneMask(raw: string): string {
@@ -70,6 +112,8 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
   const [askingPrice, setAskingPrice] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
 
+  // Opens the sr-only file input from the styled picker button.
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [locationRows, setLocationRows] = useState<LocationRow[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   // 152-ФЗ consent. MUST start false — an opt-out default is not valid consent.
@@ -301,16 +345,67 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
     );
   }
 
-  const inputCls =
-    "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 " +
-    "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
+  // Field surface now comes from the shared .ctr-control class (globals.css,
+  // FORM CONTROLS) so this form and the lead modal cannot drift apart.
+  const inputCls = "ctr-control";
+
+  // Derived, render-only: how many required answers are present. Nothing here
+  // feeds submission — the disabled state below still comes from the same
+  // `consent` / captcha conditions it always did.
+  const filledCount = [
+    ownerName.trim().length > 1,
+    countPhoneDigits(ownerPhone) >= PHONE_MIN_DIGITS,
+    !!cityId,
+    !!locationKey,
+    description.trim().length >= 10,
+    photos.length > 0,
+    captchaAnswer.trim() !== "",
+    consent,
+  ].filter(Boolean).length;
+  const remaining = REQUIRED_STEPS - filledCount;
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="mx-auto max-w-2xl space-y-5">
+    <form onSubmit={handleSubmit} noValidate>
+      {/* Card header strip: progress + what the seller gets. Full-bleed inside
+          the card, so the form owns its own padding below rather than the page. */}
+      <div className="bg-brand-tint px-5 pt-[18px] pb-4">
+        <div className="mb-2.5 flex items-baseline justify-between gap-3">
+          <span className="text-[13px] font-semibold text-brand">
+            Заполнено {filledCount} из {REQUIRED_STEPS}
+          </span>
+          <span className="text-[13px] text-fg-muted">≈ 3 минуты</span>
+        </div>
+        <div
+          className="h-1.5 overflow-hidden rounded-full bg-blue-200"
+          role="progressbar"
+          aria-valuenow={filledCount}
+          aria-valuemin={0}
+          aria-valuemax={REQUIRED_STEPS}
+          aria-label="Заполнено полей"
+        >
+          <div
+            className="h-full rounded-full bg-brand transition-[width] duration-200 ease-out"
+            style={{ width: `${(filledCount / REQUIRED_STEPS) * 100}%` }}
+          />
+        </div>
+        <ul className="mt-4 grid gap-2.5 sm:grid-cols-3">
+          {SELLING_POINTS.map(({ icon, text }) => (
+            <li
+              key={text}
+              className="flex items-center gap-2.5 text-[13px] leading-tight text-fg-secondary"
+            >
+              <Icon icon={icon} className="size-[17px] shrink-0 text-brand" />
+              {text}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="flex flex-col gap-[22px] px-5 pt-7 pb-6 sm:px-6">
       {/* Owner name */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          ФИО <span className="text-red-600">*</span>
+        <label className="ctr-label mb-[7px]">
+          ФИО <span className="ctr-label__req">*</span>
         </label>
         <Input
           type="text"
@@ -320,13 +415,13 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
           disabled={submitting}
           autoComplete="name"
         />
-        {errors.owner_name && <p className="mt-1 text-xs text-red-600">{errors.owner_name}</p>}
+        {errors.owner_name && <p className="mt-1 text-xs text-danger">{errors.owner_name}</p>}
       </div>
 
       {/* Phone */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Телефон <span className="text-red-600">*</span>
+        <label className="ctr-label mb-[7px]">
+          Телефон <span className="ctr-label__req">*</span>
         </label>
         <Input
           type="tel"
@@ -339,12 +434,13 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
         <p className="mt-1 text-xs text-gray-500">
           Ваш номер видят только сотрудники агентства. На сайте он не публикуется.
         </p>
-        {errors.owner_phone && <p className="mt-1 text-xs text-red-600">{errors.owner_phone}</p>}
+        {errors.owner_phone && <p className="mt-1 text-xs text-danger">{errors.owner_phone}</p>}
       </div>
 
       {/* City */}
       <div>
         <LocationAutocomplete
+          publicStyle
           label="Город"
           required
           placeholder="— выберите город —"
@@ -366,6 +462,7 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
       {/* District / neighborhood — same combobox pattern, scoped to city */}
       <div>
         <LocationAutocomplete
+          publicStyle
           label="Район / микрорайон"
           required
           placeholder={
@@ -393,37 +490,46 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
 
       {/* Description */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Описание объекта <span className="text-red-600">*</span>
+        <label className="ctr-label mb-[7px]">
+          Описание объекта <span className="ctr-label__req">*</span>
         </label>
-        <textarea
-          placeholder="Расскажите о вашей недвижимости: тип, площадь, состояние, особенности…"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          disabled={submitting}
-          rows={5}
-          maxLength={DESC_MAX}
-          className={`${inputCls} resize-none`}
-        />
-        <p className="mt-1 text-right text-xs text-gray-400">
-          {description.length}/{DESC_MAX}
-        </p>
-        {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description}</p>}
+        {/* relative: the counter is parked in the textarea's bottom gutter. */}
+        <div className="relative">
+          <textarea
+            placeholder="Расскажите о вашей недвижимости: тип, площадь, состояние, особенности…"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            disabled={submitting}
+            rows={5}
+            maxLength={DESC_MAX}
+            aria-invalid={errors.description ? true : undefined}
+            className="ctr-control ctr-control--area block"
+          />
+          <div className="ctr-counter">
+            {description.length}/{DESC_MAX}
+          </div>
+        </div>
+        {errors.description && <p className="mt-1 text-xs text-danger">{errors.description}</p>}
       </div>
 
       {/* Optional structured details */}
-      <fieldset className="rounded-lg border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-medium text-gray-600">
-          Детали объекта (необязательно)
+      <fieldset className="ctr-well ctr-well--lg">
+        <legend className="mb-4 flex items-center gap-2.5 p-0">
+          <span className="text-sm font-bold tracking-tight text-fg">
+            Детали объекта
+          </span>
+          <span className="rounded-full bg-surface-inset px-2.5 py-1 text-[11.5px] font-semibold text-fg-muted">
+            необязательно
+          </span>
         </legend>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Тип недвижимости</label>
+            <label className="ctr-label mb-[7px]">Тип недвижимости</label>
             <select
               value={propertyType}
               onChange={(e) => setPropertyType(e.target.value)}
               disabled={submitting}
-              className={inputCls}
+              className={`${inputCls} ctr-control--select`}
             >
               {PROPERTY_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -433,7 +539,7 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Площадь, м²</label>
+            <label className="ctr-label mb-[7px]">Площадь, м²</label>
             <Input
               type="text"
               inputMode="decimal"
@@ -444,7 +550,7 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Комнат</label>
+            <label className="ctr-label mb-[7px]">Комнат</label>
             <Input
               type="text"
               inputMode="numeric"
@@ -455,7 +561,7 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Желаемая цена, ₽</label>
+            <label className="ctr-label mb-[7px]">Желаемая цена, ₽</label>
             <Input
               type="text"
               inputMode="numeric"
@@ -470,10 +576,16 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
 
       {/* Photos */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Фотографии <span className="text-red-600">*</span>
+        <label className="ctr-label mb-[7px]">
+          Фотографии <span className="ctr-label__req">*</span>
         </label>
+        {/* Styled picker: the native control is kept in the DOM (sr-only, NOT
+            display:none, so it stays reachable by assistive tech and keyboard)
+            and a styled button opens it — the same idiom CrmStagedPhotosPicker
+            already uses. The onChange handler below is byte-identical to the
+            one the bare input had, so photo handling is unchanged. */}
         <input
+          ref={fileInputRef}
           type="file"
           accept="image/*"
           multiple
@@ -482,12 +594,29 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
             onPickPhotos(e.target.files);
             e.target.value = "";
           }}
-          className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700 disabled:opacity-50"
+          className="sr-only"
         />
-        <p className="mt-1 text-xs text-gray-500">
-          До {MAX_PHOTOS} фото. Первое станет главным при публикации.
-        </p>
-        {errors.photos && <p className="mt-1 text-xs text-red-600">{errors.photos}</p>}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={submitting || photos.length >= MAX_PHOTOS}
+          className="flex w-full items-center gap-3.5 rounded-[14px] bg-[--field-bg] p-[18px] text-left shadow-[inset_0_0_0_1.5px_rgba(22,24,29,.14)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-brand-tint hover:shadow-[inset_0_0_0_1.5px_var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[--field-bg] disabled:hover:shadow-[inset_0_0_0_1.5px_rgba(22,24,29,.14)]"
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-tint">
+            <Icon icon={ImageUp} className="size-[21px] text-brand" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[14.5px] font-semibold text-fg">
+              {photos.length >= MAX_PHOTOS
+                ? "Достигнут лимит фотографий"
+                : "Выбрать файлы"}
+            </span>
+            <span className="mt-0.5 block text-[13px] text-fg-muted">
+              До {MAX_PHOTOS} фото. Первое станет главным при публикации.
+            </span>
+          </span>
+        </button>
+        {errors.photos && <p className="mt-1 text-xs text-danger">{errors.photos}</p>}
         {photos.length > 0 && (
           <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
             {photos.map((f, i) => (
@@ -509,48 +638,75 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
       </div>
 
       {/* Captcha (same arithmetic check as the buyer lead form) */}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Проверка <span className="text-red-600">*</span>
-        </label>
+      <div className="ctr-well ctr-well--lg">
+        <div className="flex items-center gap-2.5">
+          <Icon icon={ShieldCheck} className="size-[17px] text-brand" />
+          <span className="flex items-center gap-1 text-sm font-bold tracking-tight text-fg">
+            Проверка<span className="ctr-label__req">*</span>
+          </span>
+        </div>
         {captchaLoading ? (
-          <p className="text-sm text-gray-500">Загрузка примера…</p>
+          <p className="text-[15px] text-fg-muted">Загрузка примера…</p>
         ) : captchaQuestion ? (
           <>
-            <p className="mb-2 text-sm text-gray-800">{captchaQuestion}</p>
-            <Input
-              type="text"
-              inputMode="numeric"
-              placeholder="Ответ (число)"
-              value={captchaAnswer}
-              onChange={(e) => setCaptchaAnswer(e.target.value)}
-              disabled={submitting}
-              autoComplete="off"
-            />
+            <p className="text-[15px] text-fg-secondary">{captchaQuestion}</p>
+            {/* Answer and "another example" sit on one row — the answer is a few
+                characters, so a full-width field over-weights it. */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Width lives on the WRAPPER: .ctr-control sets width:100% and is
+                  unlayered, so a w-* utility on the input itself would lose. */}
+              <div className="w-[140px]">
+                <Input
+                  className="ctr-control"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Ответ"
+                  value={captchaAnswer}
+                  onChange={(e) => setCaptchaAnswer(e.target.value)}
+                  disabled={submitting}
+                  autoComplete="off"
+                  aria-invalid={
+                    errors.captcha_answer || errors.captcha || errors.captcha_id
+                      ? true
+                      : undefined
+                  }
+                />
+              </div>
+              <button
+                type="button"
+                className="ctr-textbtn"
+                onClick={() => void loadCaptcha()}
+                disabled={submitting || captchaLoading}
+              >
+                <Icon icon={RotateCw} className="size-4" />
+                Другой пример
+              </button>
+            </div>
           </>
         ) : (
-          <p className="text-sm text-red-600">
-            Проверка недоступна. Нажмите «Другой пример».
-          </p>
+          <>
+            <p className="text-[15px] text-danger">
+              Проверка недоступна. Нажмите «Другой пример».
+            </p>
+            <button
+              type="button"
+              className="ctr-textbtn"
+              onClick={() => void loadCaptcha()}
+              disabled={submitting || captchaLoading}
+            >
+              <Icon icon={RotateCw} className="size-4" />
+              Другой пример
+            </button>
+          </>
         )}
-        <div className="mt-2">
-          <button
-            type="button"
-            className="text-xs text-blue-600 underline hover:text-blue-800 disabled:opacity-50"
-            onClick={() => void loadCaptcha()}
-            disabled={submitting || captchaLoading}
-          >
-            Другой пример
-          </button>
-        </div>
         {(errors.captcha || errors.captcha_answer || errors.captcha_id) && (
-          <p className="mt-1 text-xs text-red-600">
+          <p className="text-xs text-danger">
             {errors.captcha_answer || errors.captcha || errors.captcha_id}
           </p>
         )}
       </div>
 
-      {errors.general && <p className="text-sm text-red-600">{errors.general}</p>}
+      {errors.general && <p className="text-sm text-danger">{errors.general}</p>}
 
       <ConsentCheckbox
         checked={consent}
@@ -568,11 +724,23 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
         error={errors.consent}
       />
 
-      <div className="flex justify-end">
-        {/* Submit stays disabled until consent is given (152-ФЗ). */}
-        <Button type="submit" disabled={submitting || captchaLoading || !consent}>
+      {/* Submit stays disabled until consent is given (152-ФЗ). Geometry comes
+          from size="lg" - never className, see button-classes.ts. */}
+      <div className="flex flex-col gap-2.5">
+        <Button
+          type="submit"
+          size="lg"
+          fullWidth
+          disabled={submitting || captchaLoading || !consent}
+        >
           {submitting ? "Отправка…" : "Отправить заявку"}
         </Button>
+        {remaining > 0 && (
+          <p className="text-center text-xs text-fg-muted">
+            Осталось заполнить {remaining} {pluralFields(remaining)}
+          </p>
+        )}
+      </div>
       </div>
     </form>
   );

@@ -25,6 +25,15 @@ interface LocationAutocompleteProps {
   createExtraBody?: Record<string, unknown>;
   onChange: (id: string, name: string) => void;
   onCreated?: (item: LocationOption) => void;
+  /**
+   * Opt in to the public site's form-control styling (.ctr-label /
+   * .ctr-control) instead of the CRM's default look.
+   *
+   * A prop rather than a restyle because this component is shared with
+   * CrmPropertyFullForm — the cabinet must keep its existing appearance. Omit it
+   * and nothing changes.
+   */
+  publicStyle?: boolean;
 }
 
 const MIN_CREATE_LEN = 2;
@@ -41,6 +50,7 @@ export function LocationAutocomplete({
   createExtraBody = {},
   onChange,
   onCreated,
+  publicStyle = false,
 }: LocationAutocompleteProps) {
   const selectedName = options.find((o) => String(o.id) === value)?.name ?? "";
 
@@ -135,17 +145,28 @@ export function LocationAutocomplete({
     }
   };
 
-  const inputClass =
-    "w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 " +
-    "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent " +
-    "disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-50 " +
-    (error ? "border-red-500" : "border-gray-300");
+  const inputClass = publicStyle
+    ? "ctr-control"
+    : "w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 " +
+      "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent " +
+      "disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-50 " +
+      (error ? "border-red-500" : "border-gray-300");
 
   return (
     <div ref={wrapRef} className="relative">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label
+        className={
+          publicStyle
+            ? "ctr-label mb-[7px]"
+            : "block text-sm font-medium text-gray-700 mb-1"
+        }
+      >
         {label}
-        {required && <span className="text-red-500"> *</span>}
+        {required && (
+          <span className={publicStyle ? "ctr-label__req" : "text-red-500"}>
+            {publicStyle ? "*" : " *"}
+          </span>
+        )}
       </label>
       <input
         ref={inputRef}
