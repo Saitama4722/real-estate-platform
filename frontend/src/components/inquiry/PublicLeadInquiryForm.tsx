@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { RotateCw, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import {
   ConsentCheckbox,
   CONSENT_REQUIRED_ERROR,
@@ -261,72 +263,87 @@ export function PublicLeadInquiryForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Ваше имя <span className="text-red-600">*</span>
+    <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-[18px]">
+      <div className="ctr-field">
+        <label className="ctr-label" htmlFor="lead-name">
+          Ваше имя<span className="ctr-label__req">*</span>
         </label>
         <Input
+          id="lead-name"
+          className="ctr-control"
           type="text"
           placeholder="Иван Иванов"
           value={clientName}
           onChange={(e) => setClientName(stripName(e.target.value))}
           disabled={loading}
           autoComplete="name"
+          aria-invalid={errors.client_name ? true : undefined}
         />
         {errors.client_name && (
-          <p className="mt-1 text-xs text-red-600">{errors.client_name}</p>
+          <p className="text-xs text-danger">{errors.client_name}</p>
         )}
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Телефон <span className="text-red-600">*</span>
+      <div className="ctr-field">
+        <label className="ctr-label" htmlFor="lead-phone">
+          Телефон<span className="ctr-label__req">*</span>
         </label>
         <Input
+          id="lead-phone"
+          className="ctr-control"
           type="tel"
           placeholder="+7 (___) ___-__-__"
           value={clientPhone}
           onChange={(e) => setClientPhone(formatPhoneMask(e.target.value))}
           disabled={loading}
           autoComplete="tel"
+          aria-invalid={errors.client_phone ? true : undefined}
         />
         {errors.client_phone && (
-          <p className="mt-1 text-xs text-red-600">{errors.client_phone}</p>
+          <p className="text-xs text-danger">{errors.client_phone}</p>
         )}
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Сообщение <span className="text-red-600">*</span>
+      <div className="ctr-field">
+        <label className="ctr-label" htmlFor="lead-message">
+          Сообщение<span className="ctr-label__req">*</span>
         </label>
-        <textarea
-          placeholder="Ваш вопрос или комментарий"
-          value={clientMessage}
-          onChange={(e) => setClientMessage(e.target.value)}
-          disabled={loading}
-          rows={3}
-          maxLength={MESSAGE_MAX_LENGTH}
-          className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-50"
-        />
-        <p className="mt-1 text-right text-xs text-gray-400">
-          {clientMessage.length}/{MESSAGE_MAX_LENGTH}
-        </p>
+        {/* relative: the counter is parked in the textarea's bottom gutter. */}
+        <div className="relative">
+          <textarea
+            id="lead-message"
+            placeholder="Ваш вопрос или комментарий"
+            value={clientMessage}
+            onChange={(e) => setClientMessage(e.target.value)}
+            disabled={loading}
+            rows={4}
+            maxLength={MESSAGE_MAX_LENGTH}
+            aria-invalid={errors.client_message ? true : undefined}
+            className="ctr-control ctr-control--area block"
+          />
+          <div className="ctr-counter">
+            {clientMessage.length}/{MESSAGE_MAX_LENGTH}
+          </div>
+        </div>
         {errors.client_message && (
-          <p className="mt-1 text-xs text-red-600">{errors.client_message}</p>
+          <p className="text-xs text-danger">{errors.client_message}</p>
         )}
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Проверка <span className="text-red-600">*</span>
-        </label>
+      <div className="ctr-well">
+        <div className="flex items-center gap-2">
+          <Icon icon={ShieldCheck} className="size-[15px] text-brand" />
+          <span className="ctr-label">
+            Проверка<span className="ctr-label__req">*</span>
+          </span>
+        </div>
         {captchaLoading ? (
-          <p className="text-sm text-gray-500">Загрузка примера…</p>
+          <p className="text-[15px] text-fg-muted">Загрузка примера…</p>
         ) : captchaQuestion ? (
           <>
-            <p className="mb-2 text-sm text-gray-800">{captchaQuestion}</p>
+            <p className="text-[15px] text-fg">{captchaQuestion}</p>
             <Input
+              className="ctr-control"
               type="text"
               inputMode="numeric"
               placeholder="Ответ (число)"
@@ -334,35 +351,35 @@ export function PublicLeadInquiryForm({
               onChange={(e) => setCaptchaAnswer(e.target.value)}
               disabled={loading}
               autoComplete="off"
+              aria-invalid={
+                errors.captcha_answer || errors.captcha || errors.captcha_id
+                  ? true
+                  : undefined
+              }
             />
           </>
         ) : (
-          <p className="text-sm text-red-600">
+          <p className="text-[15px] text-danger">
             Проверка недоступна. Нажмите «Другой пример».
           </p>
         )}
-        <div className="mt-2">
-          <button
-            type="button"
-            className="text-xs text-blue-600 underline hover:text-blue-800 disabled:opacity-50"
-            onClick={() => void loadCaptcha()}
-            disabled={loading || captchaLoading}
-          >
-            Другой пример
-          </button>
-        </div>
+        <button
+          type="button"
+          className="ctr-textbtn"
+          onClick={() => void loadCaptcha()}
+          disabled={loading || captchaLoading}
+        >
+          <Icon icon={RotateCw} className="size-[13px]" />
+          Другой пример
+        </button>
         {(errors.captcha || errors.captcha_answer || errors.captcha_id) && (
-          <p className="mt-1 text-xs text-red-600">
-            {errors.captcha_answer ||
-              errors.captcha ||
-              errors.captcha_id}
+          <p className="text-xs text-danger">
+            {errors.captcha_answer || errors.captcha || errors.captcha_id}
           </p>
         )}
       </div>
 
-      {errors.general && (
-        <p className="text-sm text-red-600">{errors.general}</p>
-      )}
+      {errors.general && <p className="text-sm text-danger">{errors.general}</p>}
 
       <ConsentCheckbox
         checked={consent}
@@ -382,12 +399,17 @@ export function PublicLeadInquiryForm({
         error={errors.consent}
       />
 
-      <div className="flex justify-end">
-        {/* Submit stays disabled until consent is given (152-ФЗ). */}
-        <Button type="submit" disabled={loading || captchaLoading || !consent}>
-          {loading ? "Отправка..." : "Отправить"}
-        </Button>
-      </div>
+      {/* Submit stays disabled until consent is given (152-ФЗ). Geometry comes
+          from size="lg" (the design's 48px control height) - never className,
+          see the conflict-resolution note in button-classes.ts. */}
+      <Button
+        type="submit"
+        size="lg"
+        fullWidth
+        disabled={loading || captchaLoading || !consent}
+      >
+        {loading ? "Отправка..." : "Отправить"}
+      </Button>
     </form>
   );
 }

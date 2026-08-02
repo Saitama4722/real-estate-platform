@@ -52,7 +52,9 @@ export function ConsentCheckbox({
       <Checkbox
         id={id}
         alignTop
-        className="mt-0.5"
+        wrapperClassName="gap-[11px]"
+        className="ctr-check"
+        labelClassName="text-[13px] leading-[1.5] text-fg-muted text-pretty"
         checked={checked}
         onChange={(e) => onCheckedChange(e.target.checked)}
         disabled={disabled}
@@ -69,7 +71,7 @@ export function ConsentCheckbox({
               rel="noopener noreferrer"
               /* Opens in a NEW TAB deliberately: these forms live in modals and
                  navigating away would discard everything already typed. */
-              className="text-blue-600 underline hover:text-blue-800"
+              className="text-brand no-underline shadow-[inset_0_-1px_0_rgba(26,95,224,.35)] hover:text-brand-hover"
               /* The link sits inside the <label>, so without this a click would
                  be forwarded to the checkbox and silently toggle consent while
                  the policy opens in the other tab. */

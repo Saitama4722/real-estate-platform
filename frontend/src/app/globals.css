@@ -273,6 +273,12 @@
   --skeleton-base: #eeece6;
   --skeleton-shine: #f6f5f1;
 
+  /* Resting fill of a form control: a hair off white so an untouched field reads
+     as an affordance against the white modal, then lifts to pure white on
+     hover/focus. Kept here rather than in @theme because nothing needs a
+     `bg-*` utility for it — only .ctr-control below consumes it. */
+  --field-bg: #fbfaf8;
+
   --header-h: 64px;
   --header-h-compact: 52px;
 }
@@ -612,6 +618,217 @@
 }
 .ctr-header.is-compact .ctr-header__row {
   height: var(--header-h-compact);
+}
+
+/* ============================================================================
+   FORM CONTROLS — public lead-capture forms
+   (PublicLeadInquiryForm on the homepage / property modal / realtor modal, and
+   SellPropertyForm on /sell). Ported from the "Задать вопрос" design reference.
+
+   ⚠ DELIBERATELY UNLAYERED, same reason as the COMPACT HEADER rules above.
+   These are applied through `className` onto <Input>/<Checkbox>, whose own base
+   styles are Tailwind utilities. A rule in @layer components would LOSE to those
+   utilities; unlayered CSS beats @layer utilities, so the opt-in class wins.
+
+   ⚠ OPT-IN, and that is the point. <Input> and <Checkbox> are shared with the
+   CRM (12 and 2 call sites); nothing here applies until a form asks for it, so
+   restyling these forms cannot silently restyle the cabinet.
+
+   Every value is an existing design token. The reference's own hexes were not
+   copied where a token already says the same thing (its #1A5FE0 is --color-brand,
+   #F6F5F1 is --color-surface, #6B7280 is --color-fg-muted, and so on).
+   ========================================================================== */
+.ctr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ctr-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-fg-secondary);
+}
+.ctr-label__req {
+  color: var(--color-danger);
+}
+
+/* The field surface itself: input, textarea and select share it. */
+.ctr-control {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  font-size: 15px;
+  color: var(--color-fg);
+  background: var(--field-bg);
+  border: none;
+  border-radius: 12px;
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(22, 24, 29, 0.08),
+    0 1px 2px rgba(20, 22, 28, 0.04);
+  transition:
+    box-shadow var(--dur-base) var(--ease-out),
+    background-color var(--dur-base) var(--ease-out);
+}
+.ctr-control::placeholder {
+  color: var(--color-gray-400);
+}
+.ctr-control:hover:not(:disabled) {
+  background: var(--color-surface-raised);
+  box-shadow:
+    inset 0 0 0 1px rgba(22, 24, 29, 0.16),
+    0 1px 2px rgba(20, 22, 28, 0.05);
+}
+.ctr-control:focus {
+  background: var(--color-surface-raised);
+  /* Reuses the shared --focus-ring rather than the reference's own 4px/.14 ring,
+     so a focused lead field matches every other focus ring on the site. */
+  box-shadow:
+    inset 0 0 0 1.5px var(--color-brand),
+    var(--focus-ring);
+}
+.ctr-control:disabled {
+  cursor: not-allowed;
+  background: var(--color-surface-inset);
+  opacity: 0.6;
+}
+/* Invalid is signalled by the carmine ring; colour is never the only channel —
+   the inline error text under the field carries the same message. */
+.ctr-control[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 1.5px var(--color-danger);
+}
+.ctr-control[aria-invalid="true"]:focus {
+  box-shadow:
+    inset 0 0 0 1.5px var(--color-danger),
+    var(--focus-ring-danger);
+}
+
+/* Native <select> with the platform arrow replaced by our own chevron, so a
+   select reads as the same control as an input rather than an OS widget.
+   `padding-right` reserves the chevron's lane. */
+.ctr-control--select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 42px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236a7180' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 18px 18px;
+}
+.ctr-control--select:disabled {
+  cursor: not-allowed;
+}
+
+/* Roomier well for a panel that groups several fields rather than one. */
+.ctr-well--lg {
+  gap: 16px;
+  padding: 20px;
+  border-radius: 16px;
+}
+
+/* Multi-line variant. The extra bottom padding is the gutter the character
+   counter sits in, so a long message never runs under it. */
+.ctr-control--area {
+  height: auto;
+  min-height: 92px;
+  padding: 13px 14px 30px;
+  line-height: 1.5;
+  resize: none;
+}
+
+/* Character counter parked inside the textarea's bottom-right gutter. */
+.ctr-counter {
+  position: absolute;
+  right: 12px;
+  bottom: 9px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-gray-400);
+  pointer-events: none;
+}
+
+/* Tinted well grouping a sub-task inside a white form — the bot check. */
+.ctr-well {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+/* Inside the well the page-coloured resting fill would vanish, so controls
+   there invert to white. */
+.ctr-well .ctr-control {
+  height: 46px;
+  border-radius: 11px;
+  background: var(--color-surface-raised);
+}
+
+/* Text button for a secondary action next to a field ("Другой пример"). */
+.ctr-textbtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-brand);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.ctr-textbtn:hover:not(:disabled) {
+  color: var(--color-brand-hover);
+}
+.ctr-textbtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 20px checkbox with a painted tick, replacing the native control. */
+.ctr-check {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  /* 1px nudge so the box sits on the first line's baseline, not above it. Set
+     here rather than as an `mt-*` utility at the call site, because this rule is
+     unlayered and its `margin` would override the utility. */
+  margin: 1px 0 0;
+  border: none;
+  border-radius: 6px;
+  background-color: var(--field-bg);
+  box-shadow: inset 0 0 0 1.5px rgba(22, 24, 29, 0.16);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.ctr-check:checked {
+  background-color: var(--color-brand);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 13px 13px;
+  box-shadow: 0 1px 3px rgba(26, 95, 224, 0.35);
+}
+.ctr-check:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1.5px var(--color-brand),
+    var(--focus-ring);
+}
+.ctr-check:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 /* ============================================================================

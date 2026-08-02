@@ -22,10 +22,27 @@ export interface CheckboxProps
   alignTop?: boolean;
   /** Extra classes for the wrapping <label> (the `className` prop targets the input). */
   wrapperClassName?: string;
+  /**
+   * REPLACES the label text's default classes rather than adding to them —
+   * `cn()` is a naive join, so merging a second `text-*`/colour would emit both
+   * and let stylesheet order pick the winner. Swapping is deterministic.
+   */
+  labelClassName?: string;
 }
 
 export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, label, id, alignTop, wrapperClassName, ...props }, ref) => {
+  (
+    {
+      className,
+      label,
+      id,
+      alignTop,
+      wrapperClassName,
+      labelClassName,
+      ...props
+    },
+    ref,
+  ) => {
     return (
       <label
         htmlFor={id}
@@ -48,7 +65,11 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           )}
           {...props}
         />
-        {label && <span className="text-sm text-gray-700">{label}</span>}
+        {label && (
+          <span className={labelClassName ?? "text-sm text-gray-700"}>
+            {label}
+          </span>
+        )}
       </label>
     );
   },
