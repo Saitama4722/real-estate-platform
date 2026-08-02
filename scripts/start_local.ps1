@@ -279,12 +279,24 @@ $frontendCmd = New-FrontendCmd -Port $FrontendPort
 $workerCmd   = "`$host.UI.RawUI.WindowTitle = 'Centreal Celery worker'; Set-Location -LiteralPath '$BackendDir'; & '$venvPython' -m celery -A config.celery worker -l info -P solo"
 
 # Duplicate guard for the worker: a worker has no listening port, so we detect an
-# existing one by scanning process command lines for "celery ... worker". This
-# catches a worker started manually or by a previous run. Best-effort (it cannot
-# see workers on other machines / containers), which is fine for local dev.
+# existing one by finding the PYTHON process that IS the worker. This catches a
+# worker started manually or by a previous run. Best-effort (it cannot see
+# workers on other machines / containers), which is fine for local dev.
+#
+# ⚠ SCOPED TO python.exe ON PURPOSE - do not widen this back to every process.
+# It used to scan ALL of Win32_Process for "celery ... worker", which also
+# matched the launcher's OWN -NoExit PowerShell window: $workerCmd above contains
+# that exact text, so the window HOSTING the worker matched as though it were the
+# worker. The failure mode that produced: the worker process dies (crash, Ctrl+C)
+# but -NoExit leaves its window sitting at a prompt, the guard sees that window,
+# reports "already running", and refuses to start a replacement - so Celery tasks
+# such as the Telegram lead notifications queue up with nothing consuming them,
+# silently. Matching python.exe tracks the process that actually does the work,
+# which is what stop_local.ps1 already keys on.
 $existingWorker = $null
 try {
-    $existingWorker = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    $existingWorker = Get-CimInstance Win32_Process `
+            -Filter "Name='python.exe' OR Name='pythonw.exe'" -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -and $_.CommandLine -match 'celery' -and $_.CommandLine -match '\bworker\b' } |
         Select-Object -First 1
 } catch {
