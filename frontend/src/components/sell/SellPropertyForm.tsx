@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { LocationAutocomplete } from "@/components/crm/LocationAutocomplete";
+import { cn } from "@/lib/utils";
 import {
   ConsentCheckbox,
   CONSENT_REQUIRED_ERROR,
@@ -114,6 +115,8 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
 
   // Opens the sr-only file input from the styled picker button.
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Purely visual: whether a drag is currently hovering the photo drop zone.
+  const [dragActive, setDragActive] = useState(false);
   const [locationRows, setLocationRows] = useState<LocationRow[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   // 152-ФЗ consent. MUST start false — an opt-out default is not valid consent.
@@ -242,6 +245,31 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
   };
   const removePhoto = (idx: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  /**
+   * Drag-and-drop is only a second ENTRY POINT to onPickPhotos above — dropped
+   * files go through exactly the same handler as the file dialog, which already
+   * filters to image/* and caps at MAX_PHOTOS. No upload logic is duplicated or
+   * changed here; only `dragActive` (a visual flag) is new.
+   */
+  const photosDisabled = submitting || photos.length >= MAX_PHOTOS;
+
+  const onZoneDragOver = (e: React.DragEvent<HTMLButtonElement>) => {
+    if (photosDisabled) return;
+    // Required: without preventDefault the browser refuses the drop and instead
+    // navigates away to open the file itself.
+    e.preventDefault();
+    if (!dragActive) setDragActive(true);
+  };
+
+  const onZoneDragLeave = () => setDragActive(false);
+
+  const onZoneDrop = (e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    setDragActive(false);
+    if (photosDisabled) return;
+    onPickPhotos(e.dataTransfer?.files ?? null);
   };
 
   const validate = (): Record<string, string> => {
@@ -599,27 +627,56 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={submitting || photos.length >= MAX_PHOTOS}
-          // ⚠ bg-[var(--field-bg)], NOT bg-[--field-bg]. The bare form is
-          // Tailwind v3 shorthand; v4 still emits a rule for it, but as
-          // `background-color: --field-bg`, which is invalid CSS and the browser
-          // drops — so the zone rendered fully transparent.
-          className="flex w-full items-center gap-3.5 rounded-[14px] bg-[var(--field-bg)] p-[18px] text-left shadow-[inset_0_0_0_1.5px_rgba(22,24,29,.14)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-brand-tint hover:shadow-[inset_0_0_0_1.5px_var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[var(--field-bg)] disabled:hover:shadow-[inset_0_0_0_1.5px_rgba(22,24,29,.14)]"
+          onDragEnter={onZoneDragOver}
+          onDragOver={onZoneDragOver}
+          onDragLeave={onZoneDragLeave}
+          onDrop={onZoneDrop}
+          disabled={photosDisabled}
+          className={cn(
+            "flex w-full items-center gap-3.5 rounded-[14px] p-[18px] text-left",
+            // Colour + shadow only, so this stays correct under reduced motion —
+            // that policy cancels movement, not colour/shadow changes.
+            "transition-[background-color,box-shadow] duration-200 ease-out",
+            "disabled:cursor-not-allowed disabled:opacity-60",
+            dragActive
+              ? "bg-brand-tint shadow-[inset_0_0_0_2px_var(--color-brand)]"
+              : // ⚠ bg-[var(--field-bg)], NOT bg-[--field-bg]. The bare form is
+                // Tailwind v3 shorthand; v4 still emits a rule for it but as
+                // `background-color: --field-bg`, which is invalid CSS and the
+                // browser drops it — the zone rendered fully transparent.
+                // Verified in the compiled stylesheet, not by eye.
+                "bg-[var(--field-bg)] shadow-[inset_0_0_0_1.5px_rgba(22,24,29,.14)] hover:bg-brand-tint hover:shadow-[inset_0_0_0_1.5px_var(--color-brand)] disabled:hover:bg-[var(--field-bg)] disabled:hover:shadow-[inset_0_0_0_1.5px_rgba(22,24,29,.14)]",
+          )}
         >
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-tint">
+          {/* pointer-events-none on BOTH children: without it, dragging across a
+              child fires dragleave on the button and the highlight flickers.
+              They are decorative, so nothing is lost by making them inert. */}
+          <span className="pointer-events-none flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-tint">
             <Icon icon={ImageUp} className="size-[21px] text-brand" />
           </span>
-          <span className="min-w-0">
+          <span className="pointer-events-none min-w-0">
             <span className="block text-[14.5px] font-semibold text-fg">
               {photos.length >= MAX_PHOTOS
                 ? "Достигнут лимит фотографий"
-                : "Выбрать файлы"}
+                : dragActive
+                  ? "Отпустите, чтобы добавить"
+                  : "Перетащите фото сюда"}
             </span>
             <span className="mt-0.5 block text-[13px] text-fg-muted">
-              До {MAX_PHOTOS} фото. Первое станет главным при публикации.
+              {photos.length >= MAX_PHOTOS ? (
+                "Удалите лишние, чтобы добавить другие"
+              ) : (
+                <>
+                  или <span className="font-semibold text-brand">выберите файлы</span>{" "}
+                  на устройстве
+                </>
+              )}
             </span>
           </span>
         </button>
+        <p className="mt-2 text-xs text-fg-muted">
+          До {MAX_PHOTOS} фото. Первое станет главным при публикации.
+        </p>
         {errors.photos && <p className="mt-1 text-xs text-danger">{errors.photos}</p>}
         {photos.length > 0 && (
           <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
