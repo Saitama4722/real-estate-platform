@@ -4,14 +4,24 @@ import { useMemo } from "react";
 import L from "leaflet";
 import { AttributionControl, MapContainer, Marker, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import { Info } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { PropertySection } from "@/components/property/PropertySection";
 
 interface PropertyMapProps {
   latitude: number;
   longitude: number;
   showMap: boolean;
+  /** City / district shown on the right of the section title. */
+  locationLabel?: string;
 }
 
-export function PropertyMap({ latitude, longitude, showMap }: PropertyMapProps) {
+export function PropertyMap({
+  latitude,
+  longitude,
+  showMap,
+  locationLabel,
+}: PropertyMapProps) {
   const markerIcon = useMemo(
     () =>
       L.divIcon({
@@ -25,25 +35,32 @@ export function PropertyMap({ latitude, longitude, showMap }: PropertyMapProps) 
 
   if (!showMap) {
     return (
-      <div className="mt-6">
-        <h2 className="text-xl font-semibold text-gray-900">Расположение</h2>
-        <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+      <PropertySection title="Расположение">
+        <div className="rounded-xl border border-dashed border-border-strong bg-surface px-4 py-8 text-center text-sm text-fg-muted">
           Координаты объекта не указаны — карта недоступна.
         </div>
-      </div>
+      </PropertySection>
     );
   }
 
   return (
-    <div className="mt-6">
-      <h2 className="text-xl font-semibold text-gray-900">Расположение</h2>
-      <div className="mt-4 overflow-hidden rounded-xl border border-gray-200">
+    <PropertySection
+      title="Расположение"
+      aside={
+        locationLabel ? (
+          <span className="text-sm text-fg-secondary">{locationLabel}</span>
+        ) : undefined
+      }
+    >
+      {/* Rounded clip lives on this wrapper, not the section: Leaflet paints
+          tiles into its own panes and would square off the corners otherwise. */}
+      <div className="overflow-hidden rounded-xl">
         <MapContainer
           center={[latitude, longitude]}
           zoom={14}
           scrollWheelZoom={false}
           attributionControl={false}
-          className="h-[320px] w-full"
+          className="h-[210px] w-full md:h-[300px]"
         >
           <AttributionControl position="bottomright" prefix={false} />
           <TileLayer
@@ -53,9 +70,10 @@ export function PropertyMap({ latitude, longitude, showMap }: PropertyMapProps) 
           <Marker position={[latitude, longitude]} icon={markerIcon} />
         </MapContainer>
       </div>
-      <p className="mt-2 text-xs text-gray-500">
-        Точка на карте указана приблизительно.
+      <p className="mt-3 flex items-center gap-2 text-[12.5px] text-fg-muted">
+        <Icon icon={Info} className="size-[15px] shrink-0" />
+        Точка на карте указана приблизительно
       </p>
-    </div>
+    </PropertySection>
   );
 }

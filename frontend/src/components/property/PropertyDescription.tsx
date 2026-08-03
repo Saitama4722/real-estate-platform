@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CatalogPropertyItem } from "@/components/catalog/types";
+import { PropertySection } from "@/components/property/PropertySection";
 
 interface PropertyDescriptionProps {
   property: CatalogPropertyItem;
@@ -37,11 +38,15 @@ export function PropertyDescription({ property }: PropertyDescriptionProps) {
       : description;
 
   return (
-    <div
-      className="mt-6 select-none"
-      onCopy={(e) => e.preventDefault()}
+    <PropertySection
+      title={heading}
+      className="select-none"
+      // Reference body copy: 15.5px / 1.68. `text-base leading-relaxed` (16 /
+      // 1.625) was close but not it, and the difference shows over a paragraph.
+      bodyClassName="[&_p]:text-[15.5px] [&_p]:leading-[1.68] [&_p]:text-fg-secondary"
+      // Copy-blocking stays exactly as it was — this is a styling change only.
     >
-      <h2 className="text-xl font-semibold text-gray-900">{heading}</h2>
+      <div onCopy={(e) => e.preventDefault()}>
 
       {/* grid-rows 0fr→1fr animates the wrapper between zero and the natural
           height of the current text, giving a smooth expand/collapse. */}
@@ -75,6 +80,7 @@ export function PropertyDescription({ property }: PropertyDescriptionProps) {
           {expanded ? "Свернуть" : "Читать далее"}
         </button>
       )}
-    </div>
+      </div>
+    </PropertySection>
   );
 }

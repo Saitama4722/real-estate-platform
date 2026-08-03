@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowUpRight, MessageCircle, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { PublicLeadInquiryForm } from "@/components/inquiry/PublicLeadInquiryForm";
 
@@ -93,27 +94,30 @@ export function PropertyContactBlock({
 
   return (
     <>
-      <Card className="sticky top-6">
-        <CardHeader>
-          <CardTitle>Связаться с агентом</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
-            <RealtorAvatar name={displayName} avatar={realtorAvatar} />
-            <div>
-              <p className="text-xs text-gray-500">Риэлтор</p>
-              <p className="text-sm font-medium text-gray-900">{displayName}</p>
-            </div>
+      {/* No card chrome and no «Связаться с агентом» heading: this block is the
+          middle zone of the single unified sidebar card the reference shows —
+          PropertyPriceCard supplies the panel, the dividers and the footer. */}
+      <div>
+        <div className="mb-4 flex items-center gap-3.5">
+          <RealtorAvatar name={displayName} avatar={realtorAvatar} />
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold tracking-[0.08em] text-fg-muted uppercase">
+              Риэлтор
+            </p>
+            <p className="mt-0.5 truncate text-[16.5px] font-semibold tracking-tight text-fg">
+              {displayName}
+            </p>
           </div>
+        </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {phoneState.status === "hidden" && (
-              <Button className="w-full" onClick={handleRevealPhone}>
+              <Button size="lg" fullWidth icon={Phone} onClick={handleRevealPhone}>
                 Показать телефон
               </Button>
             )}
             {phoneState.status === "loading" && (
-              <Button className="w-full" disabled>
+              <Button size="lg" fullWidth disabled>
                 Загрузка...
               </Button>
             )}
@@ -138,8 +142,10 @@ export function PropertyContactBlock({
             )}
 
             <Button
-              variant="outline"
-              className="w-full"
+              variant="neutral"
+              size="lg"
+              fullWidth
+              icon={MessageCircle}
               onClick={() => {
                 setFormKey((k) => k + 1);
                 setRequestOpen(true);
@@ -150,18 +156,14 @@ export function PropertyContactBlock({
             {realtorCrmId ? (
               <Link
                 href={`/realtors/${encodeURIComponent(realtorCrmId)}`}
-                className="block w-full text-center text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                className="flex items-center justify-center gap-1.5 pt-1.5 text-sm font-medium text-brand hover:text-brand-hover"
               >
                 Страница риэлтора
+                <Icon icon={ArrowUpRight} className="size-[14px]" />
               </Link>
             ) : null}
           </div>
-
-          <div className="border-t border-gray-200 pt-4">
-            <p className="text-xs text-gray-500">Объект #{propertyId}</p>
-          </div>
-        </CardContent>
-      </Card>
+      </div>
 
       <Modal isOpen={requestOpen} onClose={() => setRequestOpen(false)}>
         <h2 className="text-lg font-semibold text-gray-900">Задать вопрос</h2>

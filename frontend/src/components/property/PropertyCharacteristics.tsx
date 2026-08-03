@@ -1,4 +1,5 @@
 import { CatalogPropertyItem } from "@/components/catalog/types";
+import { PropertySection } from "@/components/property/PropertySection";
 
 interface PropertyCharacteristicsProps {
   property: CatalogPropertyItem;
@@ -162,19 +163,32 @@ export function PropertyCharacteristics({ property }: PropertyCharacteristicsPro
   }
 
   return (
-    <div className="mt-6">
-      <h2 className="text-xl font-semibold text-gray-900">Характеристики</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+    <PropertySection title="Характеристики" bodyClassName="-mb-3">
+      {/* Two columns from md up, one below. The list is built above from
+          whatever the listing actually has — 2 rows for a bare land plot, 15+
+          for a fully filled apartment — so nothing here assumes a row count. */}
+      <div className="grid md:grid-cols-2 md:gap-x-11">
         {allCharacteristics.map((item, index) => (
           <div
             key={index}
-            className="flex justify-between border-b border-gray-200 pb-2"
+            className="flex items-baseline gap-2 border-b border-border py-3"
           >
-            <span className="text-sm text-gray-600">{item.label}</span>
-            <span className="text-sm font-medium text-gray-900">{item.value}</span>
+            <span className="text-sm text-fg-muted md:text-[14.5px]">
+              {item.label}
+            </span>
+            {/* The leader: a flexible baseline rule between label and value.
+                -translate-y-[3px] drops it off the text baseline onto the
+                optical line the dots should sit on. */}
+            <span
+              aria-hidden="true"
+              className="min-w-4 flex-1 -translate-y-[3px] border-b border-dotted border-border-strong"
+            />
+            <span className="text-right text-sm font-semibold text-fg md:text-[14.5px]">
+              {item.value}
+            </span>
           </div>
         ))}
       </div>
-    </div>
+    </PropertySection>
   );
 }

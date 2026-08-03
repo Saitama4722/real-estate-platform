@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatPriceRub, formatPriceCompactRub } from "@/lib/formatPrice";
+import { PropertySection } from "@/components/property/PropertySection";
 
 interface PricePoint {
   price: number;
@@ -91,31 +92,49 @@ export function PriceHistoryChart({ history }: PriceHistoryChartProps) {
   const dropped = last.price < first.price;
 
   return (
-    <section className="mt-6">
-      {/* Clickable header — collapsed by default. Shows the price-range hint and
-          a chevron that rotates 180° when open. */}
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-        className="flex w-full items-center justify-between gap-3 text-left"
-      >
-        <span className="flex flex-wrap items-baseline gap-x-3">
-          <span className="text-xl font-semibold text-gray-900">История цены</span>
-          <span className={dropped ? "text-sm font-medium text-red-600" : "text-sm text-gray-500"}>
-            {dropped ? "↓ " : ""}
-            {formatPriceRub(first.price)} → {formatPriceRub(last.price)}
+    <PropertySection
+      title="История цены"
+      badge={
+        /* The range as a pill: first → last. When the last price is BELOW the
+           first, the end value is tinted so a drop reads at a glance. */
+        <span className="inline-flex h-7 items-center gap-2 rounded-full bg-surface px-3 text-[13px] font-medium text-fg-secondary">
+          {formatPriceRub(first.price)}
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+            className="shrink-0 text-fg-muted"
+          >
+            <path
+              d="M4 12h16M14 6l6 6-6 6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className={dropped ? "font-semibold text-accent" : "font-semibold text-fg"}>
+            {formatPriceRub(last.price)}
           </span>
         </span>
-        <span className="flex shrink-0 items-center gap-1 text-sm text-gray-500">
+      }
+      aside={
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="flex h-[34px] items-center gap-2 rounded-[9px] bg-surface px-3 text-[13.5px] font-semibold text-brand transition-colors duration-150 ease-out hover:bg-brand-tint"
+        >
           {expanded ? "Скрыть график" : "Показать график"}
           <svg
-            width="16"
-            height="16"
+            width="15"
+            height="15"
             viewBox="0 0 16 16"
             fill="none"
             aria-hidden="true"
-            className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+            className={`transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
           >
             <path
               d="M4 6l4 4 4-4"
@@ -125,8 +144,9 @@ export function PriceHistoryChart({ history }: PriceHistoryChartProps) {
               strokeLinejoin="round"
             />
           </svg>
-        </span>
-      </button>
+        </button>
+      }
+    >
 
       {/* grid-rows 0fr→1fr animates the chart between collapsed and its natural
           height (same idiom as PropertyDescription.tsx). */}
@@ -136,7 +156,9 @@ export function PriceHistoryChart({ history }: PriceHistoryChartProps) {
         }`}
       >
         <div className="overflow-hidden">
-          <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
+          {/* No card chrome here any more — PropertySection already provides the
+              white panel, so this is just a ruled-off region inside it. */}
+          <div className="mt-4 border-t border-border pt-4">
             <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="h-auto w-full"
@@ -193,6 +215,6 @@ export function PriceHistoryChart({ history }: PriceHistoryChartProps) {
           </div>
         </div>
       </div>
-    </section>
+    </PropertySection>
   );
 }

@@ -6,7 +6,8 @@ export type ButtonVariant =
   | "outline"
   | "ghost"
   | "danger"
-  | "inverse";
+  | "inverse"
+  | "neutral";
 export type ButtonSize = "sm" | "md" | "lg";
 
 /**
@@ -67,6 +68,10 @@ const variantClasses: Record<ButtonVariant, string> = {
   // see the red→carmine mapping note in globals.css.
   danger: "bg-danger text-white hover:bg-danger-hover",
   inverse: "bg-white text-blue-700 hover:bg-blue-50",
+  // Warm grey fill for a secondary action that must NOT read as a second brand
+  // CTA next to a primary one (e.g. «Задать вопрос» under «Показать телефон»).
+  // `secondary` is brand-tinted and would compete; this stays neutral.
+  neutral: "bg-surface-inset text-fg hover:bg-border-strong",
 };
 
 export interface ButtonClassOptions {

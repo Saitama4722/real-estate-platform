@@ -15,23 +15,30 @@ interface PropertyMapWrapperProps {
   latitude: number;
   longitude: number;
   showMap: boolean;
+  locationLabel?: string;
 }
 
 export function PropertyMapWrapper({
   latitude,
   longitude,
   showMap,
+  locationLabel,
 }: PropertyMapWrapperProps) {
   return (
     <Suspense
       fallback={
         <div
-          className="mt-4 h-[320px] w-full animate-pulse rounded-xl border border-gray-200 bg-gray-100"
+          className="h-[266px] w-full animate-pulse rounded-2xl bg-surface-inset md:h-[380px]"
           aria-hidden
         />
       }
     >
-      <PropertyMapLazy latitude={latitude} longitude={longitude} showMap={showMap} />
+      <PropertyMapLazy
+        latitude={latitude}
+        longitude={longitude}
+        showMap={showMap}
+        locationLabel={locationLabel}
+      />
     </Suspense>
   );
 }
