@@ -600,7 +600,11 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={submitting || photos.length >= MAX_PHOTOS}
-          className="flex w-full items-center gap-3.5 rounded-[14px] bg-[--field-bg] p-[18px] text-left shadow-[inset_0_0_0_1.5px_rgba(22,24,29,.14)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-brand-tint hover:shadow-[inset_0_0_0_1.5px_var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[--field-bg] disabled:hover:shadow-[inset_0_0_0_1.5px_rgba(22,24,29,.14)]"
+          // ⚠ bg-[var(--field-bg)], NOT bg-[--field-bg]. The bare form is
+          // Tailwind v3 shorthand; v4 still emits a rule for it, but as
+          // `background-color: --field-bg`, which is invalid CSS and the browser
+          // drops — so the zone rendered fully transparent.
+          className="flex w-full items-center gap-3.5 rounded-[14px] bg-[var(--field-bg)] p-[18px] text-left shadow-[inset_0_0_0_1.5px_rgba(22,24,29,.14)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-brand-tint hover:shadow-[inset_0_0_0_1.5px_var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[var(--field-bg)] disabled:hover:shadow-[inset_0_0_0_1.5px_rgba(22,24,29,.14)]"
         >
           <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-tint">
             <Icon icon={ImageUp} className="size-[21px] text-brand" />
