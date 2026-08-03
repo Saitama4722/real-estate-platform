@@ -1355,6 +1355,35 @@ Index of what changed this session; details live in the linked sections above.
     row — do **not** use `QuerySet.update()` for an intended price change (that
     silently skips history). Reserve `QuerySet.update()` for undoing your OWN
     accidental test writes.
+### ⚠ A test fixture must NEVER reference a real object's file paths
+
+- **This destroyed real media once — 2026-08-03 `[observed]`.** Building
+  0-photo / 1-photo fixtures for the property-detail template, a disposable
+  `PropertyPhoto` was created pointing at **#18's existing** `original_file` /
+  `image_large` / `image_medium` / `image_thumb` names — reusing the paths
+  looked like a cheap way to get a valid photo. Deleting the fixture afterwards
+  ran the storage cleanup, which **deleted those files from disk**. #18 lost the
+  three derivatives of one photo and rendered a broken hero image; only
+  `original_file` survived.
+- **Recovery, if it happens again:** the derivatives are rebuildable from the
+  original — `from properties.tasks import generate_property_photo_derivatives`
+  then call it synchronously with the photo id. Verified `[measured]`: all 12
+  file paths across #18's 3 photos existed again afterwards, with price, photo
+  count and price-history rows unchanged.
+- **RULE: a fixture owns its own bytes.** If a fixture needs an image, COPY the
+  file to a fixture-only path first (e.g.
+  `properties/photos/qa_fixture/…`) and point the row at the copy, then delete
+  that directory during cleanup. Never let a disposable row share a storage path
+  with a real one — `.delete()` on the fixture cannot tell the difference.
+- **Generalises beyond photos:** the same trap exists for any FileField whose
+  model deletes from storage on delete. Before reusing ANY real record's file
+  reference in test data, assume deleting the test row will delete the file.
+- **Verify media, not just rows, after fixture cleanup.** Row counts looked
+  perfect the whole time this was broken — `photos.count()` was still 3. What
+  caught it was a rendered screenshot, and what confirmed it was
+  `os.path.exists(os.path.join(settings.MEDIA_ROOT, name))` per field. Add that
+  check to the #18 integrity pass whenever a task touched photos.
+
 - **This is a temporary single-point-of-failure concern** — once realtors add real
   properties through the CRM in normal use, it naturally fades. **Until then, treat
   #18 as fragile: verify every time, but never overwrite a real edit with a stale
