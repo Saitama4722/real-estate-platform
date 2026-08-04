@@ -14,7 +14,6 @@ import {
   parseEmployeeUser,
   type EmployeeUser,
 } from "@/lib/employeeUser";
-import { cn } from "@/lib/utils";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Icons } from "@/components/ui/icon";
 
@@ -77,7 +76,19 @@ export function HeaderAccountControls() {
         size="sm"
         icon={Icons.User}
       >
-        Вход в личный кабинет
+        {/* The full label makes the header row's intrinsic width 375px — ButtonLink
+            is whitespace-nowrap, so at a 360px viewport EVERY page grew a
+            horizontal scrollbar `[measured]` (scrollWidth 375, all four swept
+            pages identically). Below 400px only «Вход» renders; from 400px up
+            the header is pixel-identical to before. The logged-in chip never
+            had this problem — it already truncates via max-w. */}
+        {/* One outer span, so the label stays a SINGLE flex item inside the
+            button — bare text + a sibling span would become two items with the
+            button's gap-2 between them, changing ≥400px spacing. */}
+        <span>
+          Вход
+          <span className="hidden min-[400px]:inline">&nbsp;в личный кабинет</span>
+        </span>
       </ButtonLink>
     );
   }
