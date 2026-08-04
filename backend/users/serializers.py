@@ -342,7 +342,16 @@ class RealtorCrmWriteSerializer(serializers.ModelSerializer):
         user = User(**validated_data)
         user.role = User.Role.REALTOR
         user.set_password(password)
+        # post_save (users.signals) creates the profile with DEFAULT_REALTOR_BIO.
         user.save()
+        # ⚠ An EMPTY short_bio on CREATE must not overwrite that default. The
+        # CRM form posts the field unconditionally, and its bio box starts
+        # blank, so writing it through would blank the template on every new
+        # realtor — the superadmin would never see the text they are meant to
+        # tailor. On UPDATE an empty value is respected: clearing the bio there
+        # is a deliberate act.
+        if not str(profile_fields.get("short_bio", "")).strip():
+            profile_fields.pop("short_bio", None)
         _apply_realtor_profile_fields(user, profile_fields)
         return user
 

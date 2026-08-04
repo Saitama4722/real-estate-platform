@@ -98,6 +98,9 @@ class PropertyViewSet(ReadOnlyModelViewSet):
             "neighborhood",
             "residential_complex",
             "assigned_realtor",
+            # RealtorShortSerializer.is_public reads the reverse OneToOne;
+            # without this it would be one extra query per row.
+            "assigned_realtor__realtor_profile",
         )
 
         property_type = self.request.query_params.get("property_type")
@@ -423,6 +426,10 @@ class CrmPropertyViewSet(
             "residential_complex",
             "assigned_realtor",
             "created_by",
+            # Same reason as the public list: RealtorShortSerializer.is_public
+            # reads the reverse OneToOne on BOTH of these.
+            "assigned_realtor__realtor_profile",
+            "created_by__realtor_profile",
             "agency",
             "owner",
             "apartment_details",

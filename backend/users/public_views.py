@@ -16,7 +16,18 @@ from .serializers import PublicRealtorSerializer, _absolute_media_url
 class PublicRealtorDetailView(APIView):
     """
     GET /api/realtors/<crm_id>/
-    Только активные пользователи с ролью «Риэлтор»; без email и CRM-метаданных.
+    Только активные ОПУБЛИКОВАННЫЕ риэлторы; без email и CRM-метаданных.
+
+    ⚠ `is_public` — «Показывать на сайте» — ЗДЕСЬ И ЕСТЬ то место, где флаг
+    работает. Он редактируется в трёх интерфейсах (CRM-панель, /api/auth/me/,
+    админка), но раньше не проверялся ни одним публичным эндпоинтом: страница
+    отдавалась для любого активного риэлтора, то есть галочка вводила в
+    заблуждение. Профиль без `is_public=True` (в том числе полное отсутствие
+    профиля) теперь 404 — новый риэлтор остаётся черновиком, пока
+    суперадмин не отредактирует биографию и не опубликует его.
+
+    Ссылки на страницу гасятся тем же признаком (`realtor_profile_is_public`),
+    поэтому мёртвых ссылок на 404 не возникает.
     """
 
     permission_classes = [AllowAny]
@@ -28,6 +39,7 @@ class PublicRealtorDetailView(APIView):
             User.objects.filter(
                 role=User.Role.REALTOR,
                 is_active=True,
+                realtor_profile__is_public=True,
             ),
             crm_id__iexact=raw,
         )

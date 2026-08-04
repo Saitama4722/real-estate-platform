@@ -257,3 +257,44 @@ class RealtorProfile(BaseTimestampedModel):
     def save(self, *args, **kwargs):
         _compress_avatar_field(self.photo)
         return super().save(*args, **kwargs)
+
+
+#: Neutral starting bio applied to every newly created realtor.
+#:
+#: STORED AT CREATION, not a render-time fallback: the superadmin has to SEE
+#: this text in the CRM to tailor it before publishing, which only works if it
+#: is really in the field. Four paragraphs on purpose — the public page splits
+#: the bio into lead / intro / blocks / closing, and the closing paragraph is
+#: what the CTA band renders as its headline.
+#:
+#: Deliberately free of person- and city-specific claims: it must be true for
+#: any Centreal realtor on their first day. The cities are named elsewhere on
+#: the page (hero tagline, CTA fallback), so they are not repeated here, and
+#: the closing line says «Напишите» rather than «Напишите или позвоните»
+#: because a realtor may have no phone on file — in which case the page offers
+#: only the contact form.
+DEFAULT_REALTOR_BIO = (
+    "Помогаю купить и продать недвижимость и сопровождаю сделку на каждом "
+    "этапе. Подбираю варианты под задачу и бюджет, честно рассказываю о "
+    "плюсах и минусах каждого объекта.\n\n"
+    "Проверяю документы и историю объекта до просмотра, чтобы вы не тратили "
+    "время на проблемные варианты.\n\n"
+    "Организую показы, веду переговоры по цене и условиям и держу вас в курсе "
+    "на каждом шаге.\n\n"
+    "Напишите — обсудим задачу и составим план: с чего начать и какие объекты "
+    "стоит смотреть в первую очередь."
+)
+
+
+def realtor_profile_is_public(user) -> bool:
+    """
+    Whether this realtor's public page (and links to it) should exist.
+
+    ONE definition, used by the public detail view AND by every serializer
+    that exposes a realtor to the site — otherwise a surface could link to a
+    page that 404s. Requires a profile row with `is_public=True`: the flag
+    defaults to False, so a freshly created realtor is a draft until the
+    superadmin publishes them.
+    """
+    profile = getattr(user, "realtor_profile", None)
+    return bool(profile and profile.is_public)

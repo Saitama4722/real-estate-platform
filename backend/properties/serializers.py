@@ -67,11 +67,20 @@ class RealtorShortSerializer(serializers.Serializer):
     first_name = serializers.CharField()
     last_name = serializers.CharField()
     avatar = serializers.SerializerMethodField()
+    # Whether /realtors/<crm_id> exists for this person. Consumers MUST gate
+    # their link on it: the public detail view 404s an unpublished realtor, so
+    # rendering the link anyway would be a link to a 404.
+    is_public = serializers.SerializerMethodField()
 
     def get_avatar(self, obj):
         from users.serializers import _absolute_media_url
 
         return _absolute_media_url(self.context.get("request"), getattr(obj, "avatar", None))
+
+    def get_is_public(self, obj) -> bool:
+        from users.models import realtor_profile_is_public
+
+        return realtor_profile_is_public(obj)
 
 
 class ApartmentDetailsPublicSerializer(serializers.ModelSerializer):
