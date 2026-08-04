@@ -51,9 +51,16 @@ export function Header() {
             <Wordmark />
           </Link>
           <div className="flex min-w-0 items-center gap-2 lg:gap-4">
-            {/* Desktop nav row: does not fit below ~1024px — hidden in favour
-                of the hamburger (MobileNav) under lg. */}
-            <nav aria-label="Основная навигация" className="hidden lg:block">
+            {/* Desktop nav row. Hidden in favour of the hamburger (MobileNav)
+                under lg. The row's intrinsic width is ~1047px — 23px more than
+                a 1024px viewport — so the `ctr-header__nav` FIT BAND rule in
+                globals.css compresses the discretionary gaps between 1024 and
+                1100px. If you add/rename a nav item, re-measure that band
+                (see the rule's comment for the method). */}
+            <nav
+              aria-label="Основная навигация"
+              className="ctr-header__nav hidden lg:block"
+            >
               <ul className="flex items-center gap-1">
                 {navLinks.map((link) => (
                   <li key={link.href}>
