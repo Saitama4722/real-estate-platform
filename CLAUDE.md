@@ -1881,9 +1881,25 @@ real time. Reference implementation for most of them:
 - **RULE:** a build/test result must name WHERE it ran and WHAT was patched:
   "in-repo", or "mirrored copy, unpatched source", or "mirrored copy plus the
   exact local patch, named". If the signal required any local-only change, the
-  repo does NOT pass — say so explicitly. (The underlying lint error — an unused `cn`
-  import in `header-account-controls.tsx` — has since been fixed in the repo,
-  and the mirror now builds unpatched source clean `[measured]`.)
+  repo does NOT pass — say so explicitly.
+- **CORRECTED 2026-08-04 — the parenthetical here used to claim that lint error
+  "has since been fixed in the repo". It was NOT.** The unused `cn` import in
+  `header-account-controls.tsx` is still present in **committed** code: at the
+  session-start commit `bb1d894` line 17 imports `cn` and nothing uses it
+  `[measured]`. The fix exists only in the WORKING TREE, uncommitted — so
+  "fixed in the repo" was true of the checkout on this machine and false of
+  the repository, which is exactly the distinction the RULE above exists to
+  make. **Consequence: `npm run build` from a clean checkout of HEAD FAILS**
+  at the lint gate (`'cn' is defined but never used`), and has done for this
+  whole branch `[measured]` — built from `git archive HEAD`, which is the only
+  way to see it; a mirror of the working tree passes and hides it.
+- **RULE (stronger): to claim "the repo builds", build the REPO — `git archive
+  HEAD | tar -x` into the mirror, not a copy of `src/`.** A working-tree mirror
+  silently includes uncommitted fixes AND untracked files, so it proves nothing
+  about what anyone else would check out. This caught a second, worse instance
+  the same day: staging a file that carried unrelated uncommitted work
+  committed a page importing five untracked modules, leaving HEAD unbuildable
+  with "Module not found" until they were added.
 
 ## Tech Stack Reminder
 
