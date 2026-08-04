@@ -70,6 +70,15 @@ class PhoneRevealThrottle(SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": ident}
 
 
+#: Этаж presets accepted by `?floor_preset=` on the public list endpoint.
+FLOOR_PRESETS = {"not_first", "not_last", "not_first_not_last"}
+
+#: Header carrying how many listings the floor preset dropped for an unknown
+#: `floors_total`. A header rather than a JSON envelope: the list response is a
+#: bare array that every consumer already depends on.
+HIDDEN_UNKNOWN_FLOORS_HEADER = "X-Hidden-Unknown-Floors"
+
+
 class PropertyViewSet(ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -153,6 +162,36 @@ class PropertyViewSet(ReadOnlyModelViewSet):
         if market_type and market_type in {c[0] for c in MarketType.choices}:
             qs = qs.filter(market_type=market_type)
 
+        # --- Этаж -----------------------------------------------------------
+        # Presets rather than a numeric band: buyers state objections ("not the
+        # ground floor", "not the top floor"), not floor ranges.
+        #
+        # Apartments only — `floor` lives on ApartmentDetails, where it is
+        # REQUIRED, so "not first" is always evaluable. `floors_total` is
+        # NULLABLE, so "not last" cannot be evaluated when the building height
+        # is unknown. Those listings are EXCLUDED (the preset is a hard
+        # constraint, and showing a possibly-top-floor flat would violate it)
+        # and COUNTED, so the UI can say how many disappeared instead of
+        # dropping them silently. The count is returned as a response header by
+        # `list()` below — it needs no change to the array response shape.
+        self._hidden_unknown_floors = 0
+        floor_preset = self.request.query_params.get("floor_preset")
+        if floor_preset in FLOOR_PRESETS:
+            if floor_preset in ("not_first", "not_first_not_last"):
+                qs = qs.filter(apartment_details__floor__gt=1)
+            if floor_preset in ("not_last", "not_first_not_last"):
+                # `apartment_details__isnull=False` matters: a plain
+                # `floors_total__isnull=True` would LEFT JOIN and also match
+                # houses/land, which have no apartment_details at all.
+                self._hidden_unknown_floors = qs.filter(
+                    apartment_details__isnull=False,
+                    apartment_details__floors_total__isnull=True,
+                ).count()
+                qs = qs.filter(
+                    apartment_details__floors_total__isnull=False,
+                    apartment_details__floor__lt=F("apartment_details__floors_total"),
+                )
+
         house_area_min = _query_decimal("house_area_min")
         if house_area_min is not None:
             qs = qs.filter(house_details__house_area__gte=house_area_min)
@@ -220,6 +259,15 @@ class PropertyViewSet(ReadOnlyModelViewSet):
             ).prefetch_related("photos", "videos", "price_history")
 
         return qs
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        # Set by get_queryset() while applying the floor preset. Emitted only
+        # when non-zero so nothing changes for every other request.
+        hidden = getattr(self, "_hidden_unknown_floors", 0)
+        if hidden:
+            response[HIDDEN_UNKNOWN_FLOORS_HEADER] = str(hidden)
+        return response
 
     def get_object(self):
         lookup = self.kwargs.get(self.lookup_field)
