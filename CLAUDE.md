@@ -828,6 +828,24 @@ itself now — **there is no manual `-p 3001` / `.env.local` step any more.**
   `CatalogControls` were deleted. Verified `[measured]`: 84/84 Playwright
   checks (states, full keyboard run, sheet focus trap, 360→1600 sweep,
   reduced motion, AA contrast), 0 console errors.
+- **⚠ OPEN BUG (pre-existing, header — NOT fixed, needs a decision): the
+  favourites COUNT BADGE re-breaks the 1024–1099px header fit band.** With at
+  least one favourite the nav reads «Избранное1» and the row's intrinsic
+  width returns to **1047px**, so `scrollWidth` is 1047 at viewports 1024 and
+  1040 on EVERY page `[measured]`; 1080+ and empty-localStorage are clean at
+  every width. The fit band was tuned against a header with no badge, and
+  CLAUDE.md's own warning there ("if a nav label is added or renamed, the
+  1047px intrinsic width moves — re-measure") covers exactly this. Options:
+  compress more inside the band, hide the count badge below 1100, or raise
+  the desktop-nav breakpoint. **Any responsive sweep must seed a favourite**,
+  or it tests the narrower header a real user rarely has.
+- **A `getBoundingClientRect()` beyond the viewport is NOT necessarily
+  overflow.** An element inside an `overflow:hidden` ancestor still reports
+  its full un-clipped rect, so an overflow detector that only compares rects
+  produces false positives — the homepage hero icons (inside
+  `.ctr-hero__field`) report right=1045 at a 1040 viewport while contributing
+  nothing to `scrollWidth`. Trust `document.documentElement.scrollWidth` for
+  the verdict and use rects only to LOCATE the cause.
 - **⚠ A computed-style colour is NOT always `rgb()`/`rgba()` — never regex it.**
   Tailwind v4's opacity modifier on a theme colour (`bg-surface-dark/70`)
   compiles to `color-mix()`, and `getComputedStyle().backgroundColor` returns
@@ -1230,10 +1248,21 @@ Index of what changed this session; details live in the linked sections above.
     markdown. The guard lives in `publicPropertyList.ts` (`formatOldPrice`
     returns undefined unless `old > price`), so the card never has to judge.
     `market_type: "other"` and null render no badge.
-  - `is_new` **still does not exist anywhere** — no model field, no serializer,
-    no frontend type `[measured]`, and no agreed derivation rule. It needs a
-    product decision first (e.g. "published within N days", computed vs
-    stored).
+  - `is_new` **is now DERIVED, never stored** (2026-08-04): `is_new_listing()`
+    in `properties/serializers.py` returns True when `published_at` is within
+    `NEW_LISTING_DAYS` (7). No migration, no field for anyone to fill, no
+    manual toggle to forget — the badge ages out on its own. Computed
+    server-side (both list AND detail serializers) so every consumer agrees
+    on what "new" means.
+  - **ONE badge slot on the photo, and «Цена снижена» WINS it.** The kit's
+    `.ctr-card__badges` is a flex row that could hold both, but the other
+    corners are taken (top-right = heart+compare, bottom-left = market), so a
+    second badge would be a fourth overlay on one photo. Price-drop takes
+    precedence: it is the stronger buying signal and the only one not
+    conveyed elsewhere (recency is already carried by the default «Сначала
+    новые» sort and list position). «Новый объект» reuses the same box and
+    changes only the fill (brand blue + white) — which is exactly how the kit
+    separates `.ctr-badge--accent` from `--primary`.
   - `is_price_reduced` (peak-derived boolean) and `old_price` are INDEPENDENT:
     the «Цена снижена» badge and the struck price can appear together or
     separately, and neither implies the other.
