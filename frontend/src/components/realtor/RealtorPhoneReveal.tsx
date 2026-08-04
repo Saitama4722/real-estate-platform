@@ -5,7 +5,13 @@ import { Icon, Icons } from "@/components/ui/icon";
 import { formatPhone, telHref } from "@/lib/phoneFormat";
 
 /**
- * «Показать телефон» → swaps itself for the number as a `tel:` link.
+ * «Позвонить» → swaps itself for the number as a `tel:` link.
+ *
+ * (Was «Показать телефон» — relabelled when the contact aside stopped printing
+ * the number: with no phone visible anywhere else on the page, "show the
+ * phone" read oddly as the label of the page's only phone affordance, while
+ * «Позвонить» names the intent. The click still reveals in place first rather
+ * than dialling blind, so the user sees the number before committing.)
  *
  * Purely local state. There is DELIBERATELY no network call.
  *
@@ -57,7 +63,7 @@ export function RealtorPhoneReveal({
       className={buttonClassName}
     >
       <Icon icon={Icons.Phone} size={20} className="shrink-0" />
-      Показать телефон
+      Позвонить
     </button>
   );
 }

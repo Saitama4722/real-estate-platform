@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, type ButtonSize } from "@/components/ui/button";
-import { Icons, type IconName } from "@/components/ui/icon";
+import { Icon, Icons, type IconName } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { PublicLeadInquiryForm } from "@/components/inquiry/PublicLeadInquiryForm";
 
@@ -33,6 +33,15 @@ interface RealtorContactModalProps {
   fullWidth?: boolean;
   /** Дополнительные классы кнопки (НЕ для размеров — см. `size`). */
   className?: string;
+  /**
+   * Полностью кастомный триггер: когда задан, вместо общей <Button> рендерится
+   * голый <button> ровно с этими классами. Нужен контактной карточке риэлтора,
+   * чья кнопка 54px/14px/15.5px — вне лестницы размеров общей кнопки (32/40/48),
+   * а выражать размер через className общей кнопки запрещено (см.
+   * button-classes.ts: cn — плоская склейка, победителя выбирает порядок в
+   * стилях).
+   */
+  triggerClassName?: string;
 }
 
 /**
@@ -48,25 +57,37 @@ export function RealtorContactModal({
   iconName,
   fullWidth = false,
   className = "w-full sm:w-auto",
+  triggerClassName,
 }: RealtorContactModalProps) {
   const [requestOpen, setRequestOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
 
+  const open = () => {
+    setFormKey((k) => k + 1);
+    setRequestOpen(true);
+  };
+
   return (
     <>
-      <Button
-        type="button"
-        size={size}
-        icon={iconName ? Icons[iconName] : undefined}
-        fullWidth={fullWidth}
-        className={className}
-        onClick={() => {
-          setFormKey((k) => k + 1);
-          setRequestOpen(true);
-        }}
-      >
-        Связаться
-      </Button>
+      {triggerClassName ? (
+        <button type="button" className={triggerClassName} onClick={open}>
+          {iconName && (
+            <Icon icon={Icons[iconName]} size={20} className="shrink-0" />
+          )}
+          Связаться
+        </button>
+      ) : (
+        <Button
+          type="button"
+          size={size}
+          icon={iconName ? Icons[iconName] : undefined}
+          fullWidth={fullWidth}
+          className={className}
+          onClick={open}
+        >
+          Связаться
+        </Button>
+      )}
 
       <Modal isOpen={requestOpen} onClose={() => setRequestOpen(false)}>
         <h2 className="text-lg font-semibold text-gray-900">Связаться с риэлтором</h2>
