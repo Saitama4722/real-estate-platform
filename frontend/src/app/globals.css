@@ -243,11 +243,62 @@
     0 4px 12px rgba(15, 30, 56, 0.1), 0 2px 4px rgba(15, 30, 56, 0.05);
   --shadow-lg:
     0 12px 32px rgba(15, 30, 56, 0.16), 0 4px 8px rgba(15, 30, 56, 0.06);
+  /* Catalog filter panel at rest — the mockup's soft two-layer float
+     (0 1px 2px + 0 8px 24px @ 4%), alphas moved onto the system's navy base.
+     Softer and wider than --shadow-sm; a dropdown's popup still uses -lg. */
+  --shadow-panel:
+    0 1px 2px rgba(15, 30, 56, 0.04), 0 8px 24px rgba(15, 30, 56, 0.04);
 
   /* ---- Motion: ease-out family only. No bounce, no overshoot. ------------ */
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---- Realtor profile page (/realtors/[crmId]) --------------------------- */
+  /*
+   * The mockup was designed standalone and ships its own blue (#2563EB) and red
+   * (#E23A2E). Those are NOT added here: they would be a second accent system
+   * on one page, which is exactly what load-bearing decision #2 consolidated.
+   * The page uses `brand` / `accent` throughout, and only the values below —
+   * which have no equivalent token — are new.
+   *
+   * The navy ramp is anchored on the existing --color-blue-950 (#0f1e38) rather
+   * than the mockup's #0F172A, so the hero, the CTA band and the footer are all
+   * the same navy. The two later stops carry the gradient's lift and are new.
+   */
+  --color-realtor-navy: #0f1e38;
+  --color-realtor-navy-mid: #10224b;
+  --color-realtor-navy-lift: #16306b;
+  --color-realtor-navy-lift-strong: #1b3877;
+
+  /*
+   * Deep elevation. The design system's ladder tops out at --shadow-lg
+   * (0 12px 32px), which is tuned for a card sitting on the page. The portrait,
+   * the contact aside and the CTA band are lifted far further off the surface
+   * than anything else on the site, so they get their own stacks here rather
+   * than raising the shared ladder for every card in the catalogue.
+   * All alphas are on the navy base (15,30,56) the rest of the system uses.
+   */
+  --shadow-realtor-stat:
+    0 1px 2px rgba(15, 30, 56, 0.05), 0 14px 30px -22px rgba(15, 30, 56, 0.4);
+  --shadow-realtor-stat-hover:
+    0 2px 4px rgba(15, 30, 56, 0.06), 0 26px 46px -24px rgba(15, 30, 56, 0.55);
+  --shadow-realtor-aside:
+    0 1px 2px rgba(15, 30, 56, 0.06), 0 12px 24px -18px rgba(15, 30, 56, 0.35),
+    0 42px 64px -40px rgba(15, 30, 56, 0.45);
+  --shadow-realtor-portrait:
+    0 2px 6px rgba(15, 30, 56, 0.4), 0 18px 40px -14px rgba(15, 30, 56, 0.65),
+    0 52px 90px -30px rgba(15, 30, 56, 0.8);
+  --shadow-realtor-band:
+    0 2px 4px rgba(15, 30, 56, 0.2), 0 30px 60px -30px rgba(15, 30, 56, 0.7),
+    0 80px 120px -60px rgba(15, 30, 56, 0.6);
+  --shadow-realtor-panel: 0 18px 40px -26px rgba(15, 30, 56, 0.7);
+  --shadow-realtor-panel-hover: 0 30px 60px -28px rgba(15, 30, 56, 0.8);
+  --shadow-realtor-float: 0 12px 30px -14px rgba(15, 30, 56, 0.65);
+  /* Brand-tinted glow under the two primary CTAs. */
+  --shadow-realtor-cta: 0 10px 26px -10px rgba(26, 95, 224, 0.9);
+  --shadow-realtor-cta-hover:
+    0 18px 42px -8px rgba(26, 95, 224, 1), 0 0 0 6px rgba(26, 95, 224, 0.2);
 
   /* ---- Layout ------------------------------------------------------------ */
   --container-page: 1200px;
@@ -389,6 +440,20 @@
     outline: none;
     box-shadow: var(--focus-ring-danger);
   }
+
+  /* Loading shimmer for skeleton blocks (catalog result placeholders). Under
+     reduced motion the global block cancels the animation, leaving the static
+     --skeleton-base wash — the skeleton stays visible, it just doesn't move. */
+  .ctr-skel {
+    background: linear-gradient(
+      90deg,
+      var(--skeleton-base) 25%,
+      var(--skeleton-shine) 37%,
+      var(--skeleton-base) 63%
+    );
+    background-size: 300% 100%;
+    animation: ctr-shimmer 1.4s ease infinite;
+  }
 }
 
 /* ============================================================================
@@ -431,6 +496,18 @@
   }
   to {
     background-position: -200% 0;
+  }
+}
+
+/* Mobile filter sheet slide-in. Ends at the element's base position, so the
+   global reduced-motion animation cancel simply shows the sheet in place —
+   nothing depends on the keyframe to become visible (end-state rule). */
+@keyframes ctr-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
   }
 }
 
@@ -590,6 +667,376 @@
 }
 
 /* ============================================================================
+   REALTOR PROFILE PAGE — /realtors/[crmId]
+   Ported from docs/design/"Realtor Profile.html" (a Claude Design export; the
+   page markup lives JSON-escaped in its __bundler/template block).
+
+   WHY THIS IS HAND-WRITTEN CSS AND NOT TAILWIND UTILITIES. Same reason as
+   `.ctr-hero` above: these are multi-layer decorative backgrounds (three
+   stacked radial gradients, seven drifting shapes) whose Tailwind arbitrary
+   values would be unreadable one-liners. Colour and elevation still come from
+   @theme tokens — nothing here invents a value, and the JSX carries no hex.
+
+   MOTION SPLIT (deliberate, agreed before implementing):
+     • ENTRANCE reveals are NOT redefined here. The page reuses `.ctr-sec` +
+       RevealController, so it fades in at the system's --dur-reveal (360ms)
+       like every other page, and inherits the 2500ms failsafe, the print rule
+       and the visible-by-default base state for free.
+     • AMBIENT motion — the 15–26s shape drift, the 12s glow, the cursor
+       parallax and the portrait tilt — keeps the mockup's long timings and its
+       cubic-bezier(.22,1,.36,1). The design system has no budget for ambient
+       decoration, and clamping these to 250ms would delete the effect.
+
+   REDUCED MOTION is handled entirely by the global block at the end of this
+   file (`animation: none !important`), so every keyframe below is cancelled
+   there. Per the end-state rule, nothing here depends on a keyframe to become
+   visible: each drift starts AND ends at translate3d(0,0,0), and the glow
+   carries its resting opacity in the base rule rather than in the keyframe.
+   The parallax/tilt custom properties default to 0 and the client component
+   never attaches its listener under reduce, so both resolve to no transform.
+   ========================================================================== */
+
+/* Distinct names from `ctr-drift-*` above — those belong to the homepage hero
+   icon field and have different amplitudes. */
+@keyframes ctr-rp-drift-a {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(24px, -30px, 0) rotate(6deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+}
+@keyframes ctr-rp-drift-b {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(-34px, 22px, 0) rotate(-8deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+}
+@keyframes ctr-rp-drift-c {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(18px, 26px, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+@keyframes ctr-rp-drift-d {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(-4deg);
+  }
+  50% {
+    transform: translate3d(-20px, -18px, 0) rotate(4deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-4deg);
+  }
+}
+@keyframes ctr-rp-glow {
+  0% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+
+/* ---- Hero ---------------------------------------------------------------- */
+.ctr-rp-hero {
+  background: linear-gradient(
+    165deg,
+    var(--color-realtor-navy) 0%,
+    var(--color-realtor-navy-mid) 46%,
+    var(--color-realtor-navy-lift) 100%
+  );
+  /*
+   * ⚠ NO `overflow: hidden` HERE, and no `isolation: isolate`. The mockup puts
+   * both on the section; this project has been bitten by that before (the
+   * homepage hero clipped SearchBar's district dropdown — see the
+   * ancestor-overflow checklist in CLAUDE.md). The clip lives on
+   * `.ctr-rp-hero__shapes` below, which contains ONLY decoration, and the
+   * stats strip is free to overlap the hero's bottom edge.
+   */
+}
+
+/* Three stacked radial washes: two brand, one accent. */
+.ctr-rp-hero__wash {
+  background:
+    radial-gradient(
+      1100px 520px at 22% -8%,
+      rgba(26, 95, 224, 0.55),
+      transparent 70%
+    ),
+    radial-gradient(
+      760px 460px at 92% 108%,
+      rgba(26, 95, 224, 0.32),
+      transparent 72%
+    ),
+    radial-gradient(
+      420px 320px at 78% 12%,
+      rgba(222, 43, 55, 0.16),
+      transparent 70%
+    );
+}
+
+/* Darkens the gradient directly behind the H1 so white text clears WCAG AA
+   over the brightest part of the wash. */
+.ctr-rp-hero__scrim {
+  background: radial-gradient(
+    closest-side at 34% 50%,
+    rgba(6, 11, 26, 0.62),
+    rgba(6, 11, 26, 0.28) 58%,
+    transparent 82%
+  );
+}
+
+.ctr-rp-hero__shapes {
+  overflow: hidden;
+}
+
+/* ---- Drifting shapes ----------------------------------------------------- */
+/*
+ * Parallax is applied through the INDIVIDUAL `translate` property while the
+ * drift keyframes animate `transform`. The two compose instead of fighting:
+ * `translate` is applied before `transform` in the CSS transform pipeline, so
+ * the cursor offset rides on top of the drift without either clobbering the
+ * other. (The mockup animated `marginLeft`/`marginTop` for the same reason;
+ * `translate` is the same trick without touching layout.)
+ *
+ * --ctr-rp-px / --ctr-rp-py are unitless -0.5..0.5 written by
+ * RealtorHeroMotion; --ctr-rp-d is the per-shape depth set inline. All three
+ * default to a resting value so the shapes are correct with no JS at all.
+ */
+.ctr-rp-shape {
+  position: absolute;
+  pointer-events: none;
+  translate: calc(var(--ctr-rp-px, 0) * var(--ctr-rp-d, 20) * -1px)
+    calc(var(--ctr-rp-py, 0) * var(--ctr-rp-d, 20) * -0.6px);
+  transition: translate 1.6s cubic-bezier(0.22, 1, 0.36, 1);
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-iteration-count: infinite;
+}
+
+.ctr-rp-shape--a {
+  left: 6%;
+  top: 16%;
+  width: 300px;
+  height: 300px;
+  border-radius: 34px;
+  border: 1px solid rgba(189, 213, 252, 0.16);
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0)
+  );
+  animation-name: ctr-rp-drift-a;
+  animation-duration: 19s;
+}
+.ctr-rp-shape--b {
+  right: 30%;
+  top: 8%;
+  width: 190px;
+  height: 190px;
+  border-radius: 26px;
+  border: 1px solid rgba(189, 213, 252, 0.2);
+  animation-name: ctr-rp-drift-b;
+  animation-duration: 15s;
+}
+.ctr-rp-shape--c {
+  left: 40%;
+  bottom: -8%;
+  width: 420px;
+  height: 260px;
+  border-radius: 40px;
+  background: linear-gradient(
+    160deg,
+    rgba(26, 95, 224, 0.22),
+    rgba(26, 95, 224, 0)
+  );
+  animation-name: ctr-rp-drift-c;
+  animation-duration: 22s;
+}
+.ctr-rp-shape--d {
+  left: 13%;
+  bottom: 12%;
+  width: 118px;
+  height: 118px;
+  opacity: 0.3;
+  color: var(--color-blue-200);
+  animation-name: ctr-rp-drift-d;
+  animation-duration: 17s;
+}
+.ctr-rp-shape--e {
+  right: 8%;
+  top: 54%;
+  width: 84px;
+  height: 84px;
+  opacity: 0.28;
+  color: var(--color-blue-200);
+  animation-name: ctr-rp-drift-a;
+  animation-duration: 21s;
+}
+.ctr-rp-shape--f {
+  left: 52%;
+  top: 14%;
+  width: 62px;
+  height: 62px;
+  opacity: 0.24;
+  color: var(--color-accent);
+  animation-name: ctr-rp-drift-b;
+  animation-duration: 24s;
+}
+.ctr-rp-shape--g {
+  right: 4%;
+  top: 6%;
+  width: 260px;
+  height: 340px;
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(
+    200deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0) 60%
+  );
+  animation-name: ctr-rp-drift-d;
+  animation-duration: 26s;
+}
+
+/* The four largest shapes are desktop-only. Below 900px the parallax is off
+   anyway (see RealtorHeroMotion), so they would be static clutter behind the
+   H1 — and they are the expensive ones to paint. Same bespoke-modifier
+   approach as `.ctr-hero__icon--wide`, and for the same reason: these rules are
+   unlayered, so a Tailwind `hidden` utility would lose to them. */
+.ctr-rp-shape--wide {
+  display: none;
+}
+@media (min-width: 900px) {
+  .ctr-rp-shape--wide {
+    display: block;
+  }
+}
+
+/* ---- Portrait ------------------------------------------------------------ */
+.ctr-rp-portrait-glow {
+  background: radial-gradient(
+    closest-side,
+    rgba(26, 95, 224, 0.55),
+    transparent 72%
+  );
+  filter: blur(28px);
+  /* Resting opacity lives HERE, not only in the keyframe: reduced motion
+     cancels the animation outright, and a glow that started at 0 would then
+     never appear. */
+  opacity: 0.55;
+  animation: ctr-rp-glow 12s ease-in-out infinite;
+}
+
+/* 1.5px gradient hairline around the portrait. */
+.ctr-rp-portrait-ring {
+  background: linear-gradient(
+    150deg,
+    var(--color-blue-400) 0%,
+    rgba(255, 255, 255, 0.25) 42%,
+    var(--color-accent) 100%
+  );
+}
+
+.ctr-rp-portrait-inner {
+  background: linear-gradient(
+    165deg,
+    var(--color-gray-100) 0%,
+    var(--color-gray-300) 52%,
+    var(--color-gray-400) 100%
+  );
+}
+
+.ctr-rp-portrait-sheen {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -80px 90px -60px rgba(15, 30, 56, 0.55);
+}
+
+/* Cursor tilt. --ctr-rp-tx / --ctr-rp-ty are unitless -0.5..0.5 and default to
+   0, so with no JS the card sits flat. */
+.ctr-rp-tilt {
+  transform: rotateY(calc(var(--ctr-rp-tx, 0) * 8deg))
+    rotateX(calc(var(--ctr-rp-ty, 0) * -8deg));
+  transform-style: preserve-3d;
+  transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+/* ---- Dark bands (CTA + "весь каталог" panel) ----------------------------- */
+.ctr-rp-band {
+  background: linear-gradient(
+    160deg,
+    var(--color-realtor-navy) 0%,
+    var(--color-realtor-navy-mid) 55%,
+    var(--color-realtor-navy-lift-strong) 100%
+  );
+}
+.ctr-rp-band__wash {
+  background:
+    radial-gradient(
+      700px 340px at 78% -20%,
+      rgba(26, 95, 224, 0.55),
+      transparent 70%
+    ),
+    radial-gradient(
+      420px 280px at 4% 120%,
+      rgba(222, 43, 55, 0.2),
+      transparent 72%
+    );
+}
+
+.ctr-rp-panel {
+  background: linear-gradient(
+    150deg,
+    var(--color-realtor-navy),
+    var(--color-realtor-navy-lift)
+  );
+}
+.ctr-rp-panel__wash {
+  background:
+    radial-gradient(
+      420px 260px at 88% 8%,
+      rgba(26, 95, 224, 0.5),
+      transparent 70%
+    ),
+    radial-gradient(
+      260px 200px at 8% 96%,
+      rgba(222, 43, 55, 0.22),
+      transparent 72%
+    );
+}
+
+/* Slow rotating outline inside the CTA band. */
+.ctr-rp-band__ring {
+  border: 1px solid rgba(189, 213, 252, 0.16);
+  animation: ctr-rp-drift-a 22s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+/* ---- Bio block list ------------------------------------------------------ */
+/* 2px grid gaps show the wrapper colour through as hairline rules, so the rows
+   need no borders of their own. */
+.ctr-rp-bio {
+  background: var(--color-border);
+}
+
+/* ============================================================================
    COMPACT HEADER — 64px → 52px past 24px of scroll, with a blurred translucent
    background. `is-compact` is toggled by RevealController (rAF-throttled).
 
@@ -618,6 +1065,45 @@
 }
 .ctr-header.is-compact .ctr-header__row {
   height: var(--header-h-compact);
+}
+
+/* ----------------------------------------------------------------------------
+   HEADER FIT BAND — 1024–1099px.
+
+   The desktop nav switches on at lg (1024px), but the full row (logo 99px +
+   nav 701px + account controls 199px + gaps) needs 1047px, so every page
+   overflowed horizontally in the 23px band 1024–1046 `[measured]`:
+   `document.scrollWidth` was 1047 at a 1024 viewport on /catalog, /articles,
+   the homepage and the realtor page alike. This band compresses the row's
+   DISCRETIONARY spacing only — no font, padding-within-controls or visibility
+   change — freeing 26px: nav item gap 4→2px (5 gaps, 10px), the CTA's leading
+   margin 8→0px, and the nav↔account gap 16→8px. Above 1100px nothing here
+   applies, so the header is pixel-identical from 1100 up (the requirement was
+   ~1408). Below 1024 the nav is display:none and the band cannot match it.
+
+   ⚠ UNLAYERED ON PURPOSE, like the compact-header rules above — but for the
+   CASCADE, not just layering: the wrap already carries `gap-2 lg:gap-4`, and a
+   banded Tailwind utility (`lg:max-[1100px]:gap-2`) would sit in the same
+   utilities layer as `lg:gap-4`, leaving the winner to stylesheet order (the
+   `cn()` trap documented in button-classes.ts). Unlayered rules win over any
+   layer, deterministically.
+
+   ⚠ If a nav label is added or renamed, the 1047px intrinsic width moves.
+   Re-measure: load /catalog at 1024–1100 and assert
+   `document.documentElement.scrollWidth === innerWidth` (the exact sweep lives
+   in the responsive-audit method in CLAUDE.md).
+   ------------------------------------------------------------------------- */
+@media (min-width: 1024px) and (max-width: 1099.98px) {
+  .ctr-header__nav ul {
+    gap: 2px;
+  }
+  .ctr-header__nav ul > li:last-child {
+    margin-left: 0;
+  }
+  /* The wrap around nav + account controls (logo's sibling). */
+  .ctr-header__row > div {
+    gap: 8px;
+  }
 }
 
 /* ============================================================================

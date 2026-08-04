@@ -26,8 +26,9 @@ import {
   Newspaper,
   Phone,
   Plus,
-  Ruler,
+  RotateCcw,
   Scale,
+  Scan,
   Search,
   Share2,
   ShieldCheck,
@@ -103,6 +104,10 @@ export const Icons = {
   Check,
   Plus,
   Minus,
+  /** Bidirectional arrows — the results-header sort trigger. */
+  Sort: ArrowUpDown,
+  /** Counter-clockwise reset — «Сбросить всё» in the filter chip row. */
+  Reset: RotateCcw,
   ChevronRight,
   ChevronLeft,
   ChevronDown,
@@ -118,7 +123,8 @@ export const Icons = {
 
   // Card spec line
   Rooms: BedDouble,
-  Area: Ruler,
+  /** Corner-brackets glyph — the catalog mockup's area icon (was Ruler). */
+  Area: Scan,
   Floor: Building,
   Address: MapPin,
 
