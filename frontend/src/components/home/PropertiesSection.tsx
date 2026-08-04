@@ -22,6 +22,9 @@ interface PropertyItem {
   characteristics?: string;
   location: string;
   isPriceReduced?: boolean;
+  isNew?: boolean;
+  oldPrice?: string;
+  marketLabel?: string;
   propertyType?: "apartment" | "house" | "land" | "commercial";
   rooms?: number;
   area?: number;
@@ -56,6 +59,8 @@ export function PropertiesSection({ properties, sectionTitle }: PropertiesSectio
               slug={property.slug}
               image={property.image}
               price={property.price}
+              oldPrice={property.oldPrice}
+              marketLabel={property.marketLabel}
               title={property.title}
               characteristics={property.characteristics}
               rooms={property.rooms}
@@ -65,6 +70,7 @@ export function PropertiesSection({ properties, sectionTitle }: PropertiesSectio
               location={property.location}
               favoriteId={property.slug}
               isPriceReduced={property.isPriceReduced}
+              isNew={property.isNew}
               compareId={property.slug}
               compareType={property.propertyType}
             />

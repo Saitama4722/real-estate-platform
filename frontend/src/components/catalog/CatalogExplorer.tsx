@@ -263,6 +263,7 @@ export function CatalogExplorer({
       href={item.href}
       favoriteId={item.slug}
       isPriceReduced={item.isPriceReduced}
+      isNew={item.isNew}
       compareId={item.slug}
       compareType={item.propertyType}
     />

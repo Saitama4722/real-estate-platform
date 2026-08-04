@@ -48,6 +48,8 @@ export async function SimilarProperties({ current }: SimilarPropertiesProps) {
             slug={property.slug}
             image={property.image}
             price={property.price}
+            oldPrice={property.oldPrice}
+            marketLabel={property.marketLabel}
             title={property.title}
             characteristics={property.characteristics}
             rooms={property.rooms}
@@ -58,6 +60,7 @@ export async function SimilarProperties({ current }: SimilarPropertiesProps) {
             href={property.href}
             favoriteId={property.slug}
             isPriceReduced={property.isPriceReduced}
+            isNew={property.isNew}
             compareId={property.slug}
             compareType={property.propertyType}
           />
