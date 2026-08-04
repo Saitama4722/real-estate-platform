@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonSize } from "@/components/ui/button";
+import { Icons, type IconName } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { PublicLeadInquiryForm } from "@/components/inquiry/PublicLeadInquiryForm";
 
@@ -10,6 +11,28 @@ interface RealtorContactModalProps {
   crmId: string;
   /** Отображаемое имя риэлтора для текста в модалке. */
   displayName: string;
+  /**
+   * Размер кнопки. По умолчанию `md` — как было до редизайна страницы.
+   *
+   * ⚠ Именно проп, а не className: `cn()` — обычная склейка, а не
+   * tailwind-merge, поэтому `className="h-14"` не заменил бы `h-10`, обе
+   * остались бы в списке классов и победил бы порядок в стилях. См. подробный
+   * разбор в `ui/button-classes.ts`.
+   */
+  size?: ButtonSize;
+  /**
+   * Иконка перед подписью (в дизайне страницы — трубка).
+   *
+   * ⚠ ИМЯ иконки, а не сам компонент. Страница — серверный компонент, а Lucide
+   * иконка это функция; передать её пропом через границу RSC нельзя —
+   * «Functions cannot be passed directly to Client Components». Строка
+   * сериализуется, а сам глиф резолвится здесь, уже на клиенте.
+   */
+  iconName?: IconName;
+  /** Растянуть кнопку на всю ширину контейнера. */
+  fullWidth?: boolean;
+  /** Дополнительные классы кнопки (НЕ для размеров — см. `size`). */
+  className?: string;
 }
 
 /**
@@ -18,7 +41,14 @@ interface RealtorContactModalProps {
  * форс-ремаунтит `PublicLeadInquiryForm` при каждом открытии, чтобы форма
  * сбрасывалась (поля очищаются, капча перезагружается).
  */
-export function RealtorContactModal({ crmId, displayName }: RealtorContactModalProps) {
+export function RealtorContactModal({
+  crmId,
+  displayName,
+  size = "md",
+  iconName,
+  fullWidth = false,
+  className = "w-full sm:w-auto",
+}: RealtorContactModalProps) {
   const [requestOpen, setRequestOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
 
@@ -26,7 +56,10 @@ export function RealtorContactModal({ crmId, displayName }: RealtorContactModalP
     <>
       <Button
         type="button"
-        className="w-full sm:w-auto"
+        size={size}
+        icon={iconName ? Icons[iconName] : undefined}
+        fullWidth={fullWidth}
+        className={className}
         onClick={() => {
           setFormKey((k) => k + 1);
           setRequestOpen(true);
