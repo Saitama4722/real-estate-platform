@@ -757,6 +757,86 @@ itself now — **there is no manual `-p 3001` / `.env.local` step any more.**
   long option list (e.g. future ЖК/complex selectors), rather than reaching for a
   new select-search library each time.
 
+## Catalog page (redesigned 2026-08-04): URL is the single source of truth
+
+- **/catalog was rebuilt to the design reference** (`docs/design/Centreal
+  Каталог (standalone).html` — a Claude Design export whose real markup lives
+  JSON-escaped inside the bundler wrapper; extract it before reading). Every
+  filter, the sort, the list/map view and the page number live in the QUERY
+  STRING; there is no client-held filter state. The server page
+  (`catalog/page.tsx` → `CatalogPageTemplate`) parses, sorts and slices, so a
+  filtered/sorted/paginated URL is fully server-rendered; the client
+  (`CatalogExplorer`) only turns interactions into `router.push` inside
+  `startTransition` (its `isPending` drives the real skeletons).
+- **The state model lives in ONE module — `lib/catalogFilters.ts`** (parse /
+  serialize / chips / widen actions / sort-ordering map). If a param is added,
+  add it THERE, never ad-hoc in a component — the panel, chips, pagination
+  links and widen buttons all derive from it.
+- **Sorting nuance:** `sort=new|price_asc|price_desc` are also passed to the
+  API as `?ordering=`; **«По площади» (`area_desc`) has NO API ordering field**
+  (area lives in 4 per-type detail tables) and is sorted server-side in the
+  template over the full result set. Fine while the API returns everything
+  unpaginated `[measured]` (bare array, no `DEFAULT_PAGINATION_CLASS`); needs
+  a backend ordering field once the dataset grows.
+- **Deliberate deviations from the mockup** (approved, do not "fix" back):
+  no Продажа/Аренда segment (`DealType` has only `sale` — reintroduce only
+  when rent lands in the API); submit button is a static «Показать
+  объявления» (a live count would refetch the whole unpaginated set per edit;
+  a `?count_only` endpoint is the future improvement); area filters in «Ещё
+  фильтры» are REAL per-type inputs, only Этаж/Срок сдачи are «Скоро» (no
+  API params); no old-price strikethrough and no Новостройка/Вторичка card
+  badge — the public list serializer exposes neither `old_price` nor
+  `market_type` (both are one-field serializer additions if ever wanted).
+- **«Цена снижена» is ON THE PHOTO, top-left (REVERSED 2026-08-04).** An
+  earlier decision kept it beside the price to avoid the compare button in
+  that corner; the user reversed it to mockup-exact: badge top-left on the
+  photo (h-6, px-2.5, rounded-md, `bg-accent`, white 11px/600), and BOTH
+  action buttons (heart, then compare — the mockup's order) grouped in ONE
+  top-right flex row at 44px. This also reverses the old "opposite corners"
+  card decision recorded under the Compare feature below. Verified
+  `[measured]`: badge at 12/12px offsets with exact mockup metrics, both
+  controls 44×44 top-right, on a staged price-dropped fixture.
+- **Page size is 9** (`CATALOG_PAGE_SIZE` in `lib/catalogFilters.ts`) — the
+  mockup's 3×3 grid; was 12, corrected by the user.
+- **⚠ History entries must exist BEFORE the transition.** `router.push`
+  inside `startTransition` defers its `history.pushState` until the
+  transition COMMITS — on a slow dev-server render that leaves a seconds-long
+  window with NO entry for the target URL, and a Back press in that window
+  pops PAST the catalog and leaves the site `[measured]` (repro: back
+  pressed 80ms after a pagination click landed on about:blank). Fix pattern
+  in `CatalogExplorer.navigate()`: `window.history.pushState(null, "", href)`
+  synchronously (Next 15 syncs its router with native pushState), then
+  `router.replace(href)` inside the transition onto that same entry. A test
+  that awaits full settlement before pressing Back can NEVER catch this —
+  always include a mid-transition Back variant.
+- **ISR staleness is expected, not a bug:** the public list fetch uses
+  `next: { revalidate: 60 }`, so a newly published property can take up to a
+  minute (plus one stale-while-revalidate hit) to appear on a
+  previously-visited catalog URL. Warm URLs twice in tests before asserting
+  counts.
+- **SEO landings prefill the panel:** `[city]/[catalogSegment]/page.tsx`
+  passes `landingImpliedSearchRecord(city, resolved)` as
+  `catalogSearchParams`, so chips/panel reflect the route's filters and any
+  interaction continues on /catalog with that state carried over (ЖК landings
+  map to city-only — the panel has no ЖК filter). Landing rendering mode is
+  unchanged (`ƒ` dynamic, no `searchParams` read) `[measured]` in the build
+  route table.
+- **Accessible dropdowns:** `CatalogSelect` (APG select-only combobox — focus
+  stays on the trigger, `aria-activedescendant`, typeahead) and
+  `CatalogDistrictCombobox` (editable, two-table Микрорайоны/Районы groups,
+  disabled until a city is chosen). Old `CatalogResultsSection`/
+  `CatalogControls` were deleted. Verified `[measured]`: 84/84 Playwright
+  checks (states, full keyboard run, sheet focus trap, 360→1600 sweep,
+  reduced motion, AA contrast), 0 console errors.
+- **Playwright gotchas that produced FALSE bug reports here** (all
+  `[measured]`): a screenshot's default caret-hiding injects
+  `caret-color:transparent` and, racing hydration after `reload()`, fakes a
+  React hydration-mismatch console error — pass `caret="initial"`; the CDP
+  keyboard emits NO `keydown` for non-layout (Cyrillic) chars, so `type("г")`
+  can't exercise typeahead — dispatch a real `KeyboardEvent`; content after
+  `go_back()` swaps asynchronously — poll for the expected count, never read
+  it synchronously.
+
 ## Which location picker to use: `LocationAutocomplete` vs `DistrictCombobox`
 
 There are TWO searchable location pickers in the codebase. They are NOT
@@ -1143,10 +1223,10 @@ Index of what changed this session; details live in the linked sections above.
   which blocks scraping) — needs manual data from the user.
 - `TZ_Объекты.docx` describes a 16-step property form spec — reviewed but not yet
   implemented.
-- **a11y gap in `DistrictCombobox`** (`SearchBar.tsx`, the `role="combobox"` input
-  ~line 233): missing `aria-controls`/`aria-expanded` — flagged by ESLint
-  (`jsx-a11y/role-has-required-aria-props`) but left out of scope by the tasks that
-  touched this file. Worth a small dedicated a11y pass.
+- ~~a11y gap in `DistrictCombobox`~~ **FIXED (catalog redesign session,
+  2026-08-04):** the note itself was half-stale — `aria-expanded` was already
+  present; the actual gap was only `aria-controls` + a listbox `id`, both added.
+  The lint rule no longer fires on this file `[measured]` (eslint run clean).
 
 ## Price History Feature (PriceHistory model, badge, chart) — reference summary
 
@@ -1208,9 +1288,11 @@ Index of what changed this session; details live in the linked sections above.
   - **Conflict UX = BLOCK the add with a transient inline message (2.5s)**, never
     silently replace the existing selection — this was an **explicit product
     decision; don't change it to auto-replace** without checking first.
-  - **Card icon placement:** compare toggle sits **top-LEFT** of the card image,
-    favorite heart sits **top-RIGHT** — deliberately opposite corners to avoid
-    clutter, not grouped together.
+  - **Card icon placement — REVERSED 2026-08-04:** heart and compare now sit
+    **grouped in ONE top-right row** (heart first, compare second), matching
+    the catalog mockup; the top-left corner belongs to the «Цена снижена»
+    photo badge. The old "deliberately opposite corners" layout is obsolete —
+    see the catalog-page section above.
   - **Comparison table (`CompareView.tsx`):** properties as columns, attributes as
     rows, reusing the **same field set already shown on the property detail page**
     (price + price-drop badge, price per m², rooms, area, floor, district,
@@ -1318,11 +1400,12 @@ Index of what changed this session; details live in the linked sections above.
 - **Property #18** (`PID000001`, «1-комн. квартира, 45.00 м², Краснодар», created by
   realtor `vl@vl.ru`) is currently the **single real, production-meaningful**
   property in the database.
-- **Its correct state, re-read from the DB on 2026-08-03 `[measured]`:** price
+- **Its correct state, re-read from the DB on 2026-08-04 `[measured]`:** price
   **5 000 000 ₽**, **THREE** `PriceHistory` rows (**1 100 000 @ 2026-06-29** →
   **4 500 000 @ 2026-07-04 01:44** → **5 000 000 @ 2026-07-04 01:56**), **3 real
-  photos**, a real description (1464 chars), **1 lead + 11 phone-reveals**
-  attached, `is_published=True`.
+  photos** (all 12 derivative files on disk), a real description, **17
+  phone-reveals** attached (the 17th is an organic YaBrowser click confirmed by
+  the user as the new baseline), `is_published=True`.
   - **This entry used to say 4 500 000 and TWO rows.** That was not wrong when
     written — it was written *twelve minutes* before the user bumped the price
     again in the same CRM session, and then went stale. Which is the whole point
@@ -1538,6 +1621,25 @@ Index of what changed this session; details live in the linked sections above.
   perfectly. Lesson: **check `NODE_ENV` and the startup warnings before assuming
   `.next` corruption.**
 
+## Test-data protocol that worked (catalog sessions, 2026-08-04) — reuse it
+
+1. **Record exact row counts BEFORE seeding** (Property, PropertyPhoto,
+   PriceHistory, PhoneRevealLog) plus #18's field values, to a JSON file.
+2. **Mark every disposable row** with a `PIDTEST-` `crm_property_id` prefix,
+   `created_by=None`, zero photos. Set `crm_property_id` explicitly so the
+   real PID sequence is not consumed.
+3. **Hard-delete inside a transaction with PER-ROW re-asserts** immediately
+   before each `.delete()`: marker prefix AND `created_by IS NULL` AND zero
+   photos AND `pk != 18` — a shifted id can never take out a real row.
+4. **Re-verify the counts match the recorded baseline exactly** and report
+   before/after numbers.
+5. **Before deleting any unexpected extra row, check its `user_agent`/
+   timestamp** — an organic user action is DATA, not residue. Real case
+   `[measured]`: a PhoneRevealLog row appeared mid-session with a YaBrowser
+   UA (the user's real browser; automation here is HeadlessChrome) — it was
+   the user clicking «Показать телефон» while browsing, kept as the new
+   baseline (17), not deleted.
+
 ## Test-data cleanup: how test properties were identified
 
 - When cleaning up leftover **test/fake properties** from a prior testing session
@@ -1593,6 +1695,146 @@ Index of what changed this session; details live in the linked sections above.
 - The audit used **disposable test properties** (created + explicitly hard-deleted,
   no rollback reliance) — consistent with the safe-testing pattern documented
   above.
+
+## Session findings — realtor profile redesign (2026-08-04)
+
+Seven lessons from the /realtors/[crmId] redesign sessions, each of which cost
+real time. Reference implementation for most of them:
+`frontend/src/components/realtor/` + `app/realtors/[crmId]/page.tsx`.
+
+### 1. Count-up / rAF deadlock: a `startedRef` guard + rAF cleanup = permanent freeze
+
+- **The trap `[measured]`:** an animation effect that (a) sets a "started" ref at
+  the START of the animation, (b) calls `cancelAnimationFrame` in the effect
+  cleanup, and (c) has no completion guarantee, freezes forever the moment
+  anything interrupts the rAF chain: cleanup kills the frame, the re-run setup
+  returns early on the ref, nothing can restart it. Reproduced on the realtor
+  stats strip: one cancelled frame ~120ms in left the tiles at **0,1,2,1**
+  permanently; scrolling away and back did not recover them.
+- **What interrupts the chain in practice:** Fast Refresh (re-runs effects while
+  **preserving refs** — so the guard survives while the animation dies; this is
+  why the bug showed in the user's live browser but not in a fresh headless
+  load), StrictMode remounts, backgrounded tabs (rAF pauses, timers don't), and
+  dropped frames.
+- **The symptom signature:** SSR/no-JS output is CORRECT while the live browser
+  shows the animation's start value (0) forever — i.e. the "enhancement"
+  actively destroys working server output. If a no-JS test passes and the
+  browser shows 0, look for exactly this deadlock.
+- **RULE:** the real value is what React renders (`{value}` in JSX); the
+  animation is a temporary imperative overwrite of it, never the source of
+  truth. Three guarantees, all three: (1) effect cleanup writes the FINAL value
+  back, so no teardown leaves a partial state painted; (2) a `setTimeout`
+  failsafe (2500ms — same budget as RevealController's) snaps to the final
+  value, covering backgrounded tabs where rAF never fires; (3) any "done" flag
+  is set only once the true value is actually on screen — never at animation
+  start. Reference: `RealtorCountUp.tsx` `[measured]` — interrupted run now
+  recovers to the real values.
+
+### 2. Never attribute property-scoped analytics to actions outside the property page
+
+- **What happened `[measured]`:** the realtor page's «Показать телефон» was
+  wired to `POST /api/properties/<id>/reveal_phone/` (the only reveal endpoint
+  that exists) "to reuse counting and throttling". That endpoint's unit of
+  accounting is a PROPERTY: it writes `PhoneRevealLog` and increments that
+  property's `phone_views_count`. Clicks on the realtor page were therefore
+  logged against property #18, which was never viewed — 5 test clicks had to be
+  hand-deleted and the counter restored to its recorded baseline (15/15).
+- **RULE:** an endpoint's accounting scope must match the page's action. If a
+  page needs a similar interaction and no correctly-scoped endpoint exists,
+  use **local state** (the realtor reveal is now a pure `useState` flip with no
+  network call — `RealtorPhoneReveal.tsx`) or build a new endpoint — never
+  borrow another entity's. Extra tell that borrowing was wrong here: the number
+  is returned in cleartext by the realtor API and rendered elsewhere on the same
+  page, so the "reveal" was measuring nothing.
+
+### 3. Lucide icon components cannot cross the RSC boundary
+
+- Passing a Lucide icon (or any component/function) as a prop from a Server
+  Component to a `"use client"` component throws `Functions cannot be passed
+  directly to Client Components` `[observed]` — it 500s the whole page in dev.
+- **RULE:** pass the icon **name** (`iconName: IconName`) and resolve it inside
+  the client component via the `Icons` registry (`Icons[iconName]`). Reference:
+  `RealtorContactModal.tsx`. The registry type also keeps the name greppable
+  and typo-safe.
+
+### 4. IntersectionObserver is the wrong reveal/trigger mechanism in this repo
+
+- IO fires only when an intersection RATIO CROSSES A THRESHOLD. A viewport jump
+  — in-page anchor, browser-restored scroll position, fast flick — can move an
+  element from below the viewport to above it without ever crossing one, so IO
+  never fires and the element stays in its pre-reveal state permanently
+  `[observed]` (this bit the homepage reveal first; RevealController's header
+  comment documents the original measurement).
+- **RULE:** for anything scroll-gated (reveals, count-ups, lazy sections), use
+  the RevealController pattern: a position sweep («is its top above the viewport
+  bottom») shared with the rAF-throttled scroll handler, plus the 2500ms
+  failsafe so nothing stays wrong/hidden longer than that. Do not add new
+  IntersectionObserver-based triggers.
+
+### 5. Responsiveness sweeps: every 40px from 360 to 1600, not just at breakpoints
+
+- **Two real, sitewide bugs sat BETWEEN the breakpoints** and survived every
+  earlier audit (which tested 390/768/1024/1440):
+  - header overflow at **1024–1046px** `[measured]`: the desktop nav switches on
+    at `lg` (1024) but the row's intrinsic width was 1047px, so `scrollWidth`
+    was 1047 at a 1024 viewport on every page. Fixed by a scoped 1024–1099px
+    fit band in globals.css (unlayered, next to the compact-header rules)
+    compressing discretionary gaps only.
+  - a 375px floor at **360px** `[measured]`: the logged-out «Вход в личный
+    кабинет» ButtonLink is `whitespace-nowrap` and held the header at 375px
+    intrinsic width, overflowing every page at a 360px viewport. Fixed by
+    collapsing the label to «Вход» below 400px
+    (`header-account-controls.tsx`).
+- **RULE:** the pass criterion stays `document.documentElement.scrollWidth ===
+  viewport width` (exact, mechanical), but the sweep must walk **360→1600 in
+  40px steps** on at least: the page under work, /catalog, /articles, and the
+  homepage. A breakpoint-only check proves nothing about the ranges between
+  them. (Verified after both fixes: 4 pages × 32 widths, 128/128 pass
+  `[measured]`.)
+
+### 6. pCloud: `next build` cannot run in place on P:\ — mirror to local disk
+
+- **In-place `npm run build` dies on a DIFFERENT phantom file each run**
+  `[measured]`: `EPERM open .next\cache\.rscinfo`, then `EISDIR readlink
+  robots.ts`, `sitemap.ts`, `favicon.ico` across consecutive runs — all
+  ordinary files (`os.path.isfile` → True). **A different file each time is the
+  tell that it is environmental**, not code — do not start debugging the build
+  config.
+- **Workaround that gives a definitive signal (~1 min):** copy `src` +
+  `package.json` + `package-lock.json` + `next.config.ts` + `tsconfig.json` +
+  `postcss.config.mjs` + `.env.local` + `.npmrc` to a local-disk scratch dir,
+  `npm ci --include=dev`, `npm run build` there. Delete the copy afterwards.
+  `.npmrc` matters — it carries `legacy-peer-deps=true`, without which
+  `npm ci` fails on the react-leaflet-cluster peer conflict `[measured]`.
+- **`NODE_ENV=production` silently makes `npm ci` skip devDependencies**
+  `[measured]`: it reported a cheerful "added 35 packages" and produced a
+  node_modules with no `tailwindcss`/`typescript`; the only tell is the
+  implausibly small package count. Session shells here can carry
+  `NODE_ENV=production` (see the ⭐ NODE_ENV section above) — use
+  `NODE_ENV=development npm ci --include=dev` for any install.
+- **…but UNSET `NODE_ENV` again before `npm run build`** `[measured]` — the
+  variable's correct value differs per step, and both mistakes really happened:
+  `production` breaks the install (above), while `development` breaks the
+  BUILD: `next build` warns "non-standard NODE_ENV", links the dev
+  `app-page.runtime.dev.js` runtime, and prerender then dies with
+  `TypeError: Cannot read properties of undefined (reading 'env')` on
+  arbitrary pages (/crm/leads, /account/properties/new) that have nothing
+  wrong with them. Same mirror, same source, `Remove-Item Env:NODE_ENV` →
+  clean 33/33-page build. Recipe: `NODE_ENV=development` for `npm ci`, unset
+  for `npm run build`.
+
+### 7. State the provenance of every build signal
+
+- During this work, "npm run build passes" was reported while the green build
+  actually came from a **mirrored copy carrying a local-only patch** (removing
+  a pre-existing lint error the repo still had). That is a Rule-Zero violation
+  in spirit: the claim implied the repo passed when it did not.
+- **RULE:** a build/test result must name WHERE it ran and WHAT was patched:
+  "in-repo", or "mirrored copy, unpatched source", or "mirrored copy plus the
+  exact local patch, named". If the signal required any local-only change, the
+  repo does NOT pass — say so explicitly. (The underlying lint error — an unused `cn`
+  import in `header-account-controls.tsx` — has since been fixed in the repo,
+  and the mirror now builds unpatched source clean `[measured]`.)
 
 ## Tech Stack Reminder
 
