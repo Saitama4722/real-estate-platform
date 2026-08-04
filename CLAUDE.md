@@ -917,6 +917,60 @@ itself now — **there is no manual `-p 3001` / `.env.local` step any more.**
   `go_back()` swaps asynchronously — poll for the expected count, never read
   it synchronously.
 
+## Realtor profiles are a TEMPLATE: default bio, publish gate, link gating
+
+- **`is_public` («Показывать на сайте») is now ENFORCED** in
+  `PublicRealtorDetailView` (2026-08-05). It was editable in three interfaces
+  (CRM panel, `/api/auth/me/`, Django admin) and checked by **none** — every
+  active realtor was public regardless, so the checkbox actively misled.
+  `/api/realtors/<crm_id>/` now 404s unless a profile exists with
+  `is_public=True`. Verified `[measured]`: draft → 404, publish → 200,
+  unpublish → 404 again. At the time of the change **0 of 1 realtors** would
+  have been affected (RID000003 was already public), and **0 realtors lacked a
+  profile row**.
+- **Every new realtor gets a profile row with `DEFAULT_REALTOR_BIO`**, via a
+  `post_save` signal on `User` (`users/signals.py`, wired in
+  `UsersConfig.ready()`). A signal, NOT a CRM-serializer hook: realtors are
+  created through the CRM panel, Django admin AND the shell, and only a signal
+  covers all three — proved for each path `[measured]`. `is_public` keeps its
+  `False` default, so a new realtor is a DRAFT until the superadmin tailors
+  the bio and publishes.
+- **⚠ The CRM create form posts an EMPTY `short_bio`, which would wipe that
+  default.** `RealtorCrmWriteSerializer.create()` therefore drops an empty
+  `short_bio` so the template survives; on UPDATE an empty value is respected
+  (clearing the bio there is deliberate). Both directions verified.
+- **The bio is STORED, not a render-time fallback** — the superadmin has to
+  SEE the text in the CRM to edit it before publishing, which only works if it
+  is really in the field. It is four paragraphs on purpose: `splitBio` maps
+  them to lead / intro / blocks / closing, and the closing paragraph is what
+  the CTA band renders. It says «Напишите», not «Напишите или позвоните»,
+  because a realtor may have no phone.
+- **Anything linking to `/realtors/<crmId>` MUST gate on `is_public`**, or it
+  links into a 404. `RealtorShortSerializer` exposes the flag, and
+  `publicProperty.ts` only sets `realtorCrmId` when it is `true` — so the id's
+  absence IS the link's absence, and no call site needs its own rule. The one
+  public link surface today is `PropertyContactBlock` («Страница риэлтора»);
+  verified absent for an unpublished realtor and present for a published one
+  `[measured]`. **`realtor_profile_is_public()` in `users/models.py` is the
+  single definition — reuse it rather than re-deriving the rule.**
+  - N+1 note: that flag reads a reverse OneToOne, so the public list, the
+    public detail and the CRM list querysets all `select_related` the
+    profile (`assigned_realtor__realtor_profile`, `created_by__realtor_profile`).
+- **Degradation, all verified on a realtor with default bio + no photo + no
+  phone + zero listings `[measured]`:** the hero and CTA band fall back from
+  the phone CTA to «Связаться» (the page always keeps a primary action — a
+  phoneless realtor previously had none); the photo-less portrait uses the
+  navy band gradient with white initials instead of washed-out white/70 on
+  light grey; the CTA fallback copy uses the PREPOSITIONAL city names
+  («в Краснодаре и Геленджике» — the nominative form was a live grammar bug).
+- **⚠ Unpublishing does not take effect instantly on the PAGE.**
+  `fetchPublicRealtorByCrmId` caches with `revalidate: 120`, so an
+  already-rendered profile can serve a stale 200 after the flag flips — and in
+  dev it persisted across repeated requests `[measured]`. The API is correct
+  immediately; only the cached page lags. A crm_id never fetched before 404s
+  at once. Do not diagnose this as broken enforcement — test with a fresh
+  crm_id, or wait out the window.
+
 ## Which location picker to use: `LocationAutocomplete` vs `DistrictCombobox`
 
 There are TWO searchable location pickers in the codebase. They are NOT
