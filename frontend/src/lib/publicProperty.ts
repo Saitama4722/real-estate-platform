@@ -1,5 +1,6 @@
 import type { CatalogCitySlug, CatalogPropertyItem } from "@/components/catalog/types";
 import { formatPropertyPrice } from "@/lib/propertySeo";
+import { formatOldPrice, marketLabelFor } from "@/lib/propertyBadges";
 
 /** Narrow an arbitrary city slug to the two known landing-city slugs. */
 function asCitySlug(slug: string | undefined): CatalogCitySlug | undefined {
@@ -53,6 +54,12 @@ export interface PublicPropertyDetail {
   price_history?: { price: string; changed_at: string }[];
   /** True when current price is below the peak recorded price (see serializer). */
   is_price_reduced?: boolean;
+  /** Published within the last 7 days (server-derived). */
+  is_new?: boolean;
+  /** Previous price; struck through on the card only when above the current one. */
+  old_price?: string | null;
+  /** "new_building" | "secondary" | "other" | null — card photo badge. */
+  market_type?: string | null;
   assigned_realtor: {
     id: number;
     crm_id: string;
@@ -200,5 +207,12 @@ export function mapPublicDetailToCatalogItem(
           .filter((h) => Number.isFinite(h.price))
       : undefined,
     isPriceReduced: p.is_price_reduced === true,
+    isNew: p.is_new === true,
+    // Same derivations as the list mapper (shared module), so a card looks
+    // identical whether it was hydrated from the list or the detail endpoint.
+    oldPrice: formatOldPrice(p.old_price, p.price, (v) =>
+      formatPropertyPrice({ ...p, price: v }),
+    ),
+    marketLabel: marketLabelFor(p.market_type),
   };
 }

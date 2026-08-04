@@ -46,6 +46,8 @@ export interface CatalogPropertyItem {
   oldPrice?: string;
   /** «Новостройка» / «Вторичка». Absent for market_type "other" or empty. */
   marketLabel?: string;
+  /** Published within the last 7 days (server-derived, see is_new_listing). */
+  isNew?: boolean;
   /** Публичный CRM ID риэлтора (RID######) для ссылки на страницу /realtors/... */
   realtorCrmId?: string;
   details?: {

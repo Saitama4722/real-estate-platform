@@ -1,5 +1,6 @@
 import type { CatalogCitySlug, CatalogPropertyItem } from "@/components/catalog/types";
 import { getPublicApiBaseUrl } from "@/lib/publicProperty";
+import { formatOldPrice, marketLabelFor } from "@/lib/propertyBadges";
 
 const CURRENCY_LABEL: Record<string, string> = {
   rub: "₽",
@@ -45,6 +46,7 @@ export interface PublicPropertyListItemRaw {
   } | null;
   preview_image: string | null;
   is_price_reduced?: boolean;
+  is_new?: boolean;
 }
 
 function formatListPrice(price: string, currency: string): string {
@@ -52,29 +54,6 @@ function formatListPrice(price: string, currency: string): string {
   const n = Number(price);
   if (Number.isNaN(n)) return `${price} ${sym}`;
   return `${new Intl.NumberFormat("ru-RU").format(n)} ${sym}`;
-}
-
-/** «Новостройка» / «Вторичка». "other" and empty deliberately render nothing. */
-const MARKET_LABEL: Record<string, string> = {
-  new_building: "Новостройка",
-  secondary: "Вторичка",
-};
-
-/**
- * Formatted previous price, or undefined when there is nothing to strike:
- * missing, unparseable, or NOT strictly above the current price (an equal or
- * lower "old" price is not a markdown — striking it would misinform).
- */
-function formatOldPrice(
-  oldPrice: string | null,
-  price: string,
-  currency: string,
-): string | undefined {
-  if (!oldPrice) return undefined;
-  const o = Number(oldPrice);
-  const p = Number(price);
-  if (!Number.isFinite(o) || !Number.isFinite(p) || o <= p) return undefined;
-  return formatListPrice(oldPrice, currency);
 }
 
 function asCitySlug(slug: string | undefined): CatalogCitySlug | undefined {
@@ -152,8 +131,11 @@ export function mapPublicListItemToCatalogItem(row: PublicPropertyListItemRaw): 
       undefined,
     district: row.district?.name,
     isPriceReduced: row.is_price_reduced === true,
-    oldPrice: formatOldPrice(row.old_price, row.price, row.currency),
-    marketLabel: row.market_type ? MARKET_LABEL[row.market_type] : undefined,
+    isNew: row.is_new === true,
+    oldPrice: formatOldPrice(row.old_price, row.price, (v) =>
+      formatListPrice(v, row.currency),
+    ),
+    marketLabel: marketLabelFor(row.market_type),
   };
 }
 
