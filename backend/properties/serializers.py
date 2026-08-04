@@ -148,7 +148,19 @@ class PropertyListSerializer(serializers.ModelSerializer):
             "slug",
             "property_type",
             "deal_type",
+            # Рынок (Новостройка/Вторичка) — already a PUBLIC FILTER param on
+            # this endpoint (?market_type=…), so returning it exposes nothing
+            # that was not already publicly derivable; the card needs it for
+            # the photo badge.
+            "market_type",
             "price",
+            # Старая цена — a display concept («Старая цена»), not an internal
+            # figure. The detail endpoint already publishes the FULL
+            # price_history, so a single previous price reveals strictly less
+            # than what is public there. (The genuinely CRM-only fields —
+            # `owner`, `real_latitude`, `real_longitude` — carry explicit
+            # "never expose" markers in models.py and stay out.)
+            "old_price",
             "currency",
             "city",
             "district",
