@@ -30,6 +30,12 @@ interface PropertyCardProps {
   /** Show the «Цена снижена» badge next to the price (server-computed). */
   isPriceReduced?: boolean;
   /**
+   * Published within the last 7 days (server-derived `is_new`). Shows the
+   * «Новый объект» badge — but only when `isPriceReduced` is false; see the
+   * single-badge-slot rule at the render site.
+   */
+  isNew?: boolean;
+  /**
    * Optional pre-formatted «12 300 ₽/м²», right-aligned in the price row.
    * Additive (catalog cards pass it); existing call sites are unaffected.
    */
@@ -113,6 +119,7 @@ function PropertyCardComponent({
   href,
   favoriteId,
   isPriceReduced,
+  isNew,
   pricePerM2,
   oldPrice,
   marketLabel,
@@ -187,10 +194,33 @@ function PropertyCardComponent({
             opposite-corners layout (product decision, 2026-08-04): both
             action buttons now group top-RIGHT (heart, then compare — the
             mockup's order), freeing the top-left corner for the badge. */}
-        {isPriceReduced && (
+        {/*
+          * ONE badge slot, and «Цена снижена» wins it.
+          *
+          * The kit's `.ctr-card__badges` is a flex row that could hold both,
+          * but the other three corners are spoken for (top-right = heart +
+          * compare, bottom-left = market), so a second badge here would be a
+          * fourth overlay on one photo. Price-drop takes precedence because
+          * it is the stronger buying signal and the only one not conveyed
+          * elsewhere — recency is already carried by the default «Сначала
+          * новые» sort and the card's position in the list. The overlap is
+          * also rare and self-contradictory: a listing published under 7 days
+          * ago whose price has ALREADY fallen below its peak.
+          *
+          * Geometry is the catalog mockup's badge box; only the fill differs,
+          * which is exactly how the kit separates its two variants
+          * (`.ctr-badge--accent` vs `--primary` share every box metric).
+          */}
+        {isPriceReduced ? (
           <span className="absolute left-3 top-3 z-20 flex h-6 items-center rounded-md bg-accent px-2.5 text-[11px] font-semibold tracking-wide text-white">
             Цена снижена
           </span>
+        ) : (
+          isNew && (
+            <span className="absolute left-3 top-3 z-20 flex h-6 items-center rounded-md bg-brand px-2.5 text-[11px] font-semibold tracking-wide text-white">
+              Новый объект
+            </span>
+          )
         )}
         {/* Market badge, photo bottom-left (mockup): navy at 70% so it reads
             over any photo, 11px/500 white. Rendered only for the two real
