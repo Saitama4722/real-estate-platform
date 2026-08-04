@@ -11,12 +11,15 @@ import { CatalogPriceFields } from "@/components/catalog/CatalogPriceFields";
 import { CatalogAreaFields } from "@/components/catalog/CatalogAreaFields";
 import { CatalogChipsRow } from "@/components/catalog/CatalogChipsRow";
 import {
+  FLOOR_PRESET_OPTIONS,
   MARKET_OPTIONS,
   PROPERTY_TYPE_OPTIONS,
   ROOMS_OPTIONS,
   countSecondaryFilters,
+  floorFilterApplies,
   type CatalogChip,
   type CatalogFilterState,
+  type CatalogFloorPreset,
   type CatalogUiState,
 } from "@/lib/catalogFilters";
 import { cn } from "@/lib/utils";
@@ -313,20 +316,35 @@ export function CatalogFilterPanel({
             </>
           )}
 
-          {/* Honestly disabled: the public API has no floor or completion-date
-              filter yet, so these are visibly «Скоро», not dead controls. */}
+          {/* Этаж — apartments ONLY, and hidden (not disabled) otherwise, so
+              the panel never shows a control that cannot affect the results.
+              Never under «Все типы»: a floor filter there would silently turn
+              an all-types search into an apartments-only one. */}
+          {floorFilterApplies(f) && (
+            <CatalogSelect
+              label="Этаж"
+              options={FLOOR_PRESET_OPTIONS.map((o) => ({
+                value: o.value,
+                label: o.label,
+              }))}
+              value={f.floorPreset}
+              onChange={(v) => onPatch({ floorPreset: v as CatalogFloorPreset })}
+              className="w-[248px]"
+            />
+          )}
+
+          {/* Срок сдачи has no backing field anywhere (not on Property, not on
+              ApartmentDetails, not on ResidentialComplex) and is DEFERRED by
+              product decision — so it stays an honest «Скоро» placeholder
+              rather than a dead control. The label is scoped to this one
+              control now that Этаж is real. */}
           <div className="flex flex-col gap-1.5 pb-0.5">
             <span className="text-[11px] font-medium uppercase tracking-[0.04em] text-gray-400">
               Скоро
             </span>
-            <div className="flex flex-wrap gap-2">
-              <span className="flex h-9 items-center rounded-lg border border-dashed border-border-strong px-3.5 text-[13px] text-gray-400">
-                Этаж
-              </span>
-              <span className="flex h-9 items-center rounded-lg border border-dashed border-border-strong px-3.5 text-[13px] text-gray-400">
-                Срок сдачи
-              </span>
-            </div>
+            <span className="flex h-9 items-center rounded-lg border border-dashed border-border-strong px-3.5 text-[13px] text-gray-400">
+              Срок сдачи
+            </span>
           </div>
         </div>
       )}

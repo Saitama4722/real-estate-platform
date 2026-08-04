@@ -36,6 +36,8 @@ function catalogOptionalDecimalString(
 
 const MARKET_TYPES = new Set(["new_building", "secondary", "other"]);
 
+const FLOOR_PRESETS = new Set(["not_first", "not_last", "not_first_not_last"]);
+
 const COMMERCIAL_TYPES = new Set([
   "office",
   "retail",
@@ -75,6 +77,10 @@ export function publicPropertiesParamsFromSearchParams(
 
   const marketType = catalogSearchParamFirst(sp, "market_type");
   if (marketType && MARKET_TYPES.has(marketType)) out.market_type = marketType;
+
+  // Этаж preset (apartments only — the panel never emits it otherwise).
+  const floorPreset = catalogSearchParamFirst(sp, "floor_preset");
+  if (floorPreset && FLOOR_PRESETS.has(floorPreset)) out.floor_preset = floorPreset;
 
   const priceMin = catalogOptionalDecimalString(sp, "price_min");
   if (priceMin !== undefined) out.price_min = priceMin;
@@ -127,6 +133,7 @@ const SEARCH_BAR_SYNC_KEYS = [
   "rooms",
   "rooms_min",
   "market_type",
+  "floor_preset",
   "price_min",
   "price_max",
   "house_area_min",

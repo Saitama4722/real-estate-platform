@@ -7,9 +7,11 @@ import { CatalogAreaFields } from "@/components/catalog/CatalogAreaFields";
 import type { CatalogSelectOption } from "@/components/catalog/CatalogSelect";
 import type { CatalogLocationOption } from "@/components/catalog/CatalogDistrictCombobox";
 import {
+  FLOOR_PRESET_OPTIONS,
   MARKET_OPTIONS,
   PROPERTY_TYPE_OPTIONS,
   ROOMS_OPTIONS,
+  floorFilterApplies,
   propertyTypeLabel,
   type CatalogFilterState,
   type CatalogUiState,
@@ -436,6 +438,24 @@ export function CatalogFilterSheet({
               </div>
             </>
           )}
+
+          {/* Этаж — same apartments-only rule as the desktop panel; hidden,
+              not disabled, when it cannot affect the results. */}
+          {floorFilterApplies(f) &&
+            accordionRow(
+              "floor",
+              "Этаж",
+              FLOOR_PRESET_OPTIONS.find((o) => o.value === f.floorPreset)?.label ??
+                "Любой",
+              <div>
+                {FLOOR_PRESET_OPTIONS.map((o) =>
+                  optionButton(f.floorPreset === o.value, o.label, () => {
+                    onPatch({ floorPreset: o.value });
+                    setOpenSection(null);
+                  }),
+                )}
+              </div>,
+            )}
 
           {f.propertyType === "house" && (
             <>

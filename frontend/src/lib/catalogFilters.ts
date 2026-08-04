@@ -27,6 +27,16 @@ export type CatalogPropertyTypeFilter =
 
 export type CatalogRoomsValue = "" | "0" | "1" | "2" | "3" | "4" | "4plus";
 
+/**
+ * Этаж — presets, not a numeric band: buyers state objections, not ranges.
+ * Apartments only (see the emission guard in catalogUiStateToQuery).
+ */
+export type CatalogFloorPreset =
+  | ""
+  | "not_first"
+  | "not_last"
+  | "not_first_not_last";
+
 export type CatalogSortValue = "new" | "price_asc" | "price_desc" | "area_desc";
 
 export type CatalogViewValue = "list" | "map";
@@ -47,6 +57,8 @@ export interface CatalogFilterState {
   rooms: CatalogRoomsValue;
   /** "" | "new_building" | "secondary" | "other" */
   marketType: string;
+  /** Этаж preset; only meaningful for apartments. */
+  floorPreset: CatalogFloorPreset;
   /** Raw digit strings (no spaces) — the PriceInput convention. */
   priceMin: string;
   priceMax: string;
@@ -99,6 +111,32 @@ export const MARKET_OPTIONS: { value: string; label: string }[] = [
   { value: "secondary", label: "Вторичка" },
 ];
 
+export const FLOOR_PRESET_OPTIONS: {
+  value: CatalogFloorPreset;
+  label: string;
+  /** Shorter form for the chip row. */
+  chipLabel: string;
+}[] = [
+  { value: "", label: "Любой", chipLabel: "" },
+  { value: "not_first", label: "Не первый", chipLabel: "Этаж: не первый" },
+  { value: "not_last", label: "Не последний", chipLabel: "Этаж: не последний" },
+  {
+    value: "not_first_not_last",
+    label: "Не первый и не последний",
+    chipLabel: "Этаж: не первый и не последний",
+  },
+];
+
+/**
+ * Этаж is shown ONLY for an explicit «Квартиры» selection — never under «Все
+ * типы», where a floor filter would silently turn an all-types search into an
+ * apartments-only one (houses and land can never match). The panel, the sheet
+ * and the URL serializer all gate on this one predicate.
+ */
+export function floorFilterApplies(f: CatalogFilterState): boolean {
+  return f.propertyType === "apartment";
+}
+
 export const SORT_OPTIONS: { value: CatalogSortValue; label: string }[] = [
   { value: "new", label: "Сначала новые" },
   { value: "price_asc", label: "Дешевле" },
@@ -142,6 +180,7 @@ const EMPTY_FILTERS: CatalogFilterState = {
   search: "",
   rooms: "",
   marketType: "",
+  floorPreset: "",
   priceMin: "",
   priceMax: "",
   houseAreaMin: "",
@@ -186,6 +225,13 @@ function coerceMarket(raw: string | undefined): string {
   return "";
 }
 
+function coerceFloorPreset(raw: string | undefined): CatalogFloorPreset {
+  if (raw === "not_first" || raw === "not_last" || raw === "not_first_not_last") {
+    return raw;
+  }
+  return "";
+}
+
 function coerceSort(raw: string | undefined): CatalogSortValue {
   if (raw === "price_asc" || raw === "price_desc" || raw === "area_desc") return raw;
   return "new";
@@ -217,6 +263,7 @@ export function parseCatalogUiState(sp: CatalogPageSearchRecord): CatalogUiState
       search: (first("search") ?? "").trim(),
       rooms: coerceRooms(first("rooms"), first("rooms_min")),
       marketType: coerceMarket(first("market_type")),
+      floorPreset: coerceFloorPreset(first("floor_preset")),
       priceMin: digitsOnly(first("price_min") ?? ""),
       priceMax: digitsOnly(first("price_max") ?? ""),
       houseAreaMin: (first("house_area_min") ?? "").trim(),
@@ -279,6 +326,14 @@ export function catalogUiStateToQuery(state: CatalogUiState): string {
     if (f.rooms === "4plus") q.set("rooms_min", "4");
     else if (f.rooms !== "") q.set("rooms", f.rooms);
     if (f.marketType) q.set("market_type", f.marketType);
+  }
+
+  // Apartments ONLY — never under «Все типы». Because the param is emitted
+  // from state rather than copied from the old URL, switching the type away
+  // from Квартиры drops it automatically on the next navigation: no orphaned
+  // floor_preset can linger and silently filter.
+  if (floorFilterApplies(f) && f.floorPreset) {
+    q.set("floor_preset", f.floorPreset);
   }
 
   if (f.propertyType === "house") {
@@ -452,6 +507,15 @@ export function buildCatalogChips(
       clear: { marketType: "" },
     });
   }
+  if (floorFilterApplies(f) && f.floorPreset) {
+    chips.push({
+      key: "floor_preset",
+      label:
+        FLOOR_PRESET_OPTIONS.find((o) => o.value === f.floorPreset)?.chipLabel ??
+        "Этаж",
+      clear: { floorPreset: "" },
+    });
+  }
   if (f.propertyType === "house") {
     chips.push(
       ...areaChip(
@@ -525,6 +589,7 @@ export function buildCatalogChips(
 export function countSecondaryFilters(f: CatalogFilterState): number {
   let n = 0;
   if ((f.propertyType === "apartment" || f.propertyType === "") && f.marketType) n++;
+  if (floorFilterApplies(f) && f.floorPreset) n++;
   if (f.propertyType === "house") {
     for (const v of [f.houseAreaMin, f.houseAreaMax, f.houseLandAreaMin, f.houseLandAreaMax]) {
       if (normalizeDecimalInput(v)) n++;

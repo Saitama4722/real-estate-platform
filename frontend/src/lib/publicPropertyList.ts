@@ -152,13 +152,25 @@ function normalizeListPayload(
   return [];
 }
 
+export interface PublicPropertiesListResult {
+  items: CatalogPropertyItem[];
+  /**
+   * How many listings the Этаж preset dropped because the building height
+   * (`floors_total`) is unknown. Read from the X-Hidden-Unknown-Floors
+   * response header so the array response shape stays untouched. 0 when the
+   * preset is inactive or nothing was dropped.
+   */
+  hiddenUnknownFloors: number;
+}
+
 /**
- * Published properties for каталог / карты / SEO-посадочных страниц.
- * Query-параметры совпадают с публичным API Django (`city_slug`, `district_slug`, …).
+ * Published properties for каталог / карты / SEO-посадочных страниц, plus the
+ * response metadata the catalog needs. Query-параметры совпадают с публичным
+ * API Django (`city_slug`, `district_slug`, …).
  */
-export async function fetchPublicPropertiesList(options?: {
+export async function fetchPublicPropertiesListWithMeta(options?: {
   searchParams?: Record<string, string | number | undefined>;
-}): Promise<CatalogPropertyItem[]> {
+}): Promise<PublicPropertiesListResult> {
   const base = getPublicApiBaseUrl();
   const u = new URL(`${base}/properties/`);
   if (options?.searchParams) {
@@ -171,12 +183,23 @@ export async function fetchPublicPropertiesList(options?: {
     const res = await fetch(u.toString(), { next: { revalidate: 60 } });
     if (!res.ok) {
       console.error("[fetchPublicPropertiesList] HTTP", res.status, u.toString());
-      return [];
+      return { items: [], hiddenUnknownFloors: 0 };
     }
     const raw = await res.json();
-    return normalizeListPayload(raw).map(mapPublicListItemToCatalogItem);
+    const hidden = Number(res.headers.get("x-hidden-unknown-floors") ?? "0");
+    return {
+      items: normalizeListPayload(raw).map(mapPublicListItemToCatalogItem),
+      hiddenUnknownFloors: Number.isFinite(hidden) && hidden > 0 ? hidden : 0,
+    };
   } catch (e) {
     console.error("[fetchPublicPropertiesList]", u.toString(), e);
-    return [];
+    return { items: [], hiddenUnknownFloors: 0 };
   }
+}
+
+/** Items only — the shape every non-catalog consumer already expects. */
+export async function fetchPublicPropertiesList(options?: {
+  searchParams?: Record<string, string | number | undefined>;
+}): Promise<CatalogPropertyItem[]> {
+  return (await fetchPublicPropertiesListWithMeta(options)).items;
 }

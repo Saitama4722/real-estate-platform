@@ -34,6 +34,8 @@ interface CatalogPageTemplateProps {
   catalogSearchParams?: CatalogPageSearchRecord;
   /** Fallback initial view when the query string carries no `view` param. */
   initialMapView?: boolean;
+  /** Listings the Этаж preset dropped for an unknown building height. */
+  hiddenUnknownFloors?: number;
 }
 
 /**
@@ -55,6 +57,7 @@ export async function CatalogPageTemplate({
   seoLinks,
   catalogSearchParams,
   initialMapView,
+  hiddenUnknownFloors = 0,
 }: CatalogPageTemplateProps) {
   const sp = catalogSearchParams ?? {};
   const uiState = parseCatalogUiState(sp);
@@ -97,6 +100,7 @@ export async function CatalogPageTemplate({
           totalCount={totalCount}
           totalPages={totalPages}
           locationData={locationData}
+          hiddenUnknownFloors={hiddenUnknownFloors}
         />
 
         <section

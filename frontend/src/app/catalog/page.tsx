@@ -7,7 +7,7 @@ import {
   type CatalogPageSearchRecord,
 } from "@/lib/catalogQueryParams";
 import { catalogOrderingParam, parseCatalogUiState } from "@/lib/catalogFilters";
-import { fetchPublicPropertiesList } from "@/lib/publicPropertyList";
+import { fetchPublicPropertiesListWithMeta } from "@/lib/publicPropertyList";
 
 const catalogSeoText =
   "Каталог Centreal собрал предложения по продаже недвижимости в Краснодаре и Геленджике. В одном месте можно просматривать квартиры, дома, участки и коммерческие помещения, сравнивать стоимость и выбирать локацию под ваши задачи.";
@@ -43,9 +43,11 @@ export default async function CatalogPage({
   const ordering = catalogOrderingParam(parseCatalogUiState(sp).sort);
   if (ordering) apiParams.ordering = ordering;
 
-  const properties = await fetchPublicPropertiesList({ searchParams: apiParams });
+  const { items: properties, hiddenUnknownFloors } =
+    await fetchPublicPropertiesListWithMeta({ searchParams: apiParams });
   return (
     <CatalogPageTemplate
+      hiddenUnknownFloors={hiddenUnknownFloors}
       breadcrumbs={[
         { label: "Главная", href: "/" },
         { label: "Каталог" },

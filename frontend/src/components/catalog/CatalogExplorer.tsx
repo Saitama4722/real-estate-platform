@@ -11,6 +11,7 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { Icon, Icons } from "@/components/ui/icon";
 import { PropertyCard } from "@/components/home/PropertyCard";
 import { CatalogFilterPanel } from "@/components/catalog/CatalogFilterPanel";
 import { CatalogFilterSheet } from "@/components/catalog/CatalogFilterSheet";
@@ -62,6 +63,17 @@ interface CatalogExplorerProps {
   totalCount: number;
   totalPages: number;
   locationData: CatalogLocationData;
+  /** Listings the Этаж preset dropped for an unknown building height. */
+  hiddenUnknownFloors: number;
+}
+
+/** «1 объявление» / «3 объявления» / «5 объявлений». */
+function pluralListings(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "объявление";
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return "объявления";
+  return "объявлений";
 }
 
 /** «12 345 ₽/м²» from the formatted price + numeric area; rounded to 100. */
@@ -88,6 +100,7 @@ export function CatalogExplorer({
   totalCount,
   totalPages,
   locationData,
+  hiddenUnknownFloors,
 }: CatalogExplorerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -298,6 +311,31 @@ export function CatalogExplorer({
           onViewChange={(view) => navigate({ ...uiState, view })}
           onOpenSheet={() => setSheetOpen(true)}
         />
+
+        {/*
+          * Excluded-listings note. The Этаж preset drops apartments whose
+          * building height is unknown (`floors_total` is nullable), and a
+          * silent disappearance is the failure mode worth avoiding — so the
+          * count says so out loud, right under the results count, and goes
+          * away with the preset. `role="status"` announces it to AT when the
+          * filter changes.
+          */}
+        {hiddenUnknownFloors > 0 && (
+          <p
+            role="status"
+            className="mt-2 flex items-start gap-1.5 text-[13px] text-fg-muted"
+          >
+            <Icon
+              icon={Icons.Alert}
+              size={16}
+              className="mt-px shrink-0 text-gray-400"
+            />
+            <span>
+              {hiddenUnknownFloors} {pluralListings(hiddenUnknownFloors)} скрыто:
+              не указана этажность дома
+            </span>
+          </p>
+        )}
 
         {/* Mobile chips live under the results header (the panel is hidden). */}
         <div className="mt-3 md:hidden">
