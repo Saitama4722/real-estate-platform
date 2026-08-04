@@ -357,6 +357,45 @@ export function buildLandingInternalLinks(
   return out;
 }
 
+/**
+ * The catalog-filter record a landing route RESOLVES TO. Passed to
+ * CatalogPageTemplate so the filter panel pre-fills, the chips reflect the
+ * route's real filters, and any interaction continues on /catalog with that
+ * state carried over. ЖК landings map to city-only: the panel has no
+ * residential-complex filter, and claiming less is honest — the H1/subtitle
+ * still name the complex.
+ */
+export function landingImpliedSearchRecord(
+  city: CitySlug,
+  resolved: LandingResolved,
+): Record<string, string> {
+  switch (resolved.kind) {
+    case "property_type":
+      return { city_slug: city, property_type: resolved.propertyType };
+    case "rooms":
+      return {
+        city_slug: city,
+        property_type: "apartment",
+        rooms: String(resolved.rooms),
+      };
+    case "district":
+      return {
+        city_slug: city,
+        property_type: "apartment",
+        district_slug: resolved.districtSlug,
+      };
+    case "neighborhood":
+      return {
+        city_slug: city,
+        property_type: "apartment",
+        neighborhood_slug: resolved.neighborhoodSlug,
+      };
+    case "zhk":
+    default:
+      return { city_slug: city };
+  }
+}
+
 export function landingBreadcrumbCurrentLabel(resolved: LandingResolved): string {
   switch (resolved.kind) {
     case "property_type":

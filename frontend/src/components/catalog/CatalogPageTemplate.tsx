@@ -1,15 +1,17 @@
 import Link from "next/link";
-import { SearchBar } from "@/components/home/SearchBar";
 import { Container } from "@/components/layout/container";
 import { BreadcrumbItem, Breadcrumbs } from "@/components/layout/breadcrumbs";
-import { PageHeading } from "@/components/layout/page-heading";
-import { CatalogResultsSection } from "@/components/catalog/CatalogResultsSection";
+import { Icon, Icons } from "@/components/ui/icon";
+import { CatalogExplorer } from "@/components/catalog/CatalogExplorer";
 import { CatalogPropertyItem } from "@/components/catalog/types";
 import type { CatalogPageSearchRecord } from "@/lib/catalogQueryParams";
+import { catalogSearchParamFirst } from "@/lib/catalogQueryParams";
 import {
-  catalogSearchBarRemountKey,
-  catalogSearchParamFirst,
-} from "@/lib/catalogQueryParams";
+  CATALOG_PAGE_SIZE,
+  parseCatalogUiState,
+} from "@/lib/catalogFilters";
+import { fetchCatalogLocationData } from "@/lib/publicLocations";
+import { sortCatalogProperties } from "@/lib/sortCatalogProperties";
 
 interface CatalogSeoLink {
   label: string;
@@ -23,12 +25,28 @@ interface CatalogPageTemplateProps {
   properties: CatalogPropertyItem[];
   seoText: string;
   seoLinks: CatalogSeoLink[];
-  /** Query каталога (для строки поиска); на SEO-посадочных обычно пустой объект. */
+  /**
+   * Query каталога. On /catalog these are the page's real searchParams; SEO
+   * landing pages pass the record their route RESOLVES TO (city + type +
+   * district…), so the panel pre-fills, chips reflect the route's filters,
+   * and any interaction continues on /catalog with that state carried over.
+   */
   catalogSearchParams?: CatalogPageSearchRecord;
+  /** Fallback initial view when the query string carries no `view` param. */
   initialMapView?: boolean;
 }
 
-export function CatalogPageTemplate({
+/**
+ * Shared by /catalog and the SEO landing routes. Server Component: it parses
+ * the URL state, sorts the full result set and slices the current page, so a
+ * filtered/sorted/paginated URL is fully server-rendered (SEO-relevant).
+ *
+ * Sorting note: «Сначала новые» / «Дешевле» / «Дороже» are also requested
+ * from the API via ?ordering; the deterministic re-sort here makes «По
+ * площади» work too (no API ordering field for area — documented limitation)
+ * and keeps landing pages, whose list arrives pre-filtered, on the same path.
+ */
+export async function CatalogPageTemplate({
   breadcrumbs,
   title,
   subtitle,
@@ -39,59 +57,82 @@ export function CatalogPageTemplate({
   initialMapView,
 }: CatalogPageTemplateProps) {
   const sp = catalogSearchParams ?? {};
+  const uiState = parseCatalogUiState(sp);
+  if (!catalogSearchParamFirst(sp, "view") && initialMapView) {
+    uiState.view = "map";
+  }
+
+  const sorted = sortCatalogProperties(properties, uiState.sort);
+  const totalCount = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / CATALOG_PAGE_SIZE));
+  // An out-of-range ?page (stale link, shrunken result set) clamps to the
+  // last page rather than rendering an empty grid.
+  uiState.page = Math.min(uiState.page, totalPages);
+  const pageItems = sorted.slice(
+    (uiState.page - 1) * CATALOG_PAGE_SIZE,
+    uiState.page * CATALOG_PAGE_SIZE,
+  );
+
+  const locationData = await fetchCatalogLocationData();
+
   return (
-    <div className="py-6 md:py-8">
+    <div className="pb-16">
       <Container>
-        <Breadcrumbs items={breadcrumbs} />
-        <PageHeading title={title} subtitle={subtitle} />
+        <div className="pt-5 pb-5">
+          {/* `strong` tone + fg-secondary subtitle: gray-500/fg-muted on the
+              warm page background measure 4.49:1 — a hair under WCAG AA. */}
+          <Breadcrumbs items={breadcrumbs} tone="strong" />
+          <h1 className="mt-2 text-[28px] font-bold leading-tight tracking-[-0.02em] text-fg md:text-[32px]">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="mt-1 text-[14.5px] text-fg-secondary">{subtitle}</p>
+          )}
+        </div>
 
-        <section aria-label="Фильтры каталога">
-          <SearchBar
-            key={catalogSearchBarRemountKey(sp)}
-            variant="catalog"
-            initialPropertyType={catalogSearchParamFirst(sp, "property_type")}
-            initialCitySlug={catalogSearchParamFirst(sp, "city_slug")}
-            initialDistrictSlug={catalogSearchParamFirst(sp, "district_slug")}
-            initialNeighborhoodSlug={catalogSearchParamFirst(sp, "neighborhood_slug")}
-            initialRooms={catalogSearchParamFirst(sp, "rooms") ?? ""}
-            initialRoomsMin={catalogSearchParamFirst(sp, "rooms_min") ?? ""}
-            initialSearch={catalogSearchParamFirst(sp, "search") ?? ""}
-            initialMarketType={catalogSearchParamFirst(sp, "market_type") ?? ""}
-            initialPriceMin={catalogSearchParamFirst(sp, "price_min") ?? ""}
-            initialPriceMax={catalogSearchParamFirst(sp, "price_max") ?? ""}
-            initialHouseAreaMin={catalogSearchParamFirst(sp, "house_area_min") ?? ""}
-            initialHouseAreaMax={catalogSearchParamFirst(sp, "house_area_max") ?? ""}
-            initialHouseLandAreaMin={catalogSearchParamFirst(sp, "house_land_area_min") ?? ""}
-            initialHouseLandAreaMax={catalogSearchParamFirst(sp, "house_land_area_max") ?? ""}
-            initialLandAreaMin={catalogSearchParamFirst(sp, "land_area_min") ?? ""}
-            initialLandAreaMax={catalogSearchParamFirst(sp, "land_area_max") ?? ""}
-            initialCommercialType={catalogSearchParamFirst(sp, "commercial_type") ?? ""}
-            initialCommercialAreaMin={catalogSearchParamFirst(sp, "commercial_area_min") ?? ""}
-            initialCommercialAreaMax={catalogSearchParamFirst(sp, "commercial_area_max") ?? ""}
-          />
-        </section>
-
-        <CatalogResultsSection
-          properties={properties}
-          initialMapView={initialMapView ?? false}
+        <CatalogExplorer
+          uiState={uiState}
+          pageItems={pageItems}
+          allItems={sorted}
+          totalCount={totalCount}
+          totalPages={totalPages}
+          locationData={locationData}
         />
 
-        <section className="mt-10 border-t border-gray-200 pt-8" aria-label="SEO-текст">
-          <h2 className="text-2xl font-semibold text-gray-900">Недвижимость в Краснодарском крае</h2>
-          <p className="mt-4 max-w-4xl text-sm text-gray-600 md:text-base">{seoText}</p>
-        </section>
-
-        <section className="mt-10 border-t border-gray-200 pt-8" aria-label="Похожие SEO-ссылки">
-          <h2 className="text-lg font-semibold text-gray-900">Похожие запросы</h2>
-          <ul className="mt-4 grid gap-2 text-sm text-gray-700 md:grid-cols-2">
-            {seoLinks.map((link) => (
-              <li key={link.label}>
-                <Link href={link.href} className="hover:text-gray-900 hover:underline">
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+        <section
+          aria-label="SEO-текст"
+          className="mt-14 grid gap-10 border-t border-border pt-10 lg:grid-cols-2"
+        >
+          <div>
+            <h2 className="text-[20px] font-bold tracking-tight text-fg">
+              Недвижимость в Краснодарском крае
+            </h2>
+            <p className="mt-3 max-w-[58ch] text-pretty text-small leading-relaxed text-fg-secondary">
+              {seoText}
+            </p>
+          </div>
+          <div>
+            <h3 className="text-caption font-semibold uppercase tracking-[0.08em] text-fg-muted">
+              Похожие запросы
+            </h3>
+            <ul className="mt-3.5 grid gap-x-8 gap-y-1 sm:grid-cols-2">
+              {seoLinks.map((link) => (
+                <li key={link.label}>
+                  <Link
+                    href={link.href}
+                    className="group/l flex items-center gap-2 py-1.5 text-small font-medium text-fg transition-colors hover:text-brand"
+                  >
+                    <Icon
+                      icon={Icons.ArrowRight}
+                      size={16}
+                      className="h-3.5 w-3.5 shrink-0 text-gray-300 transition-colors group-hover/l:text-brand"
+                    />
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       </Container>
     </div>

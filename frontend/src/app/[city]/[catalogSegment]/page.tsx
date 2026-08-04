@@ -14,6 +14,8 @@ import {
 
   landingBreadcrumbCurrentLabel,
 
+  landingImpliedSearchRecord,
+
 } from "@/lib/catalogSeoLanding";
 
 
@@ -110,7 +112,7 @@ export default async function CatalogLandingPage({ params }: CatalogLandingPageP
 
       seoLinks={seoLinks}
 
-      catalogSearchParams={{}}
+      catalogSearchParams={landingImpliedSearchRecord(city, resolved)}
 
       initialMapView={false}
 

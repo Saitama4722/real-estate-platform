@@ -6,6 +6,7 @@ import {
   publicPropertiesParamsFromSearchParams,
   type CatalogPageSearchRecord,
 } from "@/lib/catalogQueryParams";
+import { catalogOrderingParam, parseCatalogUiState } from "@/lib/catalogFilters";
 import { fetchPublicPropertiesList } from "@/lib/publicPropertyList";
 
 const catalogSeoText =
@@ -35,9 +36,14 @@ export default async function CatalogPage({
   searchParams: Promise<CatalogPageSearchRecord>;
 }) {
   const sp = await searchParams;
-  const properties = await fetchPublicPropertiesList({
-    searchParams: publicPropertiesParamsFromSearchParams(sp),
-  });
+  const apiParams = publicPropertiesParamsFromSearchParams(sp);
+  // Sorts the API supports are requested server-side (?ordering=…). «По
+  // площади» has no API ordering field — the template's full-set sort covers
+  // it (documented limitation until a backend ordering field exists).
+  const ordering = catalogOrderingParam(parseCatalogUiState(sp).sort);
+  if (ordering) apiParams.ordering = ordering;
+
+  const properties = await fetchPublicPropertiesList({ searchParams: apiParams });
   return (
     <CatalogPageTemplate
       breadcrumbs={[
