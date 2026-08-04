@@ -35,6 +35,14 @@ interface PropertyCardProps {
    */
   pricePerM2?: string;
   /**
+   * Formatted previous price, struck through beside the current one. The
+   * mapper emits it ONLY when it is strictly higher than the current price,
+   * so this component never has to judge whether a strike is warranted.
+   */
+  oldPrice?: string;
+  /** «Новостройка» / «Вторичка» — photo badge, bottom-left. */
+  marketLabel?: string;
+  /**
    * When set (with compareType), a compare toggle is rendered over the card
    * image. Uses this value (the property slug) as the compare identifier.
    */
@@ -106,6 +114,8 @@ function PropertyCardComponent({
   favoriteId,
   isPriceReduced,
   pricePerM2,
+  oldPrice,
+  marketLabel,
   compareId,
   compareType,
   rooms,
@@ -182,6 +192,14 @@ function PropertyCardComponent({
             Цена снижена
           </span>
         )}
+        {/* Market badge, photo bottom-left (mockup): navy at 70% so it reads
+            over any photo, 11px/500 white. Rendered only for the two real
+            markets — `other`/empty deliberately show nothing. */}
+        {marketLabel && (
+          <span className="absolute bottom-3 left-3 z-20 flex h-6 items-center rounded-md bg-surface-dark/70 px-2 text-[11px] font-medium text-white">
+            {marketLabel}
+          </span>
+        )}
         {/* z-20 keeps the controls ABOVE the whole-card overlay anchor (z-10)
             added at the end of this component, so they stay clickable. */}
         {(favoriteId || (compareId && compareType)) && (
@@ -204,6 +222,15 @@ function PropertyCardComponent({
         {/* Hierarchy is strict: price (largest) → specs → address. */}
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <p className="text-price tabular-price text-fg">{price}</p>
+          {/* Previous price. The mockup's slate-400 measures ~2.3:1 on white —
+              below WCAG AA for text — so this uses the design system's own
+              muted token (4.9:1) at the mockup's 13px/line-through. Same
+              visual role, accessible. */}
+          {oldPrice && (
+            <span className="tabular-price text-[13px] text-fg-muted line-through">
+              {oldPrice}
+            </span>
+          )}
           {pricePerM2 && (
             <span className="ml-auto text-caption tabular-price text-fg-muted">
               {pricePerM2}

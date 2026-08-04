@@ -251,6 +251,8 @@ export function CatalogExplorer({
       image={item.image}
       price={item.price}
       pricePerM2={pricePerM2(item)}
+      oldPrice={item.oldPrice}
+      marketLabel={item.marketLabel}
       title={item.title}
       characteristics={item.characteristics}
       rooms={item.rooms}

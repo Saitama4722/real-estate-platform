@@ -38,6 +38,14 @@ export interface CatalogPropertyItem {
   priceHistory?: { price: number; changedAt: string }[];
   /** Current price is below the peak recorded price. */
   isPriceReduced?: boolean;
+  /**
+   * Formatted previous price for the struck-through line beside the current
+   * one. Set ONLY when it is strictly higher than the current price — an
+   * equal or lower "old" price is not a markdown and must not be struck.
+   */
+  oldPrice?: string;
+  /** «Новостройка» / «Вторичка». Absent for market_type "other" or empty. */
+  marketLabel?: string;
   /** Публичный CRM ID риэлтора (RID######) для ссылки на страницу /realtors/... */
   realtorCrmId?: string;
   details?: {
