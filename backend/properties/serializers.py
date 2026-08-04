@@ -1,6 +1,8 @@
 import json
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from rest_framework import serializers
 
 from users.models import User
@@ -96,6 +98,22 @@ class CommercialDetailsPublicSerializer(serializers.ModelSerializer):
         fields = ["commercial_type", "area_total", "floor", "floors_total"]
 
 
+#: A listing counts as «Новый объект» for this long after publication.
+#: DERIVED, never stored: no migration, no field for anyone to fill, no manual
+#: toggle to forget — the badge ages out on its own. Computed server-side so
+#: every consumer (card, future detail page, any other client) agrees on what
+#: "new" means rather than each re-deriving it from a timestamp.
+NEW_LISTING_DAYS = 7
+
+
+def is_new_listing(obj) -> bool:
+    """True when `published_at` is within the last NEW_LISTING_DAYS."""
+    published = getattr(obj, "published_at", None)
+    if not published:
+        return False
+    return (timezone.now() - published) <= timedelta(days=NEW_LISTING_DAYS)
+
+
 class PropertyPhotoPublicSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
 
@@ -139,6 +157,10 @@ class PropertyListSerializer(serializers.ModelSerializer):
     )
     preview_image = serializers.SerializerMethodField()
     is_price_reduced = serializers.SerializerMethodField()
+    is_new = serializers.SerializerMethodField()
+
+    def get_is_new(self, obj) -> bool:
+        return is_new_listing(obj)
 
     class Meta:
         model = Property
@@ -176,6 +198,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
             "commercial_details",
             "preview_image",
             "is_price_reduced",
+            "is_new",
         ]
 
     def get_is_price_reduced(self, obj) -> bool:
@@ -221,6 +244,13 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
     assigned_realtor = RealtorShortSerializer(read_only=True, allow_null=True)
     price_history = serializers.SerializerMethodField()
     is_price_reduced = serializers.SerializerMethodField()
+    # Same three card fields as the list endpoint. /favorites and /compare
+    # hydrate their cards from THIS endpoint (they store only slugs), so
+    # without them the identical card would render differently there.
+    is_new = serializers.SerializerMethodField()
+
+    def get_is_new(self, obj) -> bool:
+        return is_new_listing(obj)
     apartment_details = ApartmentDetailsPublicSerializer(
         read_only=True, allow_null=True
     )
@@ -263,7 +293,9 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
             "slug",
             "property_type",
             "deal_type",
+            "market_type",
             "price",
+            "old_price",
             "currency",
             "city",
             "district",
@@ -284,6 +316,7 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
             "videos",
             "price_history",
             "is_price_reduced",
+            "is_new",
         ]
 
 
