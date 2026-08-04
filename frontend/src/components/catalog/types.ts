@@ -48,7 +48,12 @@ export interface CatalogPropertyItem {
   marketLabel?: string;
   /** Published within the last 7 days (server-derived, see is_new_listing). */
   isNew?: boolean;
-  /** Публичный CRM ID риэлтора (RID######) для ссылки на страницу /realtors/... */
+  /**
+   * Публичный CRM ID риэлтора (RID######) для ссылки на /realtors/...
+   * Заполняется ТОЛЬКО когда профиль опубликован (`is_public`): страница
+   * неопубликованного риэлтора отдаёт 404, поэтому отсутствие id здесь — это
+   * и есть отсутствие ссылки.
+   */
   realtorCrmId?: string;
   details?: {
     ceilingHeight?: string;

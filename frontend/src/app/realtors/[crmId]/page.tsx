@@ -35,6 +35,11 @@ const TITLE_SUFFIX = " — Centreal";
  * third city is ever added, this tile follows by editing one array.
  * ------------------------------------------------------------------------- */
 const CITIES = ["Краснодар", "Геленджик"] as const;
+/* Prepositional case, for copy that says «в …». Nominative names read as a
+   grammar bug there — the CTA fallback rendered «…есть в Краснодар и
+   Геленджик» `[measured]`. Mirrors CITY_PREP in catalogSeoLanding.ts, which
+   is module-private there. */
+const CITIES_PREP = ["Краснодаре", "Геленджике"] as const;
 const PROPERTY_TYPES = ["квартиры", "дома", "участки", "коммерция"] as const;
 const DEAL_STAGES = ["проверка", "переговоры", "оформление"] as const;
 
@@ -144,9 +149,20 @@ function RealtorPortrait({
     .map((p) => p[0])
     .join("")
     .toUpperCase();
+  /*
+   * Photo-less fallback. Was white/70 initials on the light grey portrait
+   * gradient — washed out and unfinished-looking inside the tilted card
+   * `[measured]` on a blank profile. Now the hero's own navy, so a realtor
+   * with no photo yet reads as deliberate rather than broken, with
+   * full-contrast white initials over it. Pure CSS: no asset to ship, and
+   * `.ctr-rp-portrait-inner`'s light gradient is overridden here rather than
+   * changed, so a real photo is unaffected.
+   */
   return (
-    <div className="flex h-full w-full items-center justify-center text-[clamp(56px,8vw,88px)] font-bold tracking-tight text-white/70">
-      {initials || "—"}
+    <div className="ctr-rp-band flex h-full w-full items-center justify-center">
+      <span className="text-[clamp(56px,8vw,88px)] font-bold tracking-tight text-white [text-shadow:0_2px_18px_rgba(15,30,56,.55)]">
+        {initials || "—"}
+      </span>
     </div>
   );
 }
@@ -343,11 +359,23 @@ export default async function PublicRealtorPage({
                 </ul>
 
                 <div className="relative flex flex-wrap items-center gap-3">
-                  {phone && (
+                  {/* With a phone the primary action is the call; WITHOUT one
+                      it falls back to the contact form rather than vanishing —
+                      otherwise a phoneless realtor's hero loses its primary
+                      CTA entirely and «Смотреть объекты» becomes the only
+                      action `[measured]` on a blank profile. */}
+                  {phone ? (
                     <RealtorPhoneReveal
                       phone={phone}
                       buttonClassName={`${heroCta} cursor-pointer px-[26px] bg-brand text-white shadow-realtor-cta hover:bg-brand-hover hover:shadow-realtor-cta-hover`}
                       linkClassName={`${heroCta} tabular-price px-[26px] bg-brand text-white shadow-realtor-cta hover:bg-brand-hover hover:shadow-realtor-cta-hover`}
+                    />
+                  ) : (
+                    <RealtorContactModal
+                      crmId={realtor.crm_id}
+                      displayName={realtor.display_name}
+                      iconName="Message"
+                      triggerClassName={`${heroCta} cursor-pointer px-[26px] bg-brand text-white shadow-realtor-cta hover:bg-brand-hover hover:shadow-realtor-cta-hover`}
                     />
                   )}
                   <a
@@ -683,7 +711,7 @@ export default async function PublicRealtorPage({
                 </p>
                 <p className="max-w-[38ch] text-balance text-[clamp(26px,3.2vw,42px)] font-extrabold leading-[1.1] tracking-[-0.035em] text-white">
                   {bio.closing ||
-                    `Пишите или звоните — расскажу, что сейчас интересного есть в ${CITIES.join(" и ")}`}
+                    `Пишите или звоните — расскажу, что сейчас интересного есть в ${CITIES_PREP.join(" и ")}`}
                 </p>
                 {/* The supporting line is the FALLBACK's other half, so it is
                     suppressed whenever the headline came from the bio. Rendering
@@ -699,8 +727,9 @@ export default async function PublicRealtorPage({
                 )}
               </div>
 
-              {phone && (
-                <div className="flex flex-[0_1_320px] flex-col gap-3">
+              {/* Same fallback as the hero: the band always offers an action. */}
+              <div className="flex flex-[0_1_320px] flex-col gap-3">
+                {phone ? (
                   <a
                     href={telHref(phone)}
                     className={`${bandCta} tabular-price bg-brand px-6 text-white shadow-realtor-cta hover:bg-brand-hover hover:shadow-realtor-cta-hover`}
@@ -708,8 +737,15 @@ export default async function PublicRealtorPage({
                     <Icon icon={Icons.Phone} size={20} className="shrink-0" />
                     {formatPhone(phone)}
                   </a>
-                </div>
-              )}
+                ) : (
+                  <RealtorContactModal
+                    crmId={realtor.crm_id}
+                    displayName={realtor.display_name}
+                    iconName="Message"
+                    triggerClassName={`${bandCta} cursor-pointer bg-brand px-6 text-white shadow-realtor-cta hover:bg-brand-hover hover:shadow-realtor-cta-hover`}
+                  />
+                )}
+              </div>
             </div>
           </div>
         </Container>

@@ -66,6 +66,8 @@ export interface PublicPropertyDetail {
     first_name: string;
     last_name: string;
     avatar?: string | null;
+    /** Whether /realtors/<crm_id> exists — links must be gated on it. */
+    is_public?: boolean;
   } | null;
 }
 
@@ -155,8 +157,17 @@ export function mapPublicDetailToCatalogItem(
     typeof p.assigned_realtor?.avatar === "string" && p.assigned_realtor.avatar
       ? p.assigned_realtor.avatar
       : undefined;
+  /*
+   * Only set when the realtor's public page actually EXISTS. The page 404s
+   * unless the profile has `is_public=True`, so gating here means no surface
+   * can render a link into a 404 — the id simply is not there to link with.
+   * Undefined for older API payloads that predate the flag, which is the safe
+   * direction (no link rather than a possibly-dead one).
+   */
   const realtorCrmId =
-    typeof p.assigned_realtor?.crm_id === "string" && p.assigned_realtor.crm_id.trim()
+    typeof p.assigned_realtor?.crm_id === "string" &&
+    p.assigned_realtor.crm_id.trim() &&
+    p.assigned_realtor.is_public === true
       ? p.assigned_realtor.crm_id.trim()
       : undefined;
 
