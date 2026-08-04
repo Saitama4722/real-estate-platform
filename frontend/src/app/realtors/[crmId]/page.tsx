@@ -4,9 +4,11 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Container } from "@/components/layout/container";
 import { PropertyCard } from "@/components/home/PropertyCard";
+import { RealtorContactModal } from "@/components/realtor/RealtorContactModal";
 import { RealtorCountUp } from "@/components/realtor/RealtorCountUp";
 import { RealtorHeroMotion } from "@/components/realtor/RealtorHeroMotion";
 import { RealtorHeroShapes } from "@/components/realtor/RealtorHeroShapes";
+import { RealtorObjectsPagination } from "@/components/realtor/RealtorObjectsPagination";
 import { RealtorPhoneReveal } from "@/components/realtor/RealtorPhoneReveal";
 import { Icon, Icons } from "@/components/ui/icon";
 import { siteOrigin } from "@/lib/articleSeo";
@@ -36,8 +38,12 @@ const CITIES = ["Краснодар", "Геленджик"] as const;
 const PROPERTY_TYPES = ["квартиры", "дома", "участки", "коммерция"] as const;
 const DEAL_STAGES = ["проверка", "переговоры", "оформление"] as const;
 
+/** 12 cards per page in «Объекты риэлтора» (4 full rows of the 3-up grid). */
+const OBJECTS_PAGE_SIZE = 12;
+
 interface RealtorPageProps {
   params: Promise<{ crmId: string }>;
+  searchParams: Promise<{ page?: string | string[] }>;
 }
 
 export async function generateMetadata({
@@ -145,7 +151,10 @@ function RealtorPortrait({
   );
 }
 
-export default async function PublicRealtorPage({ params }: RealtorPageProps) {
+export default async function PublicRealtorPage({
+  params,
+  searchParams,
+}: RealtorPageProps) {
   const { crmId } = await params;
   const realtor = await fetchPublicRealtorByCrmId(crmId);
   if (!realtor) {
@@ -155,6 +164,24 @@ export default async function PublicRealtorPage({ params }: RealtorPageProps) {
   const properties = await fetchPublicPropertiesList({
     searchParams: { assigned_realtor_crm_id: realtor.crm_id },
   });
+
+  // «Объекты риэлтора» pagination — URL as the source of truth, like the
+  // catalog: ?page=N is parsed here so a shared link to page 2 server-renders
+  // page 2, and an out-of-range page clamps to the last one.
+  const sp = await searchParams;
+  const rawPage = Array.isArray(sp.page) ? sp.page[0] : sp.page;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(properties.length / OBJECTS_PAGE_SIZE),
+  );
+  const requestedPage =
+    rawPage && /^\d+$/.test(rawPage) ? Math.max(1, parseInt(rawPage, 10)) : 1;
+  const page = Math.min(requestedPage, totalPages);
+  const pageItems = properties.slice(
+    (page - 1) * OBJECTS_PAGE_SIZE,
+    page * OBJECTS_PAGE_SIZE,
+  );
+  const isLastPage = page === totalPages;
 
   const phone = (realtor.phone || "").trim();
   const bio = splitBio(realtor.short_bio || "");
@@ -422,9 +449,11 @@ export default async function PublicRealtorPage({ params }: RealtorPageProps) {
         </Container>
       </section>
 
-      {/* ── ABOUT + CONTACT ─────────────────────────────────────────────────── */}
-      {(bio.lead || phone) && (
-        <section className="ctr-sec pb-[clamp(64px,7vw,96px)] pt-[clamp(8px,2vw,24px)]">
+      {/* ── ABOUT + CONTACT ───────────────────────────────────────────────────
+          No longer gated on `phone`: the aside's action is the lead form,
+          which works with or without a number on file (the same product
+          decision as the public «Связаться» button — see CLAUDE.md). */}
+      <section className="ctr-sec pb-[clamp(64px,7vw,96px)] pt-[clamp(8px,2vw,24px)]">
           <Container>
             <div className="flex flex-wrap items-start gap-[clamp(32px,4vw,64px)]">
               <div className="min-w-0 flex-[1_1_min(100%,520px)]">
@@ -482,36 +511,24 @@ export default async function PublicRealtorPage({ params }: RealtorPageProps) {
                     className="absolute inset-x-[26px] top-0 h-px bg-[linear-gradient(90deg,transparent,var(--color-brand),var(--color-accent),transparent)]"
                   />
 
-                  {phone ? (
-                    <>
-                      <p className="text-[11px] font-bold tracking-[0.2em] text-fg-muted">
-                        ТЕЛЕФОН
-                      </p>
-                      <a
-                        href={telHref(phone)}
-                        className="tabular-price mb-[18px] mt-2 block rounded-sm text-[clamp(23px,2vw,27px)] font-bold tracking-[-0.02em] text-fg transition-colors hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                      >
-                        {formatPhone(phone)}
-                      </a>
-                    </>
-                  ) : (
-                    <p className="mb-[18px] text-small text-fg-muted">
-                      Телефон уточняйте по объектам.
-                    </p>
-                  )}
-
-                  {/* Same affordance as the hero, so the page has ONE behaviour
-                      for "get the number" instead of a reveal here and a modal
-                      there. Hand-rolled geometry rather than the shared Button:
-                      the mockup's aside CTA is 54px/14px/15.5px and the shared
-                      ladder's nearest size is 48px/8px/16px. */}
-                  {phone && (
-                    <RealtorPhoneReveal
-                      phone={phone}
-                      buttonClassName={`${asideCta} cursor-pointer`}
-                      linkClassName={`${asideCta} tabular-price`}
-                    />
-                  )}
+                  {/* ONE action, and it is the FORM, not the phone. The number
+                      used to appear three times on this page (aside heading,
+                      aside reveal, hero reveal) — the aside now carries the
+                      written-inquiry path instead, which reaches the CRM as a
+                      lead attributed to this realtor (realtorCrmId), while the
+                      hero keeps the single call affordance. Hand-rolled
+                      geometry rather than the shared Button: the mockup's
+                      aside CTA is 54px/14px/15.5px and the shared ladder's
+                      nearest size is 48px/8px/16px. */}
+                  <p className="mb-[18px] text-[11px] font-bold tracking-[0.2em] text-fg-muted">
+                    НАПИСАТЬ РИЭЛТОРУ
+                  </p>
+                  <RealtorContactModal
+                    crmId={realtor.crm_id}
+                    displayName={realtor.display_name}
+                    iconName="Message"
+                    triggerClassName={`${asideCta} cursor-pointer`}
+                  />
 
                   <div className="mt-[18px] flex items-start gap-3 border-t border-border pt-4">
                     <Icon
@@ -529,7 +546,6 @@ export default async function PublicRealtorPage({ params }: RealtorPageProps) {
             </div>
           </Container>
         </section>
-      )}
 
       {/* ── OBJECTS ─────────────────────────────────────────────────────────── */}
       <section
@@ -570,7 +586,7 @@ export default async function PublicRealtorPage({ params }: RealtorPageProps) {
             className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
             data-reveal-stagger
           >
-            {properties.map((p) => (
+            {pageItems.map((p) => (
               <PropertyCard
                 key={p.id}
                 slug={p.slug}
@@ -594,10 +610,17 @@ export default async function PublicRealtorPage({ params }: RealtorPageProps) {
               />
             ))}
 
+            {/* The panel is a LAST-PAGE outro: on earlier pages the pagination
+                is the onward action, and a mid-list "see the whole catalog"
+                would read as the end of the list. Its col-span generalises the
+                old single-listing rule: with a short final row it widens to
+                fill what the cards leave (1 leftover card → panel spans the
+                other 2 columns), otherwise it is a normal cell. */}
+            {isLastPage && (
             <Link
               href="/catalog"
               className={`ctr-rp-panel group relative flex min-h-[260px] flex-col justify-between overflow-hidden rounded-[20px] p-7 text-white shadow-realtor-panel transition-[box-shadow,translate] duration-[250ms] ease-out hover:-translate-y-1 hover:shadow-realtor-panel-hover focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-blue-300 motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
-                properties.length === 1 ? "lg:col-span-2" : ""
+                pageItems.length % 3 === 1 ? "lg:col-span-2" : ""
               }`}
             >
               <div
@@ -626,7 +649,17 @@ export default async function PublicRealtorPage({ params }: RealtorPageProps) {
                 </span>
               </span>
             </Link>
+            )}
           </div>
+
+          {/* Renders nothing at ≤12 listings (totalPages 1). Same-tab clicks
+              swap only the grid content and anchor scroll to #objects; the
+              cells are real links, so ?page=N is shareable and crawlable. */}
+          <RealtorObjectsPagination
+            crmId={realtor.crm_id}
+            currentPage={page}
+            totalPages={totalPages}
+          />
         </Container>
       </section>
 
