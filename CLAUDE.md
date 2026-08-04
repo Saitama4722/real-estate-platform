@@ -828,6 +828,23 @@ itself now — **there is no manual `-p 3001` / `.env.local` step any more.**
   `CatalogControls` were deleted. Verified `[measured]`: 84/84 Playwright
   checks (states, full keyboard run, sheet focus trap, 360→1600 sweep,
   reduced motion, AA contrast), 0 console errors.
+- **⚠ A computed-style colour is NOT always `rgb()`/`rgba()` — never regex it.**
+  Tailwind v4's opacity modifier on a theme colour (`bg-surface-dark/70`)
+  compiles to `color-mix()`, and `getComputedStyle().backgroundColor` returns
+  **`oklab(0.237 -0.009 -0.054 / 0.7)`** `[measured]`. An `rgba(...)` regex
+  returns null there, so a contrast/colour probe either crashes or silently
+  skips the element — i.e. reports a PASS it never actually checked. Resolve
+  any CSS colour through the browser instead: paint it into a 1×1 canvas and
+  read the pixel back (`ctx.fillStyle = css; ctx.fillRect(...)`;
+  `getImageData` gives straight sRGB + alpha for rgb, hsl, oklab and
+  color-mix alike). Also composite semi-transparent fills over their opaque
+  ancestor before measuring contrast, or a badge over a photo scores its
+  text against the photo's background and falsely fails.
+- **A box-bottom delta is not a baseline delta.** Asserting that a 13px old
+  price is baseline-aligned with a 20px price by comparing
+  `getBoundingClientRect().bottom` fails by ~2px even when alignment is
+  perfect — the smaller font has less descent. Assert the mechanism
+  (`align-items: baseline` on the row) and allow a few px on the box edges.
 - **Playwright gotchas that produced FALSE bug reports here** (all
   `[measured]`): a screenshot's default caret-hiding injects
   `caret-color:transparent` and, racing hydration after `reload()`, fakes a
@@ -1196,27 +1213,30 @@ Index of what changed this session; details live in the linked sections above.
 
 ## Known Issues / Backlog
 
-- **Property-card badges + old price are BLOCKED on the public API, not on CSS.**
-  The design's card shows a «Новый объект» / «Цена снижена» badge on the photo
-  and a struck-through old price beside the current one. Neither can be built
-  from what the public API returns today:
-  - `old_price` **exists on the model** — `DecimalField(max_digits=15,
-    decimal_places=2, null=True, blank=True)` at `properties/models.py:146`
-    `[measured]` — and is exposed on all three CRM serializers
-    (`CrmPropertyListSerializer`, `CrmPropertyDetailSerializer`,
-    `CrmPropertyWriteSerializer`). It is **absent from both public endpoints**:
-    dumping the live JSON keys for `/api/properties/` and
-    `/api/properties/<slug>/` shows no `old_price` `[measured]`. It is also not
-    on `CatalogPropertyItem`. To surface it: add the field to
-    `PropertyListSerializer` + `PropertyDetailSerializer`, add `oldPrice?: number`
-    to `CatalogPropertyItem`, map it in `publicPropertyList.ts` and
-    `publicProperty.ts`, then render. That is an API change, not styling.
-  - `is_new` **does not exist anywhere** — no model field, no serializer, no
-    frontend type `[measured]`, and no agreed derivation rule. It needs a product
-    decision first (e.g. "published within N days", computed vs stored) before
-    any of the above.
-  - Note the existing `is_price_reduced` flag is NOT a substitute: it is a
-    boolean derived from peak price and carries no previous-price VALUE to show.
+- **~~Property-card badges + old price are BLOCKED on the public API~~ — DONE
+  2026-08-04 for old price and market; `is_new` is still open.**
+  - `old_price` and `market_type` are now on `PropertyListSerializer`, so the
+    card renders the struck-through previous price and the
+    «Новостройка»/«Вторичка» photo badge. **Why exposing them is safe** (asked
+    and answered before shipping): `market_type` was ALREADY a public filter
+    param on the same endpoint (`?market_type=…`), so the value was publicly
+    derivable anyway; `old_price` is a display concept («Старая цена») and the
+    detail endpoint already publishes the FULL `price_history`, which reveals
+    strictly more. The genuinely private fields carry explicit "never expose"
+    markers in `models.py` (`owner`, `real_latitude`, `real_longitude`) and
+    stay out. Verified `[measured]`: the list payload gained exactly these two
+    keys (21 → 23) and nothing else.
+  - **A lower or equal `old_price` must NOT be struck through** — that is not a
+    markdown. The guard lives in `publicPropertyList.ts` (`formatOldPrice`
+    returns undefined unless `old > price`), so the card never has to judge.
+    `market_type: "other"` and null render no badge.
+  - `is_new` **still does not exist anywhere** — no model field, no serializer,
+    no frontend type `[measured]`, and no agreed derivation rule. It needs a
+    product decision first (e.g. "published within N days", computed vs
+    stored).
+  - `is_price_reduced` (peak-derived boolean) and `old_price` are INDEPENDENT:
+    the «Цена снижена» badge and the struck price can appear together or
+    separately, and neither implies the other.
 - ~12 test failures in the properties app: migration 0023 made city/district
   required but existing fixtures don't set them. Needs fixture updates.
 - Full Krasnodar residential complex (ЖК) list is incomplete (~130 exist on Cian,
