@@ -809,6 +809,44 @@ itself now — **there is no manual `-p 3001` / `.env.local` step any more.**
   `router.replace(href)` inside the transition onto that same entry. A test
   that awaits full settlement before pressing Back can NEVER catch this —
   always include a mid-transition Back variant.
+- **Этаж filter = PRESETS, not a numeric range** (agreed 2026-08-04). Param
+  `floor_preset` ∈ `not_first` | `not_last` | `not_first_not_last`. Buyers
+  state objections ("not the ground floor"), not floor bands; presets are one
+  tap, need no min≤max validation, and reuse the accessible `CatalogSelect`.
+  `floor_min`/`floor_max` stay available as an orthogonal future addition.
+  - **`ApartmentDetails.floor` is REQUIRED; `floors_total` is NULLABLE.** So
+    «не первый» (`floor > 1`) is always evaluable, while «не последний»
+    (`floor < floors_total`) cannot be judged when the height is unknown.
+    Those listings are **excluded** — the preset is a hard constraint — and
+    **counted**, because a silent disappearance is the failure mode to avoid.
+  - **The hidden count travels as an HTTP RESPONSE HEADER**,
+    `X-Hidden-Unknown-Floors`, not a JSON envelope: the list response is a
+    bare array every consumer already depends on. `fetchPublicPropertiesListWithMeta()`
+    reads it; `fetchPublicPropertiesList()` stays items-only for the other
+    callers. The UI shows «N объявлений скрыто: не указана этажность дома»
+    under the results count, with Russian plural agreement.
+  - **Counting gotcha:** count with `apartment_details__isnull=False` too — a
+    bare `apartment_details__floors_total__isnull=True` LEFT JOINs and also
+    matches houses/land, which have no apartment_details at all.
+  - **Visible ONLY for an explicit «Квартиры»** — hidden (not disabled) for
+    every other type and never under «Все типы», where a floor filter would
+    silently turn an all-types search into an apartments-only one. Because the
+    param is emitted from state rather than copied from the old URL, switching
+    type drops it automatically — no orphaned `floor_preset` can linger
+    `[measured]`.
+- **Срок сдачи is DEFERRED — do not relitigate.** There is NO completion-date
+  field anywhere: not on `Property`, not on `ApartmentDetails`, and not on
+  `ResidentialComplex` (whole model read: city, district, neighborhood, name,
+  slug, address_text, latitude, longitude, description) `[measured]`. With one
+  real listing, a field nobody fills is a real cost, so the control stays an
+  honest dashed «Скоро» placeholder and the «СКОРО» label is scoped to it
+  alone now that Этаж is real. **Agreed future shape when it is wanted: a
+  DATE on `ResidentialComplex`, with buckets derived at query time — no
+  quarter enum.** Completion is a property of the BUILDING, so per-property
+  storage would drift between units of the same ЖК; deriving buckets from a
+  date means they can change without a migration. Known weakness to weigh
+  then: only listings with a `residential_complex` FK become filterable, and
+  the ЖК catalogue is incomplete.
 - **ISR staleness is expected, not a bug:** the public list fetch uses
   `next: { revalidate: 60 }`, so a newly published property can take up to a
   minute (plus one stale-while-revalidate hit) to appear on a
@@ -835,10 +873,17 @@ itself now — **there is no manual `-p 3001` / `.env.local` step any more.**
   1040 on EVERY page `[measured]`; 1080+ and empty-localStorage are clean at
   every width. The fit band was tuned against a header with no badge, and
   CLAUDE.md's own warning there ("if a nav label is added or renamed, the
-  1047px intrinsic width moves — re-measure") covers exactly this. Options:
-  compress more inside the band, hide the count badge below 1100, or raise
-  the desktop-nav breakpoint. **Any responsive sweep must seed a favourite**,
-  or it tests the narrower header a real user rarely has.
+  1047px intrinsic width moves — re-measure") covers exactly this. The
+  affected range is **1024–1079px**; 1080+ is clean.
+  - **Status: KNOWN OPEN ISSUE, deliberately NOT fixed** (user decision,
+    2026-08-04 — the header stays off-limits until they say otherwise).
+  - Three options when it is taken up: (1) compress more inside the existing
+    1024–1099 band, (2) hide the count badge below 1100px, (3) raise the
+    desktop-nav breakpoint above 1024.
+  - **⚠ The 1024–1099 fit band was tuned against a BADGE-LESS header.** Any
+    future header work must re-measure **with favourites present** — and so
+    must any responsive sweep, or it silently tests a narrower header than a
+    real user with one favourite ever sees.
 - **A `getBoundingClientRect()` beyond the viewport is NOT necessarily
   overflow.** An element inside an `overflow:hidden` ancestor still reports
   its full un-clipped rect, so an overflow detector that only compares rects
