@@ -35,7 +35,9 @@ export function FavoriteHeartButton({ favoriteId, className }: FavoriteHeartButt
       aria-label={active ? "Убрать из избранного" : "Добавить в избранное"}
       title={active ? "Убрать из избранного" : "Добавить в избранное"}
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm backdrop-blur-sm transition-colors",
+        // 44px per the catalog mockup's corner controls (also the minimum
+        // comfortable touch target); was 36px.
+        "inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm backdrop-blur-sm transition-colors",
         "hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1",
         active && "text-red-500",
         className,

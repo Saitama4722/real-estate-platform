@@ -51,14 +51,12 @@ export function CompareToggleButton({
   };
 
   return (
-    // `className` carries the absolute positioning from PropertyCard
-    // (`absolute left-2 top-2 z-10`). Do NOT also add `relative` here — `cn` is a
-    // plain join (no tailwind-merge), so `relative absolute` would both land in
-    // the class list and `relative` (later in Tailwind's stylesheet) would win,
-    // pulling the button out of the image box and overlapping the price text
-    // below. An absolutely-positioned element is already a containing block for
-    // its absolutely-positioned children (the flash message), so no `relative`
-    // wrapper is needed.
+    // `className` carries this wrapper's positioning from the call site —
+    // PropertyCard now groups it in a top-right flex row and passes
+    // `relative` (the flash message below is absolutely positioned against
+    // it). Do NOT hardcode `relative` here on top of an absolute call site:
+    // `cn` is a plain join (no tailwind-merge), so both classes would land in
+    // the list and stylesheet order would pick the winner.
     <div className={className}>
       <button
         type="button"
@@ -67,7 +65,9 @@ export function CompareToggleButton({
         aria-label={active ? "Убрать из сравнения" : "Добавить к сравнению"}
         title={active ? "Убрать из сравнения" : "Добавить к сравнению"}
         className={cn(
-          "inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm backdrop-blur-sm transition-colors",
+          // 44px per the catalog mockup's corner controls (also the minimum
+          // comfortable touch target); was 36px.
+          "inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm backdrop-blur-sm transition-colors",
           "hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1",
           active && "bg-blue-600 text-white hover:bg-blue-600",
         )}
@@ -75,8 +75,8 @@ export function CompareToggleButton({
         {/* Balance-scale / compare icon; checkmark overlay when active. */}
         {active ? (
           <svg
-            width="18"
-            height="18"
+            width="20"
+            height="20"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -89,8 +89,8 @@ export function CompareToggleButton({
           </svg>
         ) : (
           <svg
-            width="18"
-            height="18"
+            width="20"
+            height="20"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -118,3 +118,4 @@ export function CompareToggleButton({
     </div>
   );
 }
+

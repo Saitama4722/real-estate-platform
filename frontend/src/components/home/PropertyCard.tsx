@@ -5,7 +5,6 @@ import Link from "next/link";
 import { isPropertyImageUrl } from "@/lib/propertyMedia";
 import { FavoriteHeartButton } from "@/components/favorites/FavoriteHeartButton";
 import { CompareToggleButton } from "@/components/compare/CompareToggleButton";
-import { PriceDropBadge } from "@/components/property/PriceDropBadge";
 import { Icon, Icons } from "@/components/ui/icon";
 import type { LucideIcon } from "lucide-react";
 import type { ComparePropertyType } from "@/lib/compare";
@@ -30,6 +29,11 @@ interface PropertyCardProps {
   favoriteId?: string;
   /** Show the «Цена снижена» badge next to the price (server-computed). */
   isPriceReduced?: boolean;
+  /**
+   * Optional pre-formatted «12 300 ₽/м²», right-aligned in the price row.
+   * Additive (catalog cards pass it); existing call sites are unaffected.
+   */
+  pricePerM2?: string;
   /**
    * When set (with compareType), a compare toggle is rendered over the card
    * image. Uses this value (the property slug) as the compare identifier.
@@ -101,6 +105,7 @@ function PropertyCardComponent({
   href,
   favoriteId,
   isPriceReduced,
+  pricePerM2,
   compareId,
   compareType,
   rooms,
@@ -139,7 +144,7 @@ function PropertyCardComponent({
      * rotate`, which is why the photo's scale below animates correctly.) If you
      * add another transformed hover state here, name its real property too.
      */
-    <article className="group relative flex h-full flex-col overflow-hidden rounded-xl bg-surface-raised shadow-sm transition-[box-shadow,translate] duration-[250ms] ease-out hover:-translate-y-[3px] hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+    <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-surface-raised shadow-sm ring-1 ring-gray-900/5 transition-[box-shadow,translate] duration-[250ms] ease-out hover:-translate-y-[3px] hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       {/* Photo is 4:3 per the design system (was 16/10). */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-inset">
         {isPropertyImageUrl(image) ? (
@@ -167,32 +172,43 @@ function PropertyCardComponent({
             {image}
           </div>
         )}
-        {/* Opposite corners on purpose — compare top-LEFT, favourite top-RIGHT.
-            Grouping them would crowd the photo; this is a settled decision, not
-            the mockup's both-on-the-right layout. */}
-        {/* z-20 keeps these ABOVE the whole-card overlay anchor (z-10) added at
-            the end of this component, so they stay clickable. */}
-        {compareId && compareType && (
-          <CompareToggleButton
-            compareId={compareId}
-            compareType={compareType}
-            className="absolute left-2 top-2 z-20"
-          />
+        {/* «Цена снижена» ON THE PHOTO, top-left, per the catalog mockup.
+            This REVERSES the earlier beside-the-price placement and the old
+            opposite-corners layout (product decision, 2026-08-04): both
+            action buttons now group top-RIGHT (heart, then compare — the
+            mockup's order), freeing the top-left corner for the badge. */}
+        {isPriceReduced && (
+          <span className="absolute left-3 top-3 z-20 flex h-6 items-center rounded-md bg-accent px-2.5 text-[11px] font-semibold tracking-wide text-white">
+            Цена снижена
+          </span>
         )}
-        {favoriteId && (
-          <FavoriteHeartButton
-            favoriteId={favoriteId}
-            className="absolute right-2 top-2 z-20"
-          />
+        {/* z-20 keeps the controls ABOVE the whole-card overlay anchor (z-10)
+            added at the end of this component, so they stay clickable. */}
+        {(favoriteId || (compareId && compareType)) && (
+          <div className="absolute right-2.5 top-2.5 z-20 flex gap-1.5">
+            {favoriteId && <FavoriteHeartButton favoriteId={favoriteId} />}
+            {compareId && compareType && (
+              <CompareToggleButton
+                compareId={compareId}
+                compareType={compareType}
+                className="relative"
+              />
+            )}
+          </div>
         )}
       </div>
 
-      {/* 14/16/16 padding, 6px between rows, per the kit's `.ctr-card__body`. */}
-      <div className="flex flex-1 flex-col px-4 pt-3.5 pb-4">
+      {/* 16px padding, 8px between rows — the catalog mockup's card body
+          (p-4 / gap-2), which supersedes the kit's earlier 14/16/16 + 6px. */}
+      <div className="flex flex-1 flex-col gap-2 p-4">
         {/* Hierarchy is strict: price (largest) → specs → address. */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <p className="text-price tabular-price text-fg">{price}</p>
-          {isPriceReduced && <PriceDropBadge />}
+          {pricePerM2 && (
+            <span className="ml-auto text-caption tabular-price text-fg-muted">
+              {pricePerM2}
+            </span>
+          )}
         </div>
 
         {/*
@@ -212,7 +228,7 @@ function PropertyCardComponent({
         </h3>
 
         {specs.length > 0 ? (
-          <ul className="mt-1.5 flex flex-wrap items-center gap-x-[14px] gap-y-1 text-small text-fg-secondary">
+          <ul className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] font-medium text-gray-700">
             {specs.map((spec) => (
               <li key={spec.text} className="inline-flex items-center gap-1.5">
                 {/* neutral-400, a step lighter than the text — the kit dims spec
@@ -228,13 +244,13 @@ function PropertyCardComponent({
           </ul>
         ) : (
           characteristics && (
-            <p className="mt-1.5 text-small text-fg-secondary">
+            <p className="text-[13px] font-medium text-gray-700">
               {characteristics}
             </p>
           )
         )}
 
-        <p className="mt-1.5 inline-flex items-start gap-1.5 text-[13px] leading-[18px] text-fg-muted">
+        <p className="inline-flex items-start gap-1.5 text-[13px] leading-[18px] text-fg-muted">
           <Icon
             icon={Icons.Address}
             size={16}
@@ -261,7 +277,7 @@ function PropertyCardComponent({
       <Link
         href={targetHref}
         aria-labelledby={titleId}
-        className="absolute inset-0 z-10 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       />
     </article>
   );

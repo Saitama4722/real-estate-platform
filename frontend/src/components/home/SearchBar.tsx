@@ -1,11 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icon";
 import { Select } from "@/components/ui/select";
+import {
+  digitsOnly,
+  groupDigits,
+  normalizeDecimalInput,
+} from "@/lib/priceDigits";
 import { cn } from "@/lib/utils";
 
 type PropertyType = "apartment" | "house" | "land" | "commercial";
@@ -96,31 +101,8 @@ async function fetchJson<T>(path: string): Promise<T | null> {
   }
 }
 
-function normalizeDecimalInput(raw: string): string | undefined {
-  const t = raw.trim().replace(/\s/g, "").replace(",", ".");
-  if (!t) return undefined;
-  const n = Number(t);
-  if (!Number.isFinite(n) || n < 0) return undefined;
-  return String(n);
-}
-
-/** Keep only 0-9, dropping every other character (letters, spaces, punctuation). */
-function digitsOnly(value: string): string {
-  return value.replace(/\D+/g, "");
-}
-
-/**
- * Format a raw digit string with a space thousands separator, ru-RU style
- * ("1000000" → "1 000 000"). We use a plain ASCII space rather than
- * `Intl.NumberFormat("ru-RU")`'s narrow no-break space (U+202F), which renders
- * inconsistently and copy-pastes oddly. Empty input → empty string.
- */
-function groupDigits(rawDigits: string): string {
-  // Drop leading zeros (but keep a lone "0") so "007" shows as "7".
-  const trimmed = rawDigits.replace(/^0+(?=\d)/, "");
-  if (!trimmed) return "";
-  return trimmed.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-}
+/* digitsOnly / groupDigits / normalizeDecimalInput moved to lib/priceDigits.ts
+   (shared with the catalog filter panel) — behaviour unchanged. */
 
 interface BuildQueryInput {
   propertyType: PropertyType;
@@ -239,6 +221,10 @@ function DistrictCombobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  /* Links the combobox input to its popup for AT (aria-controls). The listbox
+     is conditionally rendered, so the id must exist on the input regardless —
+     that is valid: aria-controls may reference an element that appears later. */
+  const listboxId = useId();
 
   const labelFor = useCallback(
     (o: LocationOption) =>
@@ -325,6 +311,7 @@ function DistrictCombobox({
           type="text"
           role="combobox"
           aria-expanded={open}
+          aria-controls={listboxId}
           aria-label="Район"
           value={open ? query : selectedLabel}
           placeholder={open ? selectedLabel : undefined}
@@ -363,12 +350,14 @@ function DistrictCombobox({
       </div>
 
       {open && (
-        // z-[1000] MUST use the arbitrary-value form: Tailwind v4's default
-        // z-index scale stops at z-50, so a bare `z-1000` is NOT a real utility
-        // and compiles to nothing (leaving the panel un-raised and letting page
-        // content bleed through). Do NOT let an editor "canonicalize" this back
-        // to `z-1000`. 1000+ is required per the Leaflet-overlay rule in CLAUDE.md.
+        // z-[1000] MUST stay in the arbitrary-value bracket form. Not because
+        // bare z-1000 is invalid (it is a documented v4 bare value) but because
+        // the bracket form is immune to the build/version drift that once
+        // emitted an empty rule here — see the z-index section in CLAUDE.md.
+        // Do NOT let an editor "canonicalize" this back to `z-1000`.
+        // 1000+ is required per the Leaflet-overlay rule.
         <ul
+          id={listboxId}
           role="listbox"
           className="absolute left-0 right-0 top-full z-[1000] mt-1 max-h-64 overflow-auto rounded-md border border-gray-200 bg-white py-1 text-sm text-gray-900 shadow-lg"
         >
