@@ -1,4 +1,5 @@
 import type { CatalogCitySlug, CatalogPropertyItem } from "@/components/catalog/types";
+import { formatGroupedNumber, formatPriceRub } from "@/lib/formatPrice";
 import { getPublicApiBaseUrl } from "@/lib/publicProperty";
 import { formatOldPrice, marketLabelFor } from "@/lib/propertyBadges";
 
@@ -22,6 +23,8 @@ export interface PublicPropertyListItemRaw {
   public_latitude: string | null;
   public_longitude: string | null;
   updated_at: string;
+  /** Optional so payloads cached before the field shipped still parse. */
+  published_at?: string | null;
   city: { id: number; name: string; slug: string } | null;
   district: { id: number; name: string; slug: string } | null;
   neighborhood: { id: number; name: string; slug: string } | null;
@@ -49,11 +52,17 @@ export interface PublicPropertyListItemRaw {
   is_new?: boolean;
 }
 
+/*
+ * Through the shared formatters (ASCII-space convention) — a direct Intl call
+ * here shipped U+202F narrow no-break spaces onto every card (review finding
+ * 14; the convention exists in CLAUDE.md's thousands-separator section).
+ */
 function formatListPrice(price: string, currency: string): string {
-  const sym = CURRENCY_LABEL[currency] ?? currency;
   const n = Number(price);
+  if (currency === "rub" && Number.isFinite(n)) return formatPriceRub(n);
+  const sym = CURRENCY_LABEL[currency] ?? currency;
   if (Number.isNaN(n)) return `${price} ${sym}`;
-  return `${new Intl.NumberFormat("ru-RU").format(n)} ${sym}`;
+  return `${formatGroupedNumber(n)} ${sym}`;
 }
 
 function asCitySlug(slug: string | undefined): CatalogCitySlug | undefined {
@@ -112,6 +121,7 @@ export function mapPublicListItemToCatalogItem(row: PublicPropertyListItemRaw): 
     latitude: Number.isFinite(lat) ? lat : 0,
     longitude: Number.isFinite(lng) ? lng : 0,
     updatedAt: row.updated_at,
+    publishedAt: row.published_at ?? undefined,
     propertyType: row.property_type,
     rooms: row.apartment_details?.rooms,
     area: row.apartment_details

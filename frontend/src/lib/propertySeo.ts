@@ -1,5 +1,6 @@
 import type { PublicPropertyDetail } from "@/lib/publicProperty";
 import { siteOrigin } from "@/lib/articleSeo";
+import { formatGroupedNumber, formatPriceRub } from "@/lib/formatPrice";
 
 export function propertyPageCanonicalUrl(pathSlug: string): string {
   const s = pathSlug.trim();
@@ -136,9 +137,16 @@ export function buildPropertyMetaDescription(p: PublicPropertyDetail): string {
   return clipSentence(s, 100, 160);
 }
 
+/*
+ * Through the shared formatters (ASCII-space convention, review finding 14) —
+ * this and the list mapper's formatListPrice must render an identical string
+ * for the same amount, or the same card differs between the list and
+ * favorites/compare hydration paths.
+ */
 export function formatPropertyPrice(p: PublicPropertyDetail): string {
-  const sym = CURRENCY_LABEL[p.currency] ?? p.currency;
   const n = Number(p.price);
+  if (p.currency === "rub" && Number.isFinite(n)) return formatPriceRub(n);
+  const sym = CURRENCY_LABEL[p.currency] ?? p.currency;
   if (Number.isNaN(n)) return `${p.price} ${sym}`;
-  return `${new Intl.NumberFormat("ru-RU").format(n)} ${sym}`;
+  return `${formatGroupedNumber(n)} ${sym}`;
 }

@@ -23,6 +23,13 @@ export interface CatalogPropertyItem {
   latitude: number;
   longitude: number;
   updatedAt?: string;
+  /**
+   * When the listing went live — what «Сначала новые» actually means (and the
+   * field the API's own `-published_at` ordering and the `is_new` badge use).
+   * Sorting by `updatedAt` instead let any CRM edit bump an old listing to
+   * the top (review finding 4).
+   */
+  publishedAt?: string;
   gallery?: string[];
   videoUrl?: string;
   propertyType?: "apartment" | "house" | "land" | "commercial";
