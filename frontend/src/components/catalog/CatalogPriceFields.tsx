@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { digitsOnly, groupDigits } from "@/lib/priceDigits";
+import { PRICE_MAX_DIGITS, digitsOnly, groupDigits } from "@/lib/priceDigits";
 import { cn } from "@/lib/utils";
 
 interface CatalogPriceFieldsProps {
@@ -17,8 +17,6 @@ interface CatalogPriceFieldsProps {
   onCommit: (min: string, max: string) => void;
   className?: string;
 }
-
-const MAX_DIGITS = 12;
 
 /**
  * The mockup's price range block: two labelled inputs sharing one 52px field
@@ -49,7 +47,7 @@ export function CatalogPriceFields({
     // Digits before the caret survive any grouping change — count them, then
     // restore the caret after that many digits in the reformatted value.
     const digitsBeforeCaret = digitsOnly(el.value.slice(0, caret)).length;
-    const raw = digitsOnly(el.value).slice(0, MAX_DIGITS);
+    const raw = digitsOnly(el.value).slice(0, PRICE_MAX_DIGITS);
     apply(raw);
     requestAnimationFrame(() => {
       const input = ref.current;

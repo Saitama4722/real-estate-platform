@@ -8,6 +8,13 @@
  * the grouped display string is derived for rendering and never stored.
  */
 
+/**
+ * Digit budget for price values — enforced by the inputs AND by the URL parser
+ * (an uncapped hand-typed ?price_min would round-trip through Number() into
+ * exponential notation and absurd chip labels). 12 digits ≡ 999 млрд ₽.
+ */
+export const PRICE_MAX_DIGITS = 12;
+
 /** Keep only 0-9, dropping every other character (letters, spaces, punctuation). */
 export function digitsOnly(value: string): string {
   return value.replace(/\D+/g, "");

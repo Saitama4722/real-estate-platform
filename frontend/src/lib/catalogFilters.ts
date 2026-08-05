@@ -16,7 +16,11 @@
 
 import type { CatalogPageSearchRecord } from "@/lib/catalogQueryParams";
 import { catalogSearchParamFirst } from "@/lib/catalogQueryParams";
-import { digitsOnly, normalizeDecimalInput } from "@/lib/priceDigits";
+import {
+  PRICE_MAX_DIGITS,
+  digitsOnly,
+  normalizeDecimalInput,
+} from "@/lib/priceDigits";
 
 export type CatalogPropertyTypeFilter =
   | ""
@@ -96,12 +100,20 @@ export const PROPERTY_TYPE_OPTIONS: {
   { value: "commercial", label: "Коммерция" },
 ];
 
+/**
+ * Every value here must stay expressible by BOTH the hero SearchBar and the
+ * catalog panel/sheet. The hero offers an exact «4» and «Иное» (market_type
+ * "other"); when the panel lacked them, a hero-built URL filtered correctly
+ * while the panel displayed «Любое»/no active segment — a live desync, not a
+ * hostile-URL edge (review finding 5).
+ */
 export const ROOMS_OPTIONS: { value: CatalogRoomsValue; label: string }[] = [
   { value: "", label: "Любое" },
   { value: "0", label: "Студия" },
   { value: "1", label: "1" },
   { value: "2", label: "2" },
   { value: "3", label: "3" },
+  { value: "4", label: "4" },
   { value: "4plus", label: "4+" },
 ];
 
@@ -109,6 +121,7 @@ export const MARKET_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "Любой" },
   { value: "new_building", label: "Новостройка" },
   { value: "secondary", label: "Вторичка" },
+  { value: "other", label: "Иное" },
 ];
 
 export const FLOOR_PRESET_OPTIONS: {
@@ -264,8 +277,11 @@ export function parseCatalogUiState(sp: CatalogPageSearchRecord): CatalogUiState
       rooms: coerceRooms(first("rooms"), first("rooms_min")),
       marketType: coerceMarket(first("market_type")),
       floorPreset: coerceFloorPreset(first("floor_preset")),
-      priceMin: digitsOnly(first("price_min") ?? ""),
-      priceMax: digitsOnly(first("price_max") ?? ""),
+      // Capped at the same limit the inputs enforce — an uncapped URL value
+      // would round-trip through Number() into exponential notation in
+      // widenedPriceMax and render an absurd chip (review finding 17).
+      priceMin: digitsOnly(first("price_min") ?? "").slice(0, PRICE_MAX_DIGITS),
+      priceMax: digitsOnly(first("price_max") ?? "").slice(0, PRICE_MAX_DIGITS),
       houseAreaMin: (first("house_area_min") ?? "").trim(),
       houseAreaMax: (first("house_area_max") ?? "").trim(),
       houseLandAreaMin: (first("house_land_area_min") ?? "").trim(),
@@ -373,6 +389,38 @@ export function catalogUiStateToQuery(state: CatalogUiState): string {
 export function catalogHref(state: CatalogUiState): string {
   const qs = catalogUiStateToQuery(state);
   return qs ? `/catalog?${qs}` : "/catalog";
+}
+
+/**
+ * Public-API query params for a UI state — THE single interpreter of the URL.
+ *
+ * Serializes through catalogUiStateToQuery, so the emission gates (per-type
+ * filters, apartments-only floor preset, exactly one location slug) are shared
+ * BY CONSTRUCTION with the URL the panel writes and the chips read, then
+ * strips the UI-only keys the API does not know. The API's param names are the
+ * URL's param names, which is what makes this a projection rather than a
+ * translation.
+ *
+ * Review finding 3: a second, raw-searchParams param builder let stale/crafted
+ * URLs filter with no chip (floor_preset on houses, cross-type area params,
+ * both location slugs at once) and — worse — silently WIDENED valid queries:
+ * its hardcoded commercial-type whitelist predated the backend's hotel/
+ * guesthouse choices, so «Гостиница» showed a chip and filtered nothing. The
+ * backend validates every param; the frontend must not maintain a second copy
+ * of that knowledge. Do not reintroduce a raw-params builder.
+ */
+export function catalogApiParamsFromUiState(
+  state: CatalogUiState,
+): Record<string, string | number | undefined> {
+  const q = new URLSearchParams(catalogUiStateToQuery(state));
+  q.delete("sort");
+  q.delete("page");
+  q.delete("view");
+  const out: Record<string, string | number | undefined> = {};
+  q.forEach((value, key) => {
+    out[key] = value;
+  });
+  return out;
 }
 
 /**
@@ -503,7 +551,7 @@ export function buildCatalogChips(
       key: "market",
       label:
         MARKET_OPTIONS.find((o) => o.value === f.marketType)?.label ??
-        (f.marketType === "other" ? "Иное" : f.marketType),
+        f.marketType,
       clear: { marketType: "" },
     });
   }
