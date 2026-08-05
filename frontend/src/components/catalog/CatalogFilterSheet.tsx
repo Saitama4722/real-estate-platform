@@ -76,18 +76,31 @@ export function CatalogFilterSheet({
     commercialAreaMax: f.commercialAreaMax,
   });
 
+  /*
+   * Per-key resync, same mechanism as the desktop panel — here it is
+   * DEFENSIVE consistency rather than a fix for an observable bug: every
+   * control in the sheet is a tap, a tap blurs the focused input, and blur
+   * commits the draft to the URL, so a sheet draft is never left uncommitted
+   * across a navigation (measured: the pending-navigation attempt produced
+   * ?price_min=3000000 — the value round-tripped, it was not preserved).
+   * Kept so both surfaces resync identically if that ever stops holding.
+   */
+  const prevAppliedRef = useRef<CatalogFilterState>(f);
   useEffect(() => {
-    setPriceMin(f.priceMin);
-    setPriceMax(f.priceMax);
-    setAreaDrafts({
-      houseAreaMin: f.houseAreaMin,
-      houseAreaMax: f.houseAreaMax,
-      houseLandAreaMin: f.houseLandAreaMin,
-      houseLandAreaMax: f.houseLandAreaMax,
-      landAreaMin: f.landAreaMin,
-      landAreaMax: f.landAreaMax,
-      commercialAreaMin: f.commercialAreaMin,
-      commercialAreaMax: f.commercialAreaMax,
+    const prev = prevAppliedRef.current;
+    if (prev === f) return;
+    prevAppliedRef.current = f;
+    if (prev.priceMin !== f.priceMin) setPriceMin(f.priceMin);
+    if (prev.priceMax !== f.priceMax) setPriceMax(f.priceMax);
+    setAreaDrafts((d) => {
+      let next: typeof d | null = null;
+      for (const key of Object.keys(d) as (keyof typeof d)[]) {
+        if (prev[key] !== f[key]) {
+          next = next ?? { ...d };
+          next[key] = f[key];
+        }
+      }
+      return next ?? d;
     });
   }, [f]);
 

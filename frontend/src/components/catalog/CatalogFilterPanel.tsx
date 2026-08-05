@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon, Icons } from "@/components/ui/icon";
 import { CatalogSelect, type CatalogSelectOption } from "@/components/catalog/CatalogSelect";
 import {
@@ -95,9 +95,33 @@ export function CatalogFilterPanel({
   const secondaryCount = countSecondaryFilters(f);
   const [moreOpen, setMoreOpen] = useState(secondaryCount > 0);
 
-  // Applied state changed (chip removed, back/forward, reset) → resync drafts.
+  /*
+   * Resync drafts PER KEY, and only where the APPLIED value actually changed.
+   *
+   * Blanket `setDrafts(draftsFrom(f))` on every `f` identity change wiped
+   * in-progress typing whenever an unrelated navigation committed — the
+   * reproducible case is typing while an EARLIER action's server render is
+   * still in flight, which on this stack is a multi-second window. Comparing
+   * against the PREVIOUS applied value distinguishes "the URL changed this
+   * field" (URL wins, resync) from "this field is untouched" (keep the
+   * draft). Chip removal, reset and back/forward all still resync, because
+   * those DO change the applied value.
+   */
+  const prevAppliedRef = useRef<CatalogFilterState>(f);
   useEffect(() => {
-    setDrafts(draftsFrom(f));
+    const prev = prevAppliedRef.current;
+    if (prev === f) return;
+    prevAppliedRef.current = f;
+    setDrafts((d) => {
+      let next: PanelDrafts | null = null;
+      for (const key of Object.keys(d) as (keyof PanelDrafts)[]) {
+        if (prev[key] !== f[key]) {
+          next = next ?? { ...d };
+          next[key] = f[key];
+        }
+      }
+      return next ?? d;
+    });
   }, [f]);
 
   // A secondary filter arriving from the URL must be visible, not hidden
