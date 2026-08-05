@@ -12,7 +12,7 @@ import {
   MARKET_OPTIONS,
   PROPERTY_TYPE_OPTIONS,
   ROOMS_OPTIONS,
-  floorFilterApplies,
+  apartmentFiltersApply,
   propertyTypeLabel,
   type CatalogFilterState,
   type CatalogUiState,
@@ -281,7 +281,9 @@ export function CatalogFilterSheet({
   const filteredNeighborhoods = neighborhoodOptions.filter(matchQ);
   const filteredDistricts = districtOptions.filter(matchQ);
 
-  const showApartmentSecondary = f.propertyType === "apartment" || f.propertyType === "";
+  /* THE RULE (lib/catalogFilters): Комнат, Рынок and Этаж all read
+     ApartmentDetails, so they appear only for an explicit «Квартиры». */
+  const showApartmentFilters = apartmentFiltersApply(f);
 
   return createPortal(
     /* z-[1100] (bracket form — do not "canonicalize"): above the site header's
@@ -423,7 +425,7 @@ export function CatalogFilterSheet({
             }}
           />
 
-          {showApartmentSecondary && (
+          {showApartmentFilters && (
             <>
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-medium uppercase tracking-[0.04em] text-fg-muted">
@@ -490,9 +492,8 @@ export function CatalogFilterSheet({
             </>
           )}
 
-          {/* Этаж — same apartments-only rule as the desktop panel; hidden,
-              not disabled, when it cannot affect the results. */}
-          {floorFilterApplies(f) &&
+          {/* Этаж — same apartments-only rule as Комнат and Рынок above. */}
+          {showApartmentFilters &&
             accordionRow(
               "floor",
               "Этаж",

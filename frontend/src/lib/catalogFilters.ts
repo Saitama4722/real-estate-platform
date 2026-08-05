@@ -141,13 +141,38 @@ export const FLOOR_PRESET_OPTIONS: {
 ];
 
 /**
- * Этаж is shown ONLY for an explicit «Квартиры» selection — never under «Все
- * типы», where a floor filter would silently turn an all-types search into an
- * apartments-only one (houses and land can never match). The panel, the sheet
- * and the URL serializer all gate on this one predicate.
+ * THE RULE: any filter whose data lives on `ApartmentDetails` requires an
+ * explicit «Квартиры» property type. That is rooms, market_type AND
+ * floor_preset — one predicate, no exceptions.
+ *
+ * Under «Все типы» such a filter silently turns an all-types search into an
+ * apartments-only one: houses, land and commercial carry no ApartmentDetails
+ * row, so they can never match. The chip says «Комнат: 2», not «квартиры
+ * только», so the narrowing is invisible. floor_preset was gated on this from
+ * the start while rooms/market_type were not — the catalog was the odd one
+ * out, since the hero SearchBar has ALWAYS rendered its rooms and market
+ * controls only for apartments.
+ *
+ * `normalizeApartmentFilters` below enforces it on the STATE, so the gates at
+ * every read site (chips, counts, widen actions, the URL serializer, the
+ * panel and the sheet) are belt-and-braces rather than the only defence.
  */
-export function floorFilterApplies(f: CatalogFilterState): boolean {
+export function apartmentFiltersApply(f: CatalogFilterState): boolean {
   return f.propertyType === "apartment";
+}
+
+/**
+ * Drops apartment-only values whenever the type is not «Квартиры», so no code
+ * path can hold one. Applied at BOTH state entry points — parse (a shared or
+ * hand-edited URL) and withFilters (a type switch) — which is what stops a
+ * value from lying dormant in state and resurrecting when the type comes back
+ * to apartments. Returns the same object when there is nothing to drop, so
+ * identity-based effects do not re-fire.
+ */
+function normalizeApartmentFilters(f: CatalogFilterState): CatalogFilterState {
+  if (apartmentFiltersApply(f)) return f;
+  if (!f.rooms && !f.marketType && !f.floorPreset) return f;
+  return { ...f, rooms: "", marketType: "", floorPreset: "" };
 }
 
 export const SORT_OPTIONS: { value: CatalogSortValue; label: string }[] = [
@@ -269,7 +294,11 @@ export function parseCatalogUiState(sp: CatalogPageSearchRecord): CatalogUiState
       : null;
 
   return {
-    filters: {
+    // normalizeApartmentFilters: a shared/stale URL carrying rooms or
+    // market_type without an explicit «Квартиры» must not filter — and must
+    // not lie dormant in state to reappear the moment the user picks
+    // apartments. See THE RULE above.
+    filters: normalizeApartmentFilters({
       propertyType: coerceType(first("property_type")),
       citySlug: (first("city_slug") ?? "").trim(),
       location,
@@ -291,7 +320,7 @@ export function parseCatalogUiState(sp: CatalogPageSearchRecord): CatalogUiState
       commercialType: (first("commercial_type") ?? "").trim(),
       commercialAreaMin: (first("commercial_area_min") ?? "").trim(),
       commercialAreaMax: (first("commercial_area_max") ?? "").trim(),
-    },
+    }),
     sort: coerceSort(first("sort")),
     page: coercePage(first("page")),
     view: first("view") === "map" ? "map" : "list",
@@ -313,10 +342,9 @@ export function searchRecordFromParams(
  * Serialize to the /catalog query string. Defaults are omitted so the
  * canonical unfiltered URL stays bare /catalog: sort=new, page=1 and
  * view=list never appear. Per-type filters are emitted only when the
- * matching property type is selected — mirroring buildCatalogQuery — so a
- * type switch cannot leave orphaned params behind. Exceptions: rooms and
- * market_type are also kept under «Все типы» (they are valid cross-type
- * narrowing on the backend; rooms implies apartments by data shape).
+ * matching property type is selected, so a type switch cannot leave orphaned
+ * params behind — including the apartment-only trio (rooms, market_type,
+ * floor_preset), which follow THE RULE above with no exceptions.
  */
 export function catalogUiStateToQuery(state: CatalogUiState): string {
   const q = new URLSearchParams();
@@ -338,18 +366,15 @@ export function catalogUiStateToQuery(state: CatalogUiState): string {
   if (pMin) q.set("price_min", pMin);
   if (pMax) q.set("price_max", pMax);
 
-  if (f.propertyType === "apartment" || f.propertyType === "") {
+  // Apartments ONLY — never under «Все типы». Because these params are
+  // emitted from state rather than copied from the old URL, switching the
+  // type away from Квартиры drops all three automatically on the next
+  // navigation: no orphaned apartment filter can linger and silently narrow.
+  if (apartmentFiltersApply(f)) {
     if (f.rooms === "4plus") q.set("rooms_min", "4");
     else if (f.rooms !== "") q.set("rooms", f.rooms);
     if (f.marketType) q.set("market_type", f.marketType);
-  }
-
-  // Apartments ONLY — never under «Все типы». Because the param is emitted
-  // from state rather than copied from the old URL, switching the type away
-  // from Квартиры drops it automatically on the next navigation: no orphaned
-  // floor_preset can linger and silently filter.
-  if (floorFilterApplies(f) && f.floorPreset) {
-    q.set("floor_preset", f.floorPreset);
+    if (f.floorPreset) q.set("floor_preset", f.floorPreset);
   }
 
   if (f.propertyType === "house") {
@@ -426,6 +451,12 @@ export function catalogApiParamsFromUiState(
 /**
  * A filter mutation resets pagination (page 1) — a new result set has no
  * memory of the old page — and keeps sort/view.
+ *
+ * Normalized, so switching the type away from «Квартиры» CLEARS the
+ * apartment-only trio in state rather than merely omitting it from the URL.
+ * Omitting alone would leave the values dormant and resurrect them if the
+ * type came back to apartments within the same client state (a pending
+ * transition reads the last navigated state, not the props).
  */
 export function withFilters(
   state: CatalogUiState,
@@ -433,7 +464,7 @@ export function withFilters(
 ): CatalogUiState {
   return {
     ...state,
-    filters: { ...state.filters, ...patch },
+    filters: normalizeApartmentFilters({ ...state.filters, ...patch }),
     page: 1,
   };
 }
@@ -534,7 +565,7 @@ export function buildCatalogChips(
       clear: { priceMax: "" },
     });
   }
-  if ((f.propertyType === "apartment" || f.propertyType === "") && f.rooms) {
+  if (apartmentFiltersApply(f) && f.rooms) {
     chips.push({
       key: "rooms",
       label:
@@ -546,7 +577,7 @@ export function buildCatalogChips(
       clear: { rooms: "" },
     });
   }
-  if ((f.propertyType === "apartment" || f.propertyType === "") && f.marketType) {
+  if (apartmentFiltersApply(f) && f.marketType) {
     chips.push({
       key: "market",
       label:
@@ -555,7 +586,7 @@ export function buildCatalogChips(
       clear: { marketType: "" },
     });
   }
-  if (floorFilterApplies(f) && f.floorPreset) {
+  if (apartmentFiltersApply(f) && f.floorPreset) {
     chips.push({
       key: "floor_preset",
       label:
@@ -636,8 +667,8 @@ export function buildCatalogChips(
  */
 export function countSecondaryFilters(f: CatalogFilterState): number {
   let n = 0;
-  if ((f.propertyType === "apartment" || f.propertyType === "") && f.marketType) n++;
-  if (floorFilterApplies(f) && f.floorPreset) n++;
+  if (apartmentFiltersApply(f) && f.marketType) n++;
+  if (apartmentFiltersApply(f) && f.floorPreset) n++;
   if (f.propertyType === "house") {
     for (const v of [f.houseAreaMin, f.houseAreaMax, f.houseLandAreaMin, f.houseLandAreaMax]) {
       if (normalizeDecimalInput(v)) n++;
@@ -709,7 +740,7 @@ export function buildWidenActions(
       state: withFilters(state, { citySlug: "", location: null }),
     });
   }
-  if ((f.propertyType === "apartment" || f.propertyType === "") && f.rooms) {
+  if (apartmentFiltersApply(f) && f.rooms) {
     actions.push({
       key: "drop_rooms",
       label: "Любое число комнат",

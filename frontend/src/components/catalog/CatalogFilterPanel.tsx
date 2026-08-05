@@ -15,8 +15,8 @@ import {
   MARKET_OPTIONS,
   PROPERTY_TYPE_OPTIONS,
   ROOMS_OPTIONS,
+  apartmentFiltersApply,
   countSecondaryFilters,
-  floorFilterApplies,
   type CatalogChip,
   type CatalogFilterState,
   type CatalogFloorPreset,
@@ -140,7 +140,12 @@ export function CatalogFilterPanel({
     }
   };
 
-  const showApartmentSecondary = f.propertyType === "apartment" || f.propertyType === "";
+  /* THE RULE (lib/catalogFilters): rooms, market_type and floor_preset all
+     read ApartmentDetails, so they need an explicit «Квартиры». Hidden rather
+     than disabled under every other type — a control that cannot affect the
+     results is noise, and the hero SearchBar has always hidden the same two
+     for non-apartments. */
+  const showApartmentFilters = apartmentFiltersApply(f);
 
   return (
     <section
@@ -209,17 +214,22 @@ export function CatalogFilterPanel({
               setDraft({ priceMin: min, priceMax: max });
             }
           }}
-          className="col-span-2 lg:col-span-3 lg:col-start-8 lg:row-start-1"
+          /* Price takes the Комнат columns (11-12) when that control is
+             hidden, so the row has no gap at its right edge. */
+          className={cn(
+            "col-span-2 lg:col-start-8 lg:row-start-1",
+            showApartmentFilters ? "lg:col-span-3" : "lg:col-span-5",
+          )}
         />
-        <CatalogSelect
-          label="Комнат"
-          options={ROOMS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-          value={showApartmentSecondary ? f.rooms : ""}
-          onChange={(v) => onPatch({ rooms: v as CatalogFilterState["rooms"] })}
-          disabled={!showApartmentSecondary}
-          disabledPlaceholder="Для квартир"
-          className="col-span-1 lg:col-span-2 lg:col-start-11 lg:row-start-1"
-        />
+        {showApartmentFilters && (
+          <CatalogSelect
+            label="Комнат"
+            options={ROOMS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+            value={f.rooms}
+            onChange={(v) => onPatch({ rooms: v as CatalogFilterState["rooms"] })}
+            className="col-span-1 lg:col-span-2 lg:col-start-11 lg:row-start-1"
+          />
+        )}
       </div>
 
       {moreOpen && (
@@ -227,7 +237,7 @@ export function CatalogFilterPanel({
           id="catalog-more-filters"
           className="mt-3.5 flex flex-wrap items-end gap-x-10 gap-y-3 border-t border-gray-100 pt-3.5"
         >
-          {showApartmentSecondary && (
+          {showApartmentFilters && (
             <div className="flex flex-col gap-1.5">
               <span className="text-[11px] font-medium uppercase tracking-[0.04em] text-fg-muted">
                 Рынок
@@ -327,11 +337,8 @@ export function CatalogFilterPanel({
             </>
           )}
 
-          {/* Этаж — apartments ONLY, and hidden (not disabled) otherwise, so
-              the panel never shows a control that cannot affect the results.
-              Never under «Все типы»: a floor filter there would silently turn
-              an all-types search into an apartments-only one. */}
-          {floorFilterApplies(f) && (
+          {/* Этаж — same apartments-only rule as Комнат and Рынок above. */}
+          {showApartmentFilters && (
             <CatalogSelect
               label="Этаж"
               options={FLOOR_PRESET_OPTIONS.map((o) => ({
