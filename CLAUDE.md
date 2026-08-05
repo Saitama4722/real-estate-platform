@@ -917,6 +917,51 @@ itself now — **there is no manual `-p 3001` / `.env.local` step any more.**
   `go_back()` swaps asynchronously — poll for the expected count, never read
   it synchronously.
 
+### Catalog invariants added by the external-review fixes (2026-08-05)
+
+All verified `[measured]` by a 34-check before/after Playwright+API run
+(every check reproduced the broken behaviour first, then the fix).
+
+- **ONE URL interpreter.** API params come from
+  `catalogApiParamsFromUiState(parseCatalogUiState(sp))` — a projection of the
+  SAME parsed state the panel and chips render from, so a filter can never
+  apply without a chip. The old raw-searchParams builder in
+  `catalogQueryParams.ts` is DELETED — its hardcoded commercial-type whitelist
+  had already gone stale (backend added `hotel`/`guesthouse`; «Гостиница»
+  showed a chip and filtered NOTHING). **Never reintroduce a frontend copy of
+  backend param validation.**
+- **Mutations in `CatalogExplorer` must read `currentState()`, never the
+  `uiState` prop.** While a transition is pending the prop describes the
+  PREVIOUS URL; two interactions inside one pending window lost the first
+  (same-tick repro: type=Дома + «На карте» kept only view=map). The
+  `lastNavigatedRef` clears when props catch up to its href, and on popstate.
+  Related: `navigate()` no-ops on the current URL (Back had appeared dead
+  after re-picking the active sort/view), and the sheet's «Показать
+  объявления» commits areas+price as ONE merged patch — two same-tick
+  `onPatch` calls always lose the first even with the ref.
+- **«Сначала новые» = `published_at`** (now on the public list serializer —
+  public-safe: the endpoint already ordered by it and `is_new` disclosed its
+  bucket). `sortCatalogProperties` no longer proxies via `updated_at`, so a
+  CRM edit cannot bump an old listing; `updatedAt` remains only as a fallback
+  for stale cached payloads.
+- **Hero parity rule:** every value the hero SearchBar can emit must be
+  expressible by the panel/sheet — that is why ROOMS_OPTIONS has an exact «4»
+  and MARKET_OPTIONS has «Иное». A hero-only value renders a working filter
+  whose panel control displays «Любое» — a live desync, not a hostile-URL
+  edge.
+- **`X-Hidden-Unknown-Floors` includes `?search`** — the count queryset runs
+  through the same `SearchFilter` backend as the list (it used to be computed
+  in `get_queryset()`, before filter backends, and over-reported).
+- **The mobile filter sheet is PORTALED to `document.body`** so it can `inert`
+  its siblings while open (a Tab trap never binds a screen reader's virtual
+  cursor). Do not move it back inside the page tree — inert would then hit an
+  ancestor of the sheet itself.
+- Price digits from the URL are capped at `PRICE_MAX_DIGITS` (12, exported
+  from `priceDigits.ts`) — same limit the inputs enforce; and ALL grouped
+  numbers go through `formatPrice.ts` (`formatPriceRub`/`formatGroupedNumber`,
+  ASCII-space convention). A mapper calling `Intl.NumberFormat` directly is
+  how U+202F reached the cards.
+
 ## Realtor profiles are a TEMPLATE: default bio, publish gate, link gating
 
 - **`is_public` («Показывать на сайте») is now ENFORCED** in
