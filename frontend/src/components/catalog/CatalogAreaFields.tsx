@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizeDecimalInput } from "@/lib/priceDigits";
 import { cn } from "@/lib/utils";
 
 interface CatalogAreaFieldsProps {
@@ -11,8 +12,13 @@ interface CatalogAreaFieldsProps {
   maxValue: string;
   onMinChange: (v: string) => void;
   onMaxChange: (v: string) => void;
-  /** Blur/Enter — the point where the panel pushes the URL (guarded upstream). */
-  onCommit: () => void;
+  /**
+   * Blur/Enter — the point where the panel pushes the URL. Receives the pair
+   * AFTER the от≤до clamp (same contract as CatalogPriceFields.onCommit): the
+   * parent must commit THESE values, not its own draft state, which has not
+   * re-rendered with the clamp yet.
+   */
+  onCommit: (min: string, max: string) => void;
   className?: string;
 }
 
@@ -46,10 +52,31 @@ export function CatalogAreaFields({
   onCommit,
   className,
 }: CatalogAreaFieldsProps) {
+  /** «От» may not exceed «до»: the edited bound is clamped to the other on
+   *  commit, mirroring CatalogPriceFields. Values compare through
+   *  normalizeDecimalInput so «45,5» and «45.5» compare numerically. */
+  const commit = (edited: "min" | "max") => {
+    let min = minValue;
+    let max = maxValue;
+    const a = normalizeDecimalInput(min);
+    const b = normalizeDecimalInput(max);
+    if (a !== undefined && b !== undefined && Number(a) > Number(b)) {
+      if (edited === "min") {
+        min = max;
+        onMinChange(min);
+      } else {
+        max = min;
+        onMaxChange(max);
+      }
+    }
+    onCommit(min, max);
+  };
+
   const lane = (
     caption: string,
     value: string,
     apply: (v: string) => void,
+    edited: "min" | "max",
     placeholder: string,
   ) => (
     <label className="flex min-w-0 flex-1 cursor-text flex-col justify-center gap-0.5 px-3.5">
@@ -61,14 +88,18 @@ export function CatalogAreaFields({
           type="text"
           inputMode="decimal"
           autoComplete="off"
+          /* The visible lane caption is just «от»/«до» — identical across
+             every area pair on the page, so the group label is folded into
+             the accessible name (review finding 11). */
+          aria-label={`${label}, ${caption}`}
           value={value}
           placeholder={placeholder}
           onChange={(e) => apply(sanitizeArea(e.target.value).slice(0, 8))}
-          onBlur={onCommit}
+          onBlur={() => commit(edited)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              onCommit();
+              commit(edited);
             }
           }}
           className="w-full min-w-0 bg-transparent text-[14px] font-semibold text-fg outline-none placeholder:font-normal placeholder:text-gray-300"
@@ -86,8 +117,8 @@ export function CatalogAreaFields({
         {label}
       </span>
       <div className="flex h-[52px] w-full min-w-[220px] divide-x divide-border rounded-xl border border-border bg-surface-raised transition-colors hover:border-border-strong focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/15">
-        {lane("от", minValue, onMinChange, "0")}
-        {lane("до", maxValue, onMaxChange, "Не важно")}
+        {lane("от", minValue, onMinChange, "min", "0")}
+        {lane("до", maxValue, onMaxChange, "max", "Не важно")}
       </div>
     </div>
   );

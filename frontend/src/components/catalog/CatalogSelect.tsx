@@ -135,9 +135,20 @@ export function CatalogSelect({
       const q = t.buffer.toLowerCase();
       const from = activeIndex >= 0 ? activeIndex : 0;
       // Search after the active option first, then wrap.
-      for (let step = 1; step <= options.length; step++) {
-        const i = (from + step) % options.length;
-        if (options[i].label.toLowerCase().startsWith(q)) return i;
+      const find = (needle: string): number => {
+        for (let step = 1; step <= options.length; step++) {
+          const i = (from + step) % options.length;
+          if (options[i].label.toLowerCase().startsWith(needle)) return i;
+        }
+        return -1;
+      };
+      const hit = find(q);
+      if (hit >= 0) return hit;
+      // APG behaviour: a buffer of one REPEATED character cycles through the
+      // options starting with it («к», «кк» → Квартиры, Коммерция, …) instead
+      // of demanding an ever-longer literal prefix (review finding 11).
+      if (q.length > 1 && q.split("").every((c) => c === q[0])) {
+        return find(q[0]);
       }
       return -1;
     },

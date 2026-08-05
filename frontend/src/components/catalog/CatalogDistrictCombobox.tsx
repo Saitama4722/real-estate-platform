@@ -37,8 +37,6 @@ interface FlatItem {
   /** null = «Все районы». */
   selection: CatalogLocationSelection | null;
   label: string;
-  /** Group header rendered above this item (not itself navigable). */
-  groupBefore?: string;
 }
 
 function keyOf(sel: CatalogLocationSelection | null): string {
@@ -80,29 +78,31 @@ export function CatalogDistrictCombobox({
     return found?.name ?? "Все районы";
   }, [neighborhoodOptions, districtOptions, value]);
 
-  /** Filtered, flattened, navigable list («Все районы» + both groups). */
-  const items = useMemo<FlatItem[]>(() => {
+  /**
+   * Filtered, FLAT, navigable list: index 0 is «Все районы», then the
+   * neighborhood matches, then the district matches. Keyboard state and
+   * option ids follow these flat indices; the render below regroups the same
+   * slices under labelled role="group" wrappers (structure for AT), so the
+   * two can never disagree on ordering.
+   */
+  const { items, nbCount, dsCount } = useMemo(() => {
     const q = query.trim().toLowerCase();
     const match = (o: CatalogLocationOption) =>
       !q || o.name.toLowerCase().includes(q);
-    const out: FlatItem[] = [{ selection: null, label: "Все районы" }];
     const nbs = neighborhoodOptions.filter(match);
     const ds = districtOptions.filter(match);
-    nbs.forEach((o, i) =>
-      out.push({
+    const out: FlatItem[] = [
+      { selection: null, label: "Все районы" },
+      ...nbs.map((o) => ({
         selection: { kind: o.kind, slug: o.slug },
         label: o.name,
-        groupBefore: i === 0 ? "Микрорайоны" : undefined,
-      }),
-    );
-    ds.forEach((o, i) =>
-      out.push({
+      })),
+      ...ds.map((o) => ({
         selection: { kind: o.kind, slug: o.slug },
         label: o.name,
-        groupBefore: i === 0 ? "Районы и населённые пункты" : undefined,
-      }),
-    );
-    return out;
+      })),
+    ];
+    return { items: out, nbCount: nbs.length, dsCount: ds.length };
   }, [neighborhoodOptions, districtOptions, query]);
 
   const openList = useCallback(() => {
@@ -183,9 +183,61 @@ export function CatalogDistrictCombobox({
     }
   };
 
-  // Rendered rows interleave non-navigable group headers with options, but
-  // aria indices/ids follow the flat `items` list only.
-  let renderedIndex = -1;
+  /** One option row; `i` is the FLAT index (aria ids, keyboard state). */
+  const renderOption = (item: FlatItem, i: number) => {
+    const selected = keyOf(value) === keyOf(item.selection);
+    const active = i === activeIndex;
+    return (
+      <div
+        key={keyOf(item.selection)}
+        id={optionId(i)}
+        role="option"
+        aria-selected={selected}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          commit(item);
+        }}
+        onMouseMove={() => {
+          if (activeIndex !== i) setActiveIndex(i);
+        }}
+        className={cn(
+          "flex h-10 cursor-pointer items-center justify-between gap-2 rounded-lg px-3 text-[14px] transition-colors",
+          selected ? "bg-brand-tint font-semibold text-brand" : "text-fg-secondary",
+          active && !selected && "bg-gray-50 text-fg",
+          active && "outline-2 -outline-offset-2 outline-brand",
+        )}
+      >
+        <span className="truncate">{item.label}</span>
+        {selected && (
+          <Icon icon={Icons.Check} size={16} className="shrink-0 text-brand" />
+        )}
+      </div>
+    );
+  };
+
+  /**
+   * The two tables render as labelled role="group" wrappers so AT users hear
+   * WHICH table an option belongs to — the микрорайон/район distinction is
+   * load-bearing (they map to different query params; see CLAUDE.md). The
+   * former visual-only headers were role="presentation" and never reached AT
+   * (review finding 11). li wrappers carry role="none": a bare <li> under a
+   * role="listbox" ul computes to a generic role and breaks the required
+   * listbox→(group→)option ownership chain.
+   */
+  const renderGroup = (title: string, groupKey: string, slice: FlatItem[], offset: number) =>
+    slice.length > 0 && (
+      <li role="none" key={groupKey}>
+        <div role="group" aria-labelledby={`${baseId}-grp-${groupKey}`}>
+          <div
+            id={`${baseId}-grp-${groupKey}`}
+            className="select-none px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-fg-muted"
+          >
+            {title}
+          </div>
+          {slice.map((item, k) => renderOption(item, offset + k))}
+        </div>
+      </li>
+    );
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
@@ -273,57 +325,18 @@ export function CatalogDistrictCombobox({
           ref={listRef}
           className="absolute left-0 top-[calc(100%+6px)] z-[1000] max-h-[320px] w-full min-w-[210px] overflow-auto rounded-xl bg-surface-raised p-1.5 shadow-lg ring-1 ring-gray-900/10"
         >
-          {items.map((item) => {
-            renderedIndex += 1;
-            const i = renderedIndex;
-            const selected = keyOf(value) === keyOf(item.selection);
-            const active = i === activeIndex;
-            return (
-              <li key={keyOf(item.selection)} className="contents">
-                {item.groupBefore && (
-                  <div
-                    role="presentation"
-                    className="select-none px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-fg-muted"
-                  >
-                    {item.groupBefore}
-                  </div>
-                )}
-                <div
-                  id={optionId(i)}
-                  role="option"
-                  aria-selected={selected}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    commit(item);
-                  }}
-                  onMouseMove={() => {
-                    if (activeIndex !== i) setActiveIndex(i);
-                  }}
-                  className={cn(
-                    "flex h-10 cursor-pointer items-center justify-between gap-2 rounded-lg px-3 text-[14px] transition-colors",
-                    selected
-                      ? "bg-brand-tint font-semibold text-brand"
-                      : "text-fg-secondary",
-                    active && !selected && "bg-gray-50 text-fg",
-                    active && "outline-2 -outline-offset-2 outline-brand",
-                  )}
-                >
-                  <span className="truncate">{item.label}</span>
-                  {selected && (
-                    <Icon
-                      icon={Icons.Check}
-                      size={16}
-                      className="shrink-0 text-brand"
-                    />
-                  )}
-                </div>
-              </li>
-            );
-          })}
+          <li role="none">{renderOption(items[0], 0)}</li>
+          {renderGroup("Микрорайоны", "nb", items.slice(1, 1 + nbCount), 1)}
+          {renderGroup(
+            "Районы и населённые пункты",
+            "ds",
+            items.slice(1 + nbCount, 1 + nbCount + dsCount),
+            1 + nbCount,
+          )}
           {items.length === 1 && query.trim() && (
-            <div className="px-3 py-2 text-[14px] text-fg-muted">
+            <li role="none" className="px-3 py-2 text-[14px] text-fg-muted">
               Ничего не найдено
-            </div>
+            </li>
           )}
         </ul>
       )}

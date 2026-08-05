@@ -262,6 +262,9 @@ export function CatalogFilterPanel({
 
           {f.propertyType === "house" && (
             <>
+              {/* onCommit receives the от≤до-clamped pair — commit THAT via
+                  commitDrafts(extra); the draft state has not re-rendered
+                  with the clamp yet (same contract as CatalogPriceFields). */}
               <CatalogAreaFields
                 label="Площадь дома"
                 unit="м²"
@@ -269,7 +272,9 @@ export function CatalogFilterPanel({
                 maxValue={drafts.houseAreaMax}
                 onMinChange={(v) => setDraft({ houseAreaMin: v })}
                 onMaxChange={(v) => setDraft({ houseAreaMax: v })}
-                onCommit={commitDrafts}
+                onCommit={(min, max) =>
+                  commitDrafts({ houseAreaMin: min, houseAreaMax: max })
+                }
               />
               <CatalogAreaFields
                 label="Участок"
@@ -278,7 +283,9 @@ export function CatalogFilterPanel({
                 maxValue={drafts.houseLandAreaMax}
                 onMinChange={(v) => setDraft({ houseLandAreaMin: v })}
                 onMaxChange={(v) => setDraft({ houseLandAreaMax: v })}
-                onCommit={commitDrafts}
+                onCommit={(min, max) =>
+                  commitDrafts({ houseLandAreaMin: min, houseLandAreaMax: max })
+                }
               />
             </>
           )}
@@ -291,7 +298,9 @@ export function CatalogFilterPanel({
               maxValue={drafts.landAreaMax}
               onMinChange={(v) => setDraft({ landAreaMin: v })}
               onMaxChange={(v) => setDraft({ landAreaMax: v })}
-              onCommit={commitDrafts}
+              onCommit={(min, max) =>
+                commitDrafts({ landAreaMin: min, landAreaMax: max })
+              }
             />
           )}
 
@@ -311,7 +320,9 @@ export function CatalogFilterPanel({
                 maxValue={drafts.commercialAreaMax}
                 onMinChange={(v) => setDraft({ commercialAreaMin: v })}
                 onMaxChange={(v) => setDraft({ commercialAreaMax: v })}
-                onCommit={commitDrafts}
+                onCommit={(min, max) =>
+                  commitDrafts({ commercialAreaMin: min, commercialAreaMax: max })
+                }
               />
             </>
           )}

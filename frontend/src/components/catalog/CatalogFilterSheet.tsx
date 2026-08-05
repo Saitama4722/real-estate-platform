@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon, Icons } from "@/components/ui/icon";
 import { CatalogPriceFields } from "@/components/catalog/CatalogPriceFields";
 import { CatalogAreaFields } from "@/components/catalog/CatalogAreaFields";
@@ -56,6 +57,8 @@ export function CatalogFilterSheet({
 }: CatalogFilterSheetProps) {
   const f = state.filters;
   const dialogRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const districtQueryRef = useRef<HTMLInputElement>(null);
   const openerRef = useRef<Element | null>(null);
   const [openSection, setOpenSection] = useState<string | null>(null);
   const [districtQuery, setDistrictQuery] = useState("");
@@ -88,19 +91,32 @@ export function CatalogFilterSheet({
     });
   }, [f]);
 
-  const commitAreaDrafts = useCallback(() => {
+  /** Pending area-draft diffs as a patch object (no navigation). */
+  const pendingAreaPatch = useCallback(() => {
     const patch: Partial<CatalogFilterState> = {};
-    let changed = false;
     for (const key of Object.keys(areaDrafts) as (keyof typeof areaDrafts)[]) {
       if (areaDrafts[key] !== f[key]) {
         patch[key] = areaDrafts[key];
-        changed = true;
       }
     }
-    if (changed) onPatch(patch);
-  }, [areaDrafts, f, onPatch]);
+    return patch;
+  }, [areaDrafts, f]);
 
-  // Focus trap + Escape + body scroll lock, active only while open.
+  /**
+   * `extra` merges over the pending diffs — the clamped pair from
+   * CatalogAreaFields arrives here before the draft state has re-rendered,
+   * same idea as the desktop panel's commitDrafts(extra).
+   */
+  const commitAreaDrafts = useCallback(
+    (extra?: Partial<CatalogFilterState>) => {
+      const patch = { ...pendingAreaPatch(), ...(extra ?? {}) };
+      if (Object.keys(patch).length > 0) onPatch(patch);
+    },
+    [pendingAreaPatch, onPatch],
+  );
+
+  // Focus trap + Escape + body scroll lock + inert background, active only
+  // while open.
   useEffect(() => {
     if (!open) return;
     openerRef.current = document.activeElement;
@@ -110,8 +126,36 @@ export function CatalogFilterSheet({
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
+    /*
+     * The Tab trap below keeps KEYBOARD focus inside, but a screen reader's
+     * virtual cursor is not bound by focus — without `inert` it can wander
+     * into the page behind the sheet. The sheet is PORTALED to document.body
+     * exactly so its siblings can be inerted without inerting the sheet
+     * itself (inert also hides them from AT, so no separate aria-hidden).
+     */
+    const overlay = overlayRef.current;
+    const inerted: HTMLElement[] = [];
+    if (overlay && overlay.parentElement === document.body) {
+      for (const el of Array.from(document.body.children)) {
+        if (el === overlay || !(el instanceof HTMLElement)) continue;
+        if (el.tagName === "SCRIPT" || el.hasAttribute("inert")) continue;
+        el.setAttribute("inert", "");
+        inerted.push(el);
+      }
+    }
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // First Escape inside the district search clears the query (the
+        // editable-combobox convention); only an Escape with nothing left to
+        // clear closes the sheet. Read .value from the DOM — this effect does
+        // not re-bind on query keystrokes.
+        const q = districtQueryRef.current;
+        if (q && e.target === q && q.value) {
+          e.preventDefault();
+          setDistrictQuery("");
+          return;
+        }
         e.preventDefault();
         onClose();
         return;
@@ -137,6 +181,7 @@ export function CatalogFilterSheet({
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
       document.body.style.overflow = prevOverflow;
+      inerted.forEach((el) => el.removeAttribute("inert"));
       // Focus returns to the «Фильтры» trigger that opened the sheet.
       if (openerRef.current instanceof HTMLElement) openerRef.current.focus();
     };
@@ -238,10 +283,12 @@ export function CatalogFilterSheet({
 
   const showApartmentSecondary = f.propertyType === "apartment" || f.propertyType === "";
 
-  return (
+  return createPortal(
     /* z-[1100] (bracket form — do not "canonicalize"): above the site header's
-       z-[1000], since the sheet is a modal over the whole page. */
-    <div className="fixed inset-0 z-[1100] md:hidden">
+       z-[1000], since the sheet is a modal over the whole page. Portaled to
+       document.body so the inert effect above can disable everything else
+       without touching an ancestor of the sheet. */
+    <div ref={overlayRef} className="fixed inset-0 z-[1100] md:hidden">
       <button
         type="button"
         aria-label="Закрыть фильтры"
@@ -307,6 +354,7 @@ export function CatalogFilterSheet({
               <label className="mx-1.5 mt-1 flex h-10 items-center gap-2 rounded-lg border border-border px-3 focus-within:border-brand">
                 <Icon icon={Icons.Search} size={16} className="shrink-0 text-gray-400" />
                 <input
+                  ref={districtQueryRef}
                   type="text"
                   value={districtQuery}
                   onChange={(e) => setDistrictQuery(e.target.value)}
@@ -410,10 +458,13 @@ export function CatalogFilterSheet({
                 <span className="text-[11px] font-medium uppercase tracking-[0.04em] text-fg-muted">
                   Рынок
                 </span>
+                {/* 2×2 grid: MARKET_OPTIONS now carries four values («Иное»
+                    included — it is reachable from the hero search, so the
+                    sheet must be able to express it; review finding 5). */}
                 <div
                   role="group"
                   aria-label="Рынок"
-                  className="grid h-12 grid-cols-3 gap-1 rounded-xl bg-surface-inset p-1"
+                  className="grid grid-cols-2 gap-1 rounded-xl bg-surface-inset p-1"
                 >
                   {MARKET_OPTIONS.map((m) => {
                     const active = f.marketType === m.value;
@@ -424,7 +475,7 @@ export function CatalogFilterSheet({
                         aria-pressed={active}
                         onClick={() => onPatch({ marketType: m.value })}
                         className={cn(
-                          "rounded-lg text-[13px] transition-colors focus-ring-brand",
+                          "h-10 rounded-lg text-[13px] transition-colors focus-ring-brand",
                           active
                             ? "bg-surface-raised font-semibold text-fg shadow-xs"
                             : "text-fg-secondary hover:text-fg",
@@ -466,7 +517,9 @@ export function CatalogFilterSheet({
                 maxValue={areaDrafts.houseAreaMax}
                 onMinChange={(v) => setAreaDrafts((d) => ({ ...d, houseAreaMin: v }))}
                 onMaxChange={(v) => setAreaDrafts((d) => ({ ...d, houseAreaMax: v }))}
-                onCommit={commitAreaDrafts}
+                onCommit={(min, max) =>
+                  commitAreaDrafts({ houseAreaMin: min, houseAreaMax: max })
+                }
               />
               <CatalogAreaFields
                 label="Участок"
@@ -475,7 +528,9 @@ export function CatalogFilterSheet({
                 maxValue={areaDrafts.houseLandAreaMax}
                 onMinChange={(v) => setAreaDrafts((d) => ({ ...d, houseLandAreaMin: v }))}
                 onMaxChange={(v) => setAreaDrafts((d) => ({ ...d, houseLandAreaMax: v }))}
-                onCommit={commitAreaDrafts}
+                onCommit={(min, max) =>
+                  commitAreaDrafts({ houseLandAreaMin: min, houseLandAreaMax: max })
+                }
               />
             </>
           )}
@@ -488,7 +543,9 @@ export function CatalogFilterSheet({
               maxValue={areaDrafts.landAreaMax}
               onMinChange={(v) => setAreaDrafts((d) => ({ ...d, landAreaMin: v }))}
               onMaxChange={(v) => setAreaDrafts((d) => ({ ...d, landAreaMax: v }))}
-              onCommit={commitAreaDrafts}
+              onCommit={(min, max) =>
+                commitAreaDrafts({ landAreaMin: min, landAreaMax: max })
+              }
             />
           )}
 
@@ -514,7 +571,9 @@ export function CatalogFilterSheet({
                 maxValue={areaDrafts.commercialAreaMax}
                 onMinChange={(v) => setAreaDrafts((d) => ({ ...d, commercialAreaMin: v }))}
                 onMaxChange={(v) => setAreaDrafts((d) => ({ ...d, commercialAreaMax: v }))}
-                onCommit={commitAreaDrafts}
+                onCommit={(min, max) =>
+                  commitAreaDrafts({ commercialAreaMin: min, commercialAreaMax: max })
+                }
               />
             </>
           )}
@@ -524,10 +583,18 @@ export function CatalogFilterSheet({
           <button
             type="button"
             onClick={() => {
-              commitAreaDrafts();
-              if (priceMin !== f.priceMin || priceMax !== f.priceMax) {
-                onPatch({ priceMin, priceMax });
-              }
+              /*
+               * ONE merged patch — never two onPatch calls in the same tick.
+               * Two calls both derive from the same pre-navigation state, so
+               * the second's URL is missing the first's change and silently
+               * overwrites it (review finding 1: area + price edits submitted
+               * together deterministically lost the area). Mirrors the
+               * desktop panel's commitDrafts(extra).
+               */
+              const patch: Partial<CatalogFilterState> = pendingAreaPatch();
+              if (priceMin !== f.priceMin) patch.priceMin = priceMin;
+              if (priceMax !== f.priceMax) patch.priceMax = priceMax;
+              if (Object.keys(patch).length > 0) onPatch(patch);
               onClose();
             }}
             className="h-12 w-full rounded-xl bg-brand text-[15px] font-semibold text-white transition-colors hover:bg-brand-hover focus-ring-brand"
@@ -536,6 +603,7 @@ export function CatalogFilterSheet({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
