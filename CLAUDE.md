@@ -949,6 +949,43 @@ All verified `[measured]` by a 34-check before/after Playwright+API run
   and MARKET_OPTIONS has «Иное». A hero-only value renders a working filter
   whose panel control displays «Любое» — a live desync, not a hostile-URL
   edge.
+- **⭐ THE APARTMENT-ONLY RULE (2026-08-05): any filter whose data lives on
+  `ApartmentDetails` requires an explicit «Квартиры» property type.** That is
+  `rooms`, `market_type` AND `floor_preset` — one predicate,
+  `apartmentFiltersApply(f)`, no exceptions. Under «Все типы» such a filter
+  silently turns an all-types search into an apartments-only one (nothing else
+  has an ApartmentDetails row to match), and the chip says «Комнат: 2», never
+  «квартиры только». `floor_preset` was gated from the start while
+  rooms/market_type were not — **the catalog was the odd one out: the hero
+  SearchBar has ALWAYS rendered its rooms/market controls only for
+  apartments** (`propertyType === "apartment" &&` in SearchBar.tsx), so the
+  panel was the inconsistent surface, not the hero.
+  - **Enforced on the STATE, not just at read sites.**
+    `normalizeApartmentFilters()` runs in BOTH `parseCatalogUiState` (a shared
+    or stale URL) and `withFilters` (a type switch), so an inapplicable value
+    can never sit dormant in state and resurrect when the type comes back to
+    apartments. Verified `[measured]`: before, `?rooms=2` with no type
+    filtered (2 of 8 fixtures) and picking «Квартиры» kept `rooms=2`; after,
+    it filters nothing, shows no chip, and picking «Квартиры» gives all 5
+    apartments. The gates at the read sites (chips, counts, widen actions, the
+    serializer, panel, sheet) are belt-and-braces.
+  - Controls are **hidden, not disabled**, for every non-apartment type
+    `[measured]`: rooms/market/floor all absent under «Все типы», «Дома»,
+    «Участки» and «Коммерция»; all three present under «Квартиры». The price
+    field takes the freed grid columns (`lg:col-span-5`) so the row has no gap.
+  - **Accepted cost:** a shared URL carrying `rooms`/`market_type` with no
+    type stops filtering. Same class as the `rooms=27` change.
+- **Draft resync is PER KEY, against the previous applied value**
+  (`prevAppliedRef` in the panel and the sheet). A blanket
+  `setDrafts(draftsFrom(f))` on every `f` identity change wiped in-progress
+  typing whenever an unrelated navigation committed. **The repro needs a
+  PENDING navigation** `[measured]`: type while an earlier action's RSC render
+  is still in flight, and the commit wipes the draft. The obvious "type, then
+  click another control" flow does NOT reproduce it — the click blurs the
+  input, blur commits the draft to the URL, and it round-trips back. Same
+  reason there is no user-reachable wipe in the SHEET at all (every control
+  there is a tap): its per-key resync is defensive consistency, verified
+  non-regressive rather than fixing an observable bug.
 - **`X-Hidden-Unknown-Floors` includes `?search`** — the count queryset runs
   through the same `SearchFilter` backend as the list (it used to be computed
   in `get_queryset()`, before filter backends, and over-reported).
