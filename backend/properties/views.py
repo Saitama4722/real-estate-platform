@@ -186,10 +186,20 @@ class PropertyViewSet(ReadOnlyModelViewSet):
                 # `apartment_details__isnull=False` matters: a plain
                 # `floors_total__isnull=True` would LEFT JOIN and also match
                 # houses/land, which have no apartment_details at all.
-                self._hidden_unknown_floors = qs.filter(
+                count_qs = qs.filter(
                     apartment_details__isnull=False,
                     apartment_details__floors_total__isnull=True,
-                ).count()
+                )
+                # The SearchFilter backend runs in filter_queryset(), AFTER
+                # this method — the main queryset gets ?search for free, this
+                # count would not, and it over-reported hidden listings that
+                # never matched the search (review finding 6). Reusing the
+                # backend itself (same search_fields on this view) means the
+                # count can never drift from what the list actually matches.
+                count_qs = filters.SearchFilter().filter_queryset(
+                    self.request, count_qs, self
+                )
+                self._hidden_unknown_floors = count_qs.count()
                 qs = qs.filter(
                     apartment_details__floors_total__isnull=False,
                     apartment_details__floor__lt=F("apartment_details__floors_total"),
