@@ -1777,6 +1777,72 @@ Index of what changed this session; details live in the linked sections above.
   warm restart (keep `.next`); reserve deletion for a last resort when the drive is
   known-healthy.
 
+## Claude Code itself can abort with 0xC0000409 on this drive — recovery checklist
+
+- **The abort is ENVIRONMENTAL, not a code error.** Claude Code died mid-session
+  with Windows exit code **`0xC0000409` (3221226505,
+  `STATUS_STACK_BUFFER_OVERRUN`)** `[observed]` — the same class of pCloud
+  filesystem fragility as the `.next\trace` EPERM and the PackFileCache rename
+  failures above, just hitting the agent process instead of the dev server. The
+  log named `.claude\settings.local.json` being written on the pCloud drive at
+  the moment of the crash. **Do not start debugging application code, and do not
+  assume the repository is damaged.**
+- **The settings file was NOT corrupted, and the log line naming it is not
+  evidence that it was** `[measured]`: after the abort,
+  `.claude/settings.local.json` parsed as **valid JSON**, 3280 bytes, with an
+  mtime of **2026-06-28** — i.e. no write had landed at crash time at all. Check
+  it, but expect it to be fine; `[inferred]` the abort interrupted the write
+  before it touched the file rather than half-writing it.
+
+### First moves after ANY abnormal termination — in this order
+
+1. **`git status` + `git log --oneline -10`.** What is committed is safe; only
+   the working tree can be mid-edit.
+2. **Check for an in-progress operation** before touching anything —
+   `MERGE_HEAD`, `REBASE_HEAD`, `CHERRY_PICK_HEAD`, `BISECT_LOG`,
+   `rebase-merge/`, `rebase-apply/` under `.git/`. A half-finished rebase is the
+   one state where the tree really is incoherent, and it is invisible in a
+   casual `git status` read.
+3. **`tsc --noEmit`** to prove the tree compiles rather than eyeballing diffs
+   for truncation. Run it with the **project-local** binary —
+   `& "frontend\node_modules\.bin\tsc.cmd" --noEmit -p frontend\tsconfig.json`.
+   Bare `npx tsc` from the repo root does **not** resolve (typescript is a
+   `frontend/` dependency) and prints "This is not the tsc command you are
+   looking for", which is a tooling miss, not a type error `[measured]`.
+4. Only then read diffs.
+
+### ⭐ The diagnostic that actually settled it: mtimes vs commit timestamps
+
+- **Compare each dirty file's `LastWriteTime` against the timestamps of the last
+  commits.** That is what proved the abort landed _after_ the final commit
+  rather than during one, and it is cheaper and far more conclusive than reading
+  the diff and guessing whether it "looks finished".
+- **Worked example (2026-08-05 recovery)** `[measured]`: the last three commits
+  were written at **05:36:51 / 05:37:57 / 05:38:07 +0300**; the single dirty file
+  (`frontend/src/app/privacy/page.tsx`) had an mtime of **2026-08-03 01:06** —
+  **two days earlier**. So it was a stale leftover from an unrelated earlier
+  session, not a casualty of the crash, and the interrupted task had in fact
+  completed and committed. `tsc --noEmit` exited **0** and no in-progress git
+  operation existed, confirming the tree was coherent.
+- **Corollary — a dirty file is not automatically "the file it crashed on".**
+  Establish its age before assuming it needs repair or reverting it. Reverting a
+  complete, unrelated edit because it happened to be uncommitted is the
+  destructive failure mode here.
+
+### Prevention: commits on this drive exist in exactly one place
+
+- **Push early and often.** 38 commits of finished work were sitting only on
+  `P:\` when this abort hit — on a drive this file already documents as capable
+  of locking files, failing builds and killing processes. `git push` is the only
+  thing that makes work survive the drive. `[measured]` the branch pushed clean
+  afterwards (`bb1d894..2379b13`, remote ref == local HEAD).
+- **Gotcha:** `git push` may print **`fatal: Cannot prompt because user
+  interactivity has been disabled`** and still succeed `[measured]` — that line
+  comes from a credential-helper probe, and the real result is the
+  `old..new branch -> branch` line below it. **Verify with
+  `git ls-remote origin <branch>` against `git rev-parse HEAD` instead of
+  reading the word "fatal" as failure.**
+
 ## CRM cabinet "EvalError: Code generation from strings disallowed" — ROOT CAUSE + FIX
 
 - **Symptom:** every `/account/*` page 500s in dev with `EvalError: Code generation
