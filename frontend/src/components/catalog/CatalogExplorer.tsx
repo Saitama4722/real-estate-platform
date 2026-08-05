@@ -167,9 +167,59 @@ export function CatalogExplorer({
     el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
   }, []);
 
+  /*
+   * Last state handed to navigate(), kept until the server render for that
+   * URL commits. While a transition is pending the `uiState` PROP still
+   * describes the PREVIOUS URL, so building the next mutation from props
+   * would silently revert the pending change — two taps inside one pending
+   * transition lost the first (review finding 2; the sheet's «Показать
+   * объявления» hit the same shape deterministically, finding 1). Every
+   * mutation therefore reads currentState(), never uiState directly.
+   */
+  const lastNavigatedRef = useRef<{ state: CatalogUiState; href: string } | null>(
+    null,
+  );
+
+  // Props caught up with the last programmatic navigation → props are the
+  // authority again. An intermediate commit (an EARLIER navigation's render
+  // landing while a newer one is still pending) carries a different href and
+  // correctly keeps the ref alive.
+  useEffect(() => {
+    if (
+      lastNavigatedRef.current &&
+      catalogHref(uiState) === lastNavigatedRef.current.href
+    ) {
+      lastNavigatedRef.current = null;
+    }
+  }, [uiState]);
+
+  // Back/forward rewrites the URL outside navigate() — a kept ref would
+  // resurrect the pre-Back state on the next patch.
+  useEffect(() => {
+    const onPop = () => {
+      lastNavigatedRef.current = null;
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const currentState = useCallback(
+    () => lastNavigatedRef.current?.state ?? uiState,
+    [uiState],
+  );
+
   const navigate = useCallback(
     (state: CatalogUiState, opts?: { toResults?: boolean }) => {
       const href = catalogHref(state);
+      // Same-URL navigation is a no-op: pushing an identical entry would make
+      // the next Back press appear to do nothing (review finding 7). Landing
+      // routes never match — their pathname is not /catalog — so the first
+      // interaction there always navigates.
+      if (href === window.location.pathname + window.location.search) {
+        if (opts?.toResults) scrollToResults();
+        return;
+      }
+      lastNavigatedRef.current = { state, href };
       /*
        * Create the history entry SYNCHRONOUSLY, before the transition.
        * `router.push` inside startTransition defers its pushState until the
@@ -191,8 +241,9 @@ export function CatalogExplorer({
   );
 
   const patchFilters = useCallback(
-    (patch: Partial<CatalogFilterState>) => navigate(withFilters(uiState, patch)),
-    [navigate, uiState],
+    (patch: Partial<CatalogFilterState>) =>
+      navigate(withFilters(currentState(), patch)),
+    [navigate, currentState],
   );
 
   const removeChip = useCallback(
@@ -201,8 +252,8 @@ export function CatalogExplorer({
   );
 
   const resetAll = useCallback(
-    () => navigate(resetAllState(uiState)),
-    [navigate, uiState],
+    () => navigate(resetAllState(currentState())),
+    [navigate, currentState],
   );
 
   /* ---- Sticky condensed bar: rAF-throttled position sweep (never IO) ----- */
@@ -307,8 +358,8 @@ export function CatalogExplorer({
           filtersCount={chips.length}
           sort={uiState.sort}
           view={uiState.view}
-          onSortChange={(sort) => navigate({ ...uiState, sort, page: 1 })}
-          onViewChange={(view) => navigate({ ...uiState, view })}
+          onSortChange={(sort) => navigate({ ...currentState(), sort, page: 1 })}
+          onViewChange={(view) => navigate({ ...currentState(), view })}
           onOpenSheet={() => setSheetOpen(true)}
         />
 
@@ -392,7 +443,7 @@ export function CatalogExplorer({
                   return; // new-tab / download intents keep native link behaviour
                 }
                 e.preventDefault();
-                navigate({ ...uiState, page }, { toResults: true });
+                navigate({ ...currentState(), page }, { toResults: true });
               }}
             />
           </>
