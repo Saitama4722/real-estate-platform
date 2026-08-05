@@ -208,6 +208,13 @@ class PropertyListSerializer(serializers.ModelSerializer):
             "preview_image",
             "is_price_reduced",
             "is_new",
+            # Publication timestamp — what «Сначала новые» sorts by. Public-safe:
+            # this endpoint already orders by it (?ordering=-published_at),
+            # `is_new` already discloses its 7-day bucket, and updated_at is
+            # already published. Without it the frontend's deterministic
+            # re-sort fell back to updated_at, so any CRM edit bumped an old
+            # listing to the top (review finding 4).
+            "published_at",
         ]
 
     def get_is_price_reduced(self, obj) -> bool:
