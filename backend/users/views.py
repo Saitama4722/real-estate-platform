@@ -11,6 +11,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .activity import record_employee_activity
 from .models import EmployeeActivityLog
 from .permissions import IsCrmStaffManager, IsCrmUser
+from .throttles import LoginThrottle, ThrottledRu
 from .serializers import (
     CurrentUserSerializer,
     CurrentUserUpdateSerializer,
@@ -25,9 +26,26 @@ class LoginView(TokenObtainPairView):
     Body: {"email": "...", "password": "..."}
     Returns: {"access": "...", "refresh": "..."}
     Only active users can log in.
+
+    Rate limited by LoginThrottle. Nothing else about the flow changes: the
+    credential check, the token pair and the 401 body are simplejwt's.
+
+    ⚠ The 401 for a wrong password and for a disabled account is deliberately
+    IDENTICAL (simplejwt's "no active account"). Do not split them — the login
+    form would become an account-enumeration oracle. The frontend maps the
+    single 401 to one message and reserves a distinct one for this 429.
     """
     serializer_class = EmailTokenObtainPairSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [LoginThrottle]
+
+    def throttled(self, request, wait):
+        # DRF sets Retry-After from `wait`; the frontend reads it to render the
+        # countdown in the «Слишком много попыток» banner.
+        raise ThrottledRu(
+            wait=wait,
+            detail="Слишком много попыток входа. Попробуйте позже.",
+        )
 
 
 class RefreshView(TokenRefreshView):
