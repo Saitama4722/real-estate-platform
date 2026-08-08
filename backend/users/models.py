@@ -100,6 +100,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         default=False,
     )
 
+    #: Счётчик поколений токенов. Увеличивается при сбросе пароля суперадмином;
+    #: JWT несёт это значение в claim `tv`, и VersionedJWTAuthentication
+    #: отклоняет любой токен со старым номером. Так все выданные ранее access-
+    #: и refresh-токены умирают немедленно, а не доживают до истечения срока.
+    token_version = models.PositiveIntegerField("Поколение токенов", default=0)
+
     objects = UserManager()
 
     USERNAME_FIELD = "email"
@@ -177,16 +183,33 @@ class EmployeeActivityLog(models.Model):
     class ActionType(models.TextChoices):
         LOGIN = "login", "Вход"
         LOGOUT = "logout", "Выход"
+        #: Сброс пароля сотрудника суперадминистратором. В журнале фиксируются
+        #: кто сбросил, кому и когда — сам пароль НИКОГДА не записывается.
+        PASSWORD_RESET = "password_reset", "Сброс пароля"
+        #: Смена собственного email (email — это логин).
+        EMAIL_CHANGE = "email_change", "Смена email"
 
     user = models.ForeignKey(
         "User",
         on_delete=models.CASCADE,
         related_name="activity_logs",
         verbose_name="Пользователь",
+        help_text="Кто выполнил действие.",
+    )
+    #: Над кем выполнено действие, если это не сам пользователь. Заполняется для
+    #: сброса пароля: `user` — суперадмин, `target_user` — сотрудник. Для входа
+    #: и выхода остаётся пустым.
+    target_user = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="activity_logs_as_target",
+        verbose_name="Над кем",
+        null=True,
+        blank=True,
     )
     action_type = models.CharField(
         "Действие",
-        max_length=16,
+        max_length=32,
         choices=ActionType.choices,
         db_index=True,
     )

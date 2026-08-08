@@ -2,12 +2,24 @@
 Serializers for auth and current user.
 """
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework.validators import UniqueValidator
+from rest_framework_simplejwt.exceptions import InvalidToken
+from rest_framework_simplejwt.serializers import (
+    TokenObtainPairSerializer,
+    TokenRefreshSerializer,
+)
 
+from .authentication import TOKEN_VERSION_CLAIM
 from .models import EmployeeActivityLog, RealtorProfile
 
 User = get_user_model()
+
+#: Один текст для всех мест, где email занят. DRF по умолчанию отдаёт английское
+#: «This field must be unique.» — сотруднику это ничего не объясняет.
+EMAIL_TAKEN_MESSAGE = "Этот email уже используется другой учётной записью."
 
 # Максимальная длина публичной «продающей» биографии риэлтора. Ограничение
 # держим синхронным с фронтендом (textarea maxLength).
@@ -170,7 +182,83 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
         # Optional: add role to token payload if needed later
         token["role"] = user.role
+        # Generation stamp — VersionedJWTAuthentication rejects the token once
+        # this falls behind the user's token_version (password reset).
+        token[TOKEN_VERSION_CLAIM] = user.token_version
         return token
+
+
+class VersionedTokenRefreshSerializer(TokenRefreshSerializer):
+    """
+    Refresh that also honours `token_version`.
+
+    Without this the refresh would succeed and mint an access token carrying the
+    STALE `tv` claim (simplejwt copies custom claims across), which
+    VersionedJWTAuthentication would then reject — the user gets logged out, but
+    only after a pointless extra round trip and a confusing intermediate 200.
+    Failing here makes a revoked session fail at the first opportunity.
+    """
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        refresh = self.token_class(attrs["refresh"])
+        user_id = refresh.get("user_id")
+        claimed = refresh.get(TOKEN_VERSION_CLAIM, 0)
+        current = (
+            User.objects.filter(pk=user_id)
+            .values_list("token_version", flat=True)
+            .first()
+        )
+        if current is None or int(claimed) != int(current):
+            raise InvalidToken("Сессия завершена: пароль был изменён. Войдите заново.")
+        return data
+
+
+class SetEmployeePasswordSerializer(serializers.Serializer):
+    """
+    Суперадмин задаёт новый пароль сотруднику.
+
+    ⚠ Пароль только принимается и проверяется; он не логируется, не возвращается
+    в ответе и нигде не сохраняется в открытом виде.
+    """
+
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_password(self, value):
+        # Django's configured validators (AUTH_PASSWORD_VALIDATORS): длина,
+        # схожесть с данными пользователя, словарь частых паролей, «только
+        # цифры». Своё правило не изобретаем.
+        try:
+            validate_password(value, user=self.context.get("target_user"))
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
+        return value
+
+
+class ChangeOwnEmailSerializer(serializers.Serializer):
+    """
+    Смена собственного email с подтверждением текущим паролем.
+
+    Email — это логин, поэтому его подмена равносильна захвату аккаунта. Пароль
+    просят у того, кто меняет СВОЙ адрес (защита от «оставленного открытым
+    ноутбука»); суперадмин, меняющий чужой адрес, уже привилегирован и его
+    действие пишется в журнал под его именем.
+    """
+
+    email = serializers.EmailField()
+    current_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        user = self.context["user"]
+        if User.objects.filter(email__iexact=value).exclude(pk=user.pk).exists():
+            raise serializers.ValidationError(EMAIL_TAKEN_MESSAGE)
+        return value
+
+    def validate_current_password(self, value):
+        if not self.context["user"].check_password(value):
+            raise serializers.ValidationError("Неверный текущий пароль.")
+        return value
 
 
 class EmployeeActivityLogSerializer(serializers.ModelSerializer):
@@ -283,7 +371,19 @@ class RealtorCrmWriteSerializer(serializers.ModelSerializer):
     `public_phone`, `is_public`), которые пишутся в связанный RealtorProfile.
     """
 
+    #: Пароль принимается ТОЛЬКО при создании учётной записи. Смена пароля
+    #: существующего сотрудника идёт через отдельную ручку set_password,
+    #: доступную одному суперадмину (см. update() ниже).
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    email = serializers.EmailField(
+        validators=[
+            UniqueValidator(
+                queryset=User.objects.all(),
+                message=EMAIL_TAKEN_MESSAGE,
+                lookup="iexact",
+            )
+        ]
+    )
     short_bio = serializers.CharField(
         required=False, allow_blank=True, max_length=SHORT_BIO_MAX
     )
@@ -357,11 +457,15 @@ class RealtorCrmWriteSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         profile_fields = self._pop_profile_fields(validated_data)
-        password = validated_data.pop("password", None)
+        # ⚠ Пароль здесь ИГНОРИРУЕТСЯ намеренно. Раньше PATCH на риэлтора
+        # менял пароль, и это мог сделать любой админ (IsCrmStaffManager).
+        # Теперь смена пароля — только POST set_password под суперадмином, с
+        # проверкой валидаторами, записью в журнал и сбросом сессий.
+        validated_data.pop("password", None)
+        if "email" in validated_data:
+            validated_data["email"] = validated_data["email"].strip().lower()
         for key, value in validated_data.items():
             setattr(instance, key, value)
-        if password and str(password).strip():
-            instance.set_password(password)
         instance.save()
         _apply_realtor_profile_fields(instance, profile_fields)
         return instance

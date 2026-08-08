@@ -13,10 +13,12 @@ from .models import EmployeeActivityLog
 from .permissions import IsCrmStaffManager, IsCrmUser
 from .throttles import LoginThrottle, ThrottledRu
 from .serializers import (
+    ChangeOwnEmailSerializer,
     CurrentUserSerializer,
     CurrentUserUpdateSerializer,
     EmailTokenObtainPairSerializer,
     EmployeeActivityLogSerializer,
+    VersionedTokenRefreshSerializer,
 )
 
 
@@ -53,8 +55,13 @@ class RefreshView(TokenRefreshView):
     POST /api/auth/refresh/
     Body: {"refresh": "..."}
     Returns: {"access": "..."}
+
+    Uses VersionedTokenRefreshSerializer so a refresh token from before a
+    password reset fails here instead of minting an access token that the
+    authentication layer would reject a moment later.
     """
     permission_classes = [AllowAny]
+    serializer_class = VersionedTokenRefreshSerializer
 
 
 class LogoutView(APIView):
@@ -122,4 +129,40 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
         self.perform_update(serializer)
         return Response(
             CurrentUserSerializer(instance, context=self.get_serializer_context()).data
+        )
+
+
+class ChangeOwnEmailView(APIView):
+    """
+    POST /api/auth/me/email/  {"email": "...", "current_password": "..."}
+
+    Смена собственного логина. Email — это учётные данные, поэтому подтверждаем
+    текущим паролем: иначе любой, кто подошёл к незаблокированному компьютеру,
+    забирает аккаунт в один клик, и владелец об этом не узнает.
+
+    Токены НЕ отзываются: пользователь меняет адрес сам и остаётся собой — в
+    отличие от сброса пароля суперадмином, где смысл как раз в разрыве сессий.
+    """
+
+    permission_classes = [IsCrmUser]
+    http_method_names = ["post", "head", "options"]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ChangeOwnEmailSerializer(
+            data=request.data, context={"user": request.user}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        new_email = serializer.validated_data["email"]
+        if new_email != user.email:
+            user.email = new_email
+            user.save(update_fields=["email"])
+            record_employee_activity(
+                request,
+                user,
+                EmployeeActivityLog.ActionType.EMAIL_CHANGE,
+            )
+        return Response(
+            CurrentUserSerializer(user, context={"request": request}).data
         )

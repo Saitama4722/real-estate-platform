@@ -24,8 +24,15 @@ def record_employee_activity(
     request: HttpRequest | None,
     user: User,
     action_type: EmployeeActivityLog.ActionType | str,
+    target_user: User | None = None,
 ) -> None:
-    """Создать запись в журнале; только для ролей CRM."""
+    """
+    Создать запись в журнале; только для ролей CRM.
+
+    `user` — кто выполнил действие, `target_user` — над кем (для сброса пароля).
+    ⚠ Никогда не передавайте сюда пароль или его часть: в журнал попадают только
+    идентификаторы, IP и User-Agent.
+    """
     if not user or not user.is_authenticated:
         return
     allowed = {
@@ -43,6 +50,7 @@ def record_employee_activity(
     ua = user_agent_from_request(request)
     EmployeeActivityLog.objects.create(
         user=user,
+        target_user=target_user,
         action_type=action_value,
         ip_address=ip,
         user_agent=ua,

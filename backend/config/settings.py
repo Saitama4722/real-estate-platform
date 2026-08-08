@@ -302,7 +302,11 @@ if DEBUG:
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # Subclass of simplejwt's JWTAuthentication that additionally checks the
+        # token's `tv` claim against User.token_version, so a superadmin
+        # password reset kills existing access AND refresh tokens immediately
+        # instead of leaving the access token valid for up to an hour.
+        "users.authentication.VersionedJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
