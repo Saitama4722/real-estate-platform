@@ -1,22 +1,27 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowLeft,
   ArrowRight,
   ArrowUpDown,
   BedDouble,
   Building,
   Building2,
+  Calendar,
   Car,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  Clock,
   DoorOpen,
   Heart,
   House,
   Inbox,
+  Info,
   KeyRound,
   LandPlot,
+  Link2,
   List,
   Map as MapIcon,
   MapPin,
@@ -30,6 +35,8 @@ import {
   Scale,
   Scan,
   Search,
+  SearchX,
+  Send,
   Share2,
   ShieldCheck,
   SlidersHorizontal,
@@ -112,8 +119,21 @@ export const Icons = {
   ChevronLeft,
   ChevronDown,
   ArrowRight,
+  ArrowLeft,
   Inbox,
   Article: Newspaper,
+
+  // Articles (index + detail)
+  Clock,
+  Calendar,
+  /** Paper-plane — the Telegram share pill. */
+  Send,
+  /** Chain link — «Скопировать ссылку». */
+  CopyLink: Link2,
+  /** Crossed-out magnifier — the empty-category state. */
+  SearchEmpty: SearchX,
+  /** Callout «Важно» marker in the article body. */
+  Info,
 
   // Property categories
   Apartment: Building2,

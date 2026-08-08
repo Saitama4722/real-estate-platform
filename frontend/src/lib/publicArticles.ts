@@ -5,6 +5,8 @@ export interface PublicArticle {
   title: string;
   excerpt: string;
   body: string;
+  /** ArticleCategory slug ("" only for a stale cached payload without it). */
+  category: string;
   publishedAt: string;
   coverImage: string | null;
 }
@@ -14,6 +16,7 @@ interface ArticleRaw {
   title: string;
   excerpt: string;
   body: string;
+  category?: string;
   published_at: string;
   cover_image: string | null;
 }
@@ -24,6 +27,7 @@ function mapArticleRaw(row: ArticleRaw): PublicArticle {
     title: row.title,
     excerpt: row.excerpt,
     body: row.body,
+    category: row.category ?? "",
     publishedAt: row.published_at,
     coverImage: row.cover_image,
   };
@@ -80,13 +84,21 @@ export function listArticlesSorted(articles: PublicArticle[]): PublicArticle[] {
   );
 }
 
+/**
+ * «Другие статьи»: same-category articles first (newest first), then the rest
+ * by recency. Pass the current article's category so a reader deep in
+ * «Ипотека» sees mortgage material before generic news.
+ */
 export function getSimilarArticles(
   slug: string,
   articles: PublicArticle[],
   limit = 3,
+  category?: string,
 ): PublicArticle[] {
   const key = slug.trim();
-  return listArticlesSorted(articles)
-    .filter((a) => a.slug !== key)
-    .slice(0, limit);
+  const others = listArticlesSorted(articles).filter((a) => a.slug !== key);
+  if (!category) return others.slice(0, limit);
+  const same = others.filter((a) => a.category === category);
+  const rest = others.filter((a) => a.category !== category);
+  return [...same, ...rest].slice(0, limit);
 }

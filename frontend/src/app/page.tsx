@@ -3,6 +3,7 @@ import { HeroSection } from "@/components/home/HeroSection";
 import { siteOrigin } from "@/lib/articleSeo";
 import { HomeCatalogExplorer, type HomeCategory } from "@/components/home/HomeCatalogExplorer";
 import { ArticlesSection } from "@/components/home/ArticlesSection";
+import { articleCardDataFrom } from "@/components/articles/ArticleCard";
 import { SellCtaSection } from "@/components/home/SellCtaSection";
 import { SeoTextSection } from "@/components/home/SeoTextSection";
 import { HomeInquiryCard } from "@/components/home/HomeInquiryCard";
@@ -54,12 +55,9 @@ export default async function HomePage() {
     fetchHomepageTextBlockMap(),
   ]);
 
-  const articles = listArticlesSorted(articlesRaw).slice(0, 3).map((a) => ({
-    slug: a.slug,
-    title: a.title,
-    excerpt: a.excerpt,
-    coverImage: a.coverImage,
-  }));
+  const articles = listArticlesSorted(articlesRaw)
+    .slice(0, 3)
+    .map(articleCardDataFrom);
 
   return (
     <>
