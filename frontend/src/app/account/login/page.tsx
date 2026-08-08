@@ -1,14 +1,17 @@
-import { PageHeading } from "@/components/layout/page-heading";
-import { CrmLoginForm } from "@/components/crm/CrmLoginForm";
+import type { Metadata } from "next";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { SignInForm } from "@/components/auth/SignInForm";
+
+export const metadata: Metadata = {
+  title: "Вход в личный кабинет — Centreal",
+  description: "Вход для сотрудников Centreal: объекты, заявки и клиенты.",
+  robots: { index: false, follow: false },
+};
 
 export default function AccountLoginPage() {
   return (
-    <>
-      <PageHeading
-        title="Вход в личный кабинет"
-        subtitle="Email и пароль учётной записи сотрудника"
-      />
-      <CrmLoginForm />
-    </>
+    <AuthShell>
+      <SignInForm />
+    </AuthShell>
   );
 }

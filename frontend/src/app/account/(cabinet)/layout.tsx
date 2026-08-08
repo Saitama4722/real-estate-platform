@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { CRM_ACCESS_COOKIE_NAME } from "@/lib/crmAuthConstants";
 import { AccountCabinetLayout } from "@/components/account/AccountCabinetLayout";
+import { Container } from "@/components/layout/container";
 
 /**
  * Server-side auth gate for the whole `/account/(cabinet)` group.
@@ -25,5 +26,14 @@ export default async function AccountCabinetRouteLayout({
   if (!token?.trim()) {
     redirect("/account/login");
   }
-  return <AccountCabinetLayout>{children}</AccountCabinetLayout>;
+  /* The slate band + wide Container live HERE, not in account/layout.tsx,
+     which also wraps the full-bleed login screen. `size="wide"` (1536px) is
+     what keeps the leads and CRM tables from being clipped. */
+  return (
+    <div className="border-t border-slate-200 bg-slate-50 py-8">
+      <Container size="wide">
+        <AccountCabinetLayout>{children}</AccountCabinetLayout>
+      </Container>
+    </div>
+  );
 }

@@ -794,6 +794,38 @@
     transform: translate3d(0, 0, 0) rotate(-4deg);
   }
 }
+/*
+ * Auth brand-panel drift. Distinct names from `ctr-rp-drift-*` and
+ * `ctr-drift-*`: same 0→peak→0 contract, different amplitudes tuned to a
+ * 792px panel that sits beside a form someone is typing into — deliberately
+ * calmer and slower than the realtor hero.
+ */
+@keyframes ctr-auth-drift-a {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(26px, -34px, 0) rotate(3deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+}
+@keyframes ctr-auth-drift-b {
+  0% { transform: translate3d(0, 0, 0) rotate(-8deg); }
+  50% { transform: translate3d(-30px, 22px, 0) rotate(-3deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(-8deg); }
+}
+@keyframes ctr-auth-drift-c {
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(14px, 26px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes ctr-auth-drift-d {
+  0% { transform: translate3d(0, 0, 0) rotate(6deg); }
+  50% { transform: translate3d(-16px, -20px, 0) rotate(1deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(6deg); }
+}
+@keyframes ctr-auth-glow {
+  0% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.08); }
+  100% { opacity: 0.55; transform: scale(1); }
+}
+
 @keyframes ctr-rp-glow {
   0% {
     opacity: 0.45;
@@ -1367,6 +1399,316 @@
 .ctr-check:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+/* ============================================================================
+   AUTHENTICATION — /account/login, /crm/login and any future auth screen
+   Ported from docs/design/"Centreal Auth - standalone.html" (§01–§05).
+
+   ⚠ DELIBERATELY UNLAYERED and OPT-IN, exactly like the form kit above. These
+   classes are applied through `className`, and a rule in @layer components
+   would lose to the Tailwind utilities on the same element.
+
+   ⚠ WHY A SECOND CONTROL LADDER. The form kit above is 48px tall / 12px radius;
+   these controls are 52px / 10px because the mockup specifies that ladder for a
+   full-page, single-focus form. Keeping them as separate classes means the
+   cabinet's shared <Input> cannot be disturbed by an auth-only change, and vice
+   versa. Do not "unify" them without re-measuring both designs.
+
+   Every colour resolves to an existing token: the mockup's #2563EB is
+   --color-brand, its #0F172A navy is the realtor navy ramp. No second blue.
+   ========================================================================== */
+
+/* ---- The split-screen shell ---------------------------------------------- */
+
+.ctr-auth-panel {
+  background: linear-gradient(
+    150deg,
+    var(--color-realtor-navy-mid) 0%,
+    var(--color-realtor-navy) 42%,
+    #0a1225 100%
+  );
+}
+
+/* Two slow radial glows. Resting opacity lives in the BASE rule, not only in
+   the keyframe: reduced motion cancels the animation outright, and a blob that
+   started at 0 would then never appear (the .ctr-rp-portrait-glow lesson). */
+.ctr-auth-glow {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.55;
+  animation: ctr-auth-glow 20s ease-in-out infinite;
+}
+.ctr-auth-glow--brand {
+  width: 760px;
+  height: 760px;
+  left: -180px;
+  top: -220px;
+  filter: blur(10px);
+  background: radial-gradient(
+    circle,
+    rgba(26, 95, 224, 0.42) 0%,
+    rgba(26, 95, 224, 0.1) 46%,
+    rgba(26, 95, 224, 0) 70%
+  );
+}
+.ctr-auth-glow--accent {
+  width: 520px;
+  height: 520px;
+  right: -140px;
+  bottom: -160px;
+  filter: blur(14px);
+  animation-duration: 26s;
+  animation-delay: 3s;
+  background: radial-gradient(
+    circle,
+    rgba(222, 43, 55, 0.2) 0%,
+    rgba(222, 43, 55, 0) 68%
+  );
+}
+
+/* Line-art shapes. Same contract as .ctr-rp-shape: every drift is a 0→peak→0
+   round trip, so cancelling the animation leaves the shape exactly at rest. */
+.ctr-auth-shape {
+  position: absolute;
+  pointer-events: none;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-iteration-count: infinite;
+}
+.ctr-auth-shape--house {
+  left: 78px;
+  top: 196px;
+  opacity: 0.07;
+  animation-name: ctr-auth-drift-a;
+  animation-duration: 22s;
+}
+.ctr-auth-shape--squares {
+  right: -40px;
+  top: 120px;
+  opacity: 0.06;
+  animation-name: ctr-auth-drift-b;
+  animation-duration: 26s;
+}
+.ctr-auth-shape--window {
+  left: 520px;
+  top: 560px;
+  opacity: 0.09;
+  animation-name: ctr-auth-drift-c;
+  animation-duration: 18s;
+}
+.ctr-auth-shape--pin-lg {
+  left: 392px;
+  top: 150px;
+  opacity: 0.5;
+  animation-name: ctr-auth-drift-d;
+  animation-duration: 15s;
+}
+.ctr-auth-shape--pin-sm {
+  left: 640px;
+  top: 420px;
+  opacity: 0.28;
+  animation-name: ctr-auth-drift-d;
+  animation-duration: 21s;
+  animation-delay: 2s;
+}
+.ctr-auth-shape--rect {
+  left: -40px;
+  bottom: 120px;
+  opacity: 0.05;
+  animation-name: ctr-auth-drift-c;
+  animation-duration: 24s;
+  animation-delay: 4s;
+}
+
+/*
+ * ≤1024 the split collapses to a header band (mockup §05). The drift shapes,
+ * the grain and the accent glow are DROPPED rather than scaled — a 96px band
+ * cannot host them legibly, and killing them also removes all ambient motion
+ * from the viewport most likely to be a phone.
+ *
+ * Unlayered on purpose so `display:none` here beats any utility on the element.
+ */
+@media (max-width: 1024px) {
+  .ctr-auth-shape,
+  .ctr-auth-grain,
+  .ctr-auth-glow--accent {
+    display: none;
+  }
+  .ctr-auth-glow--brand {
+    width: 420px;
+    height: 420px;
+    left: -80px;
+    top: -200px;
+    filter: none;
+    opacity: 1;
+    animation: none;
+    background: radial-gradient(
+      circle,
+      rgba(26, 95, 224, 0.4) 0%,
+      rgba(26, 95, 224, 0) 70%
+    );
+  }
+  .ctr-auth-panel {
+    background: linear-gradient(
+      120deg,
+      var(--color-realtor-navy-mid) 0%,
+      var(--color-realtor-navy) 55%,
+      #0a1225 100%
+    );
+  }
+}
+
+/* ---- Controls ------------------------------------------------------------- */
+
+.ctr-auth-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-gray-700);
+}
+
+.ctr-auth-control {
+  width: 100%;
+  height: 52px;
+  padding: 0 15px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-raised);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--color-fg);
+  outline: none;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+/* Room for the 44px visibility toggle. */
+.ctr-auth-control--password {
+  padding-right: 56px;
+}
+.ctr-auth-control::placeholder {
+  font-weight: 400;
+  color: var(--color-fg-muted);
+}
+.ctr-auth-control:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+}
+.ctr-auth-control:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 4px rgba(26, 95, 224, 0.18);
+}
+.ctr-auth-control:disabled {
+  background: var(--color-surface-inset);
+  border-color: var(--color-border);
+  color: var(--color-gray-400);
+  cursor: not-allowed;
+}
+/* Colour is never the only channel — the message under the field says the same. */
+.ctr-auth-control[aria-invalid="true"] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px rgba(222, 43, 55, 0.13);
+}
+.ctr-auth-control[aria-invalid="true"]:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px rgba(222, 43, 55, 0.2);
+}
+
+/*
+ * ⚠ CHROME AUTOFILL. Chrome paints its own blue wash on an autofilled field
+ * with a UA style that ordinary `background` cannot beat. The only reliable
+ * defeat is to cover the field with a huge INSET box-shadow and to set the
+ * glyph colour through -webkit-text-fill-color (Chrome overrides `color` too).
+ * The 9999s background-color transition stops the wash from ever animating in.
+ * Verified in a real Chromium profile with a saved credential, not assumed.
+ */
+.ctr-auth-control:-webkit-autofill,
+.ctr-auth-control:-webkit-autofill:hover,
+.ctr-auth-control:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-fg);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-surface-raised) inset;
+  box-shadow: 0 0 0 1000px var(--color-surface-raised) inset;
+  caret-color: var(--color-fg);
+  border: 1px solid var(--color-border);
+  font-size: 15px;
+  font-weight: 500;
+  transition: background-color 9999s ease-out 0s;
+}
+/* The focus ring has to be STACKED onto the inset wash, or setting one drops
+   the other and the blue returns. */
+.ctr-auth-control:-webkit-autofill:focus {
+  border-color: var(--color-brand);
+  box-shadow:
+    0 0 0 1000px var(--color-surface-raised) inset,
+    0 0 0 4px rgba(26, 95, 224, 0.18);
+}
+
+/* 44px hit area parked inside the 52px field. */
+.ctr-auth-toggle {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.ctr-auth-toggle:hover:not(:disabled) {
+  background: var(--color-gray-100);
+  color: var(--color-fg);
+}
+/* Inset outline so the ring cannot overflow the field's rounded corner. */
+.ctr-auth-toggle:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: -2px;
+  color: var(--color-fg);
+}
+.ctr-auth-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ctr-auth-submit {
+  width: 100%;
+  height: 52px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-brand);
+  color: var(--color-fg-inverse);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.ctr-auth-submit:hover:not(:disabled) {
+  background: var(--color-brand-hover);
+  box-shadow: 0 6px 18px rgba(26, 95, 224, 0.28);
+}
+.ctr-auth-submit:active:not(:disabled) {
+  background: var(--color-brand-active);
+}
+.ctr-auth-submit:focus-visible {
+  outline: none;
+  /* Denser than the field ring (.28 vs .18) — the mockup's own distinction. */
+  box-shadow: 0 0 0 4px rgba(26, 95, 224, 0.28);
+}
+.ctr-auth-submit:disabled {
+  background: var(--color-blue-300);
+  cursor: not-allowed;
 }
 
 /* ============================================================================

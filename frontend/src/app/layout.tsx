@@ -7,6 +7,7 @@ import { FavoritesProvider } from "@/lib/favorites";
 import { CompareProvider } from "@/lib/compare";
 import { CompareBar } from "@/components/compare/CompareBar";
 import { RevealController } from "@/components/layout/RevealController";
+import { SiteChrome } from "@/components/layout/SiteChrome";
 
 /**
  * Golos Text — the design system's single type family, chosen for full Cyrillic
@@ -40,10 +41,17 @@ export default function RootLayout({
             {/* Renders nothing; arms the section reveal and the compact header.
                 Must stay mounted for both — see RevealController. */}
             <RevealController />
-            <Header />
+            {/* Auth routes are full-bleed split screens with their own
+                branding, so the site chrome is withheld there. Header/Footer
+                are still SERVER-rendered and passed through as slots. */}
+            <SiteChrome>
+              <Header />
+            </SiteChrome>
             <main className="flex-1">{children}</main>
-            <Footer />
-            <CompareBar />
+            <SiteChrome>
+              <Footer />
+              <CompareBar />
+            </SiteChrome>
           </CompareProvider>
         </FavoritesProvider>
       </body>

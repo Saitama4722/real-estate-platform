@@ -15,6 +15,8 @@ import {
   CircleAlert,
   Clock,
   DoorOpen,
+  Eye,
+  EyeOff,
   Heart,
   House,
   Inbox,
@@ -23,6 +25,9 @@ import {
   LandPlot,
   Link2,
   List,
+  LoaderCircle,
+  Lock,
+  Mail,
   Map as MapIcon,
   MapPin,
   Menu,
@@ -159,6 +164,17 @@ export const Icons = {
   // Hero backdrop field
   Key: KeyRound,
   Door: DoorOpen,
+
+  // Authentication
+  /** Password visibility toggle — masked state (click to reveal). */
+  Eye,
+  /** Password visibility toggle — revealed state (click to mask). */
+  EyeOff,
+  Lock,
+  Mail,
+  /** Submit spinner. NEVER the only loading signal: reduced motion cancels
+      every animation, so the control's label must change too. */
+  Loader: LoaderCircle,
 } as const;
 
 export type IconName = keyof typeof Icons;
