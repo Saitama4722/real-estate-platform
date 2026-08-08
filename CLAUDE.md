@@ -130,6 +130,18 @@ Port 3000 on this machine is intermittently held by an unrelated **java** proces
 that accepts TCP but never responds. `scripts\start_local.ps1` handles this by
 itself now — **there is no manual `-p 3001` / `.env.local` step any more.**
 
+> **⭐ THE JAVA PROCESS IS IDENTIFIED — stop investigating it.** It is the VS Code
+> extension **`ibm.db2forzosdeveloperextension`** (IBM Db2 for z/OS Developer
+> Extension), which launches `com.ibm.db2.server.DssLauncher 3000` using Android
+> Studio's bundled JBR. `[measured]` 2026-08-08 via
+> `Get-CimInstance Win32_Process | Select-Object CommandLine` on the PID holding
+> the port. It starts with VS Code and dies with it, which is exactly why the
+> contention looked random and why 3000 is almost always busy while you are
+> working in the editor. **It is not malware, not a stale Next.js server, and not
+> worth killing** — the launcher's fallback already handles it. Disabling that
+> extension would free 3000 permanently, if anyone ever wants the round number
+> back.
+
 - **Port choice:** prefers **3000**, and if it is held walks upward (3001, 3002,
   …) to the first genuinely free port. Same idea for the backend (prefers 8001).
   `[measured]` — holding 3000 gave "Frontend port 3000 is busy - using 3001
@@ -1287,6 +1299,81 @@ the whole migration graph ON IMPORT. The constant is now inlined in 0003.
 **Never reference a live app-module attribute from a migration**; a migration is
 a historical record.
 
+## Copy notice: articles and guides append © text to the CLIPBOARD (2026-08-08)
+
+`components/articles/ArticleCopyNotice.tsx` appends a Russian copyright notice
+to text copied out of the reading column. It is mounted from
+`ArticleReadingPage`, so it covers **exactly `/articles/[slug]` and
+`/districts/[slug]`** — the only two files that render that layout
+(grep-verified). Guides are in scope deliberately: that corpus is the owner's
+writing as much as the blog is.
+
+- **It renders NOTHING.** The component returns `null` and only installs a
+  `copy` listener; the notice exists solely in the clipboard payload, in both
+  the `text/plain` and `text/html` flavours. Wording lives in
+  `buildCopyrightNotice()` and cites **ст. 1259, 1270 и 1274 ГК РФ** — 1274
+  (lawful citation with attribution) is there on purpose, so the notice tells a
+  reader how to comply instead of only forbidding. **ст. 1301 (компенсация
+  10 000–5 000 000 ₽) is deliberately NOT cited**; a damages threat on every
+  copied sentence reads as hostile. Owner-approved as written.
+- **⭐ THE TEST IS INTERSECTION, NOT CONTAINMENT — do not "tighten" it back.**
+  The first version required the selection to sit _inside_ `#article-body`,
+  which meant **`Ctrl+A` bailed and the entire article left clean**
+  `[measured]`: 4864 chars copied, no notice. `Ctrl+A` → `Ctrl+C` is the single
+  most likely bulk-copy path, i.e. the one case worth catching. Now any range
+  that _touches_ the column triggers it (`range.intersectsNode(container)`, with
+  the old containment test as the fallback for browsers lacking it).
+  - **Accepted cost, stated by the owner:** a selection spanning chrome AND body
+    carries the notice along with that nav/footer text. A notice riding on
+    copied nav text is a far smaller cost than a whole article leaving clean.
+  - **Selections lying entirely outside the column stay clean** `[measured]` —
+    header-only and footer-only copies get no notice, in both browsers. So the
+    cost only applies to selections that genuinely include article text.
+- **⚠ THE PAGE IS UNCHANGED — but "byte-identical source" is the WRONG claim to
+  make about a `"use client"` component, and the code comment used to make it.**
+  Measured against the same pages rebuilt from HEAD without the component:
+  `innerText` identical (sha `d7d4f7fd68ce` article / `5e930ceb2258` guide),
+  element count 321/214 identical, every `id` and `aria-controls` token
+  identical, and the server markup byte-identical at 32 198 chars **once
+  `<script>` blocks are excluded**. Full view-source is **+487 chars**, all of it
+  inside Next's RSC bootstrap payload where the client module gets registered
+  (2 mentions of the path). That is unavoidable for ANY client component and
+  contains no visible content — but it is a real diff, so say "rendered markup",
+  never "source".
+- **It is mounted LAST in `ArticleReadingPage` on purpose** — `useId()` encodes
+  tree position, so inserting it earlier shifts every later consumer's id. The
+  identical `aria-controls` tokens above are the proof that last position costs
+  nothing.
+- **⚠ `Get-Clipboard -TextFormatType Html` MANGLES CYRILLIC — it is the READER,
+  not the payload. Do not re-investigate this.** The Windows CF_HTML payload is
+  UTF-8 and PowerShell decodes it as ANSI, so a perfectly good notice reads back
+  as `РР· РєР°РєРёС…`. Pasting the same clipboard into a real rich-text editor
+  renders correct Cyrillic with the notice as proper `<p>` paragraphs
+  `[measured]`. **Verify clipboard HTML by pasting it back into a browser, never
+  by printing PowerShell's decode of it.**
+- **The CRM cabinet is CODE-VERIFIED clean, not measured.** No authenticated
+  page can render the notice because no `/account/*` route mounts
+  `ArticleReadingPage`. What was measured is `/account/login` — form field,
+  static heading and `Ctrl+A` on the whole page, all clean in both browsers.
+  There is no credential in this environment and none should be requested.
+- **Reusable verification recipe** (this is how the above was measured; 30+
+  cases across **real Google Chrome** (`channel="chrome"`) and **Playwright
+  Firefox**, both headed, zero console errors):
+  1. **Set the clipboard to a unique sentinel before every case.** Without it a
+     stale clipboard reads as a successful copy — the single most likely way to
+     fake a pass here.
+  2. Drive a **real `Ctrl+C`** (`page.keyboard.press`), then read the **Windows**
+     clipboard with `Get-Clipboard -Raw`. That is the true end-to-end path; the
+     in-page `navigator.clipboard` API is not what a user's paste uses.
+  3. **Firefox writes CRLF**, so normalise line endings before comparing
+     lengths, or every multi-line total looks short by the number of lines.
+  4. Treat `<<CLIPBOARD UNCHANGED>>` as a **test** failure, not a product one —
+     it means the copy never fired (usually focus), so redo the case.
+- `cut` is deliberately not listened for (it only fires in editable contexts, and
+  the reading column is not editable), so editing anywhere on the site keeps
+  stock behaviour. Form fields everywhere stay clean `[measured]`: homepage,
+  `/sell`, `/account/login`.
+
 ## ⚠ A column drop cannot be split across commits — bisect will mislead you
 
 The refactor above landed as five thematic commits (models+migrations, content
@@ -2290,6 +2377,42 @@ Index of what changed this session; details live in the linked sections above.
     existing one. If Django throws intermittent `OperationalError` with no code
     cause, check `SELECT count(*) FROM pg_stat_activity;` against
     `SHOW max_connections;` **before** assuming it's a code bug.
+  - **⚠ A CRASHED OR KILLED SESSION LEAVES THE SERVERS RUNNING — check for
+    orphans before starting the stack.** The launcher opens its three windows as
+    detached processes, so anything that kills the agent or the terminal (the
+    `0xC0000409` abort documented above, closing the wrong window, a reboot that
+    restores VS Code but not its children) leaves `runserver` alive and holding
+    its Postgres connections. Because the launcher then WALKS TO THE NEXT FREE
+    PORT rather than failing, the second stack starts cleanly and the duplicate
+    is silent. `[measured]` 2026-08-08: a status check found
+    `manage.py runserver 127.0.0.1:8001` **and** `manage.py runserver
+    127.0.0.1:8002` running at once, left over from an earlier session — exactly
+    the two-instances pattern this section blames for exhausting
+    `max_connections`. **Check first, every time:**
+
+    ```powershell
+    Get-CimInstance Win32_Process |
+      Where-Object { $_.CommandLine -match 'manage.py|celery|next' } |
+      Select-Object ProcessId,CommandLine
+    ```
+
+    A clean machine returns nothing. Anything listed **before** you launch means
+    run `scripts\stop_local.ps1` first, or you are building the
+    duplicate-connection problem again.
+  - **⚠ DO NOT COUNT PROCESSES — count LISTENERS.** Django's autoreloader
+    re-execs itself, so **ONE healthy backend shows up as FOUR `manage.py
+    runserver` processes** in a parent→child chain, and the chain alternates
+    between `backend\.venv\Scripts\python.exe` and the system
+    `…\Python310\python.exe` `[measured]` 2026-08-08. Celery does the same thing
+    two-deep. That mixed-interpreter chain looks exactly like "someone started a
+    second stack with the wrong Python" and **is not** — this misread happened
+    during the very session that wrote this note. The reliable tells are
+    `ParentProcessId` (walk it to a single launcher window) and **the listening
+    port**: two backends can only coexist on two DIFFERENT ports, so
+    `Get-NetTCPConnection -State Listen -LocalPort 8001,8002` deciding it is one
+    server is the check that cannot be fooled. **A backend listening on anything
+    other than 8001 is the real tell** — that is precisely what the orphan pair
+    on 8001 **and** 8002 looked like.
 
 - **`manage.py shell -c` + `transaction.savepoint_rollback()` is UNRELIABLE — do
   NOT trust it to undo test-data changes.** Observed: during a shell-based test, a

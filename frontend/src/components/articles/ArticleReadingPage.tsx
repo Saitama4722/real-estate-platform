@@ -3,6 +3,7 @@ import { Container } from "@/components/layout/container";
 import { Breadcrumbs, type BreadcrumbItem } from "@/components/layout/breadcrumbs";
 import { Icon, Icons } from "@/components/ui/icon";
 import { ArticleBodyRenderer } from "@/components/articles/ArticleBodyRenderer";
+import { ArticleCopyNotice } from "@/components/articles/ArticleCopyNotice";
 import { ArticleProgressBar } from "@/components/articles/ArticleProgressBar";
 import { ArticleShareRow } from "@/components/articles/ArticleShareRow";
 import { ArticleToc } from "@/components/articles/ArticleToc";
@@ -185,6 +186,21 @@ export function ArticleReadingPage({
 
         {after}
       </Container>
+
+      {/*
+       * Renders nothing — it appends the copyright notice to the CLIPBOARD when
+       * text is copied out of #article-body. `shareUrl` is already this page's
+       * canonical URL, so the notice can never cite a hardcoded address.
+       *
+       * ⚠ MOUNTED LAST ON PURPOSE. React's useId() encodes a component's
+       * position in the tree, so inserting this ANYWHERE EARLIER shifts the id
+       * of every useId consumer after it — measured: mounting it beside
+       * ArticleProgressBar changed ArticleTocAccordion's aria-controls token
+       * from «Rdlkferl7» to «Rdlsferl7», the single byte of difference in an
+       * otherwise identical document. Last position leaves the rendered HTML
+       * byte-identical. Keep it here.
+       */}
+      <ArticleCopyNotice title={title} url={shareUrl} />
     </div>
   );
 }
