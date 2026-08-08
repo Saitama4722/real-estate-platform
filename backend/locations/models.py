@@ -210,6 +210,18 @@ class DistrictGuide(BaseTimestampedModel):
         verbose_name="Кому подойдёт", blank=True,
         help_text="Пустое поле не выводится на странице.",
     )
+    # Добавлено 2026-08-08. У каждого из 24 пилотных гидов есть блок «на что
+    # обратить внимание» (обычно строка-подводка и список), и до этого поля ему
+    # не находилось honest-заголовка: он попадал бы под «Инфраструктуру».
+    # Порядок — после «Кому подойдёт», как гиды и написаны, чтобы автор
+    # заполнял форму сверху вниз без перескоков.
+    caveats = models.TextField(
+        verbose_name="На что обратить внимание", blank=True,
+        help_text=(
+            "Оговорки и что проверить перед покупкой. "
+            "Пустое поле не выводится на странице."
+        ),
+    )
     conclusion = models.TextField(
         verbose_name="Вывод", blank=True,
         help_text="Выводится карточкой «Главное» в конце гида.",
@@ -253,7 +265,9 @@ class DistrictGuide(BaseTimestampedModel):
 
     #: Section fields in reading order. One definition, so a sixth section
     #: cannot be added to the model and silently missed by word_count.
-    SECTION_FIELDS = ("intro", "housing", "infrastructure", "audience", "conclusion")
+    SECTION_FIELDS = (
+        "intro", "housing", "infrastructure", "audience", "caveats", "conclusion",
+    )
 
     def section_texts(self):
         """Non-empty section texts in reading order."""

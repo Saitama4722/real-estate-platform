@@ -85,7 +85,7 @@ class DistrictGuideAdmin(admin.ModelAdmin):
             "Текст гида",
             {
                 "description": (
-                    "Пять разделов в порядке чтения. Пишите обычным текстом — "
+                    "Шесть разделов в порядке чтения. Пишите обычным текстом — "
                     "подзаголовки подставляются сами. Любой раздел можно "
                     "оставить пустым: он просто не появится на странице."
                 ),
@@ -94,6 +94,7 @@ class DistrictGuideAdmin(admin.ModelAdmin):
                     "housing",
                     "infrastructure",
                     "audience",
+                    "caveats",
                     "conclusion",
                 ),
             },

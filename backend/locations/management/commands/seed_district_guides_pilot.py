@@ -30,6 +30,11 @@ it. Idempotent by guide slug; --clear removes exactly this batch.
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from locations.guide_pilot_sections import (
+    PILOT_SECTION_MAP,
+    SECTION_ORDER,
+    split_pilot_text,
+)
 from locations.models import City, District, DistrictGuide, Neighborhood
 
 
@@ -649,6 +654,28 @@ class Command(BaseCommand):
             help="Delete exactly this pilot batch instead of creating it.",
         )
 
+    @staticmethod
+    def section_values(guide):
+        """
+        The guide's six section fields.
+
+        Every key is always present, so a re-run OVERWRITES rather than leaves
+        stale text behind — the bug this replaces wrote the whole body back into
+        `intro` while the split sections kept theirs, rendering each guide twice.
+
+        The pilot texts predate the sections, so they are divided by the
+        paragraph map in `locations/guide_pilot_sections.py`. The two overview
+        guides are absent from that map on purpose and stay whole in `intro`,
+        which renders unheaded — exactly as they do today.
+        """
+        values = {name: "" for name in SECTION_ORDER}
+        spec = PILOT_SECTION_MAP.get(guide["guide_slug"])
+        if spec is None:
+            values["intro"] = guide["body"]
+        else:
+            values.update(split_pilot_text(guide["body"], spec))
+        return values
+
     def handle(self, *args, **options):
         slugs = [g["guide_slug"] for g in GUIDES]
 
@@ -689,6 +716,7 @@ class Command(BaseCommand):
 
             # Stagger published_at for deterministic ordering (earlier = newer).
             published_at = now - timezone.timedelta(minutes=i)
+            sections = self.section_values(g)
             obj, created = DistrictGuide.objects.get_or_create(
                 slug=g["guide_slug"],
                 defaults={
@@ -696,15 +724,11 @@ class Command(BaseCommand):
                     "neighborhood": neighborhood,
                     "title": g["title"],
                     "excerpt": g["excerpt"],
-                    # These pilot texts are one continuous piece with no
-                    # headings, so they are the guide's «Что за район» intro —
-                    # which renders unheaded. The other four sections stay
-                    # empty until the superadmin fills them in.
-                    "intro": g["body"],
                     "status": DistrictGuide.GuideStatus.PUBLISHED,
                     "published_at": published_at,
                     # cover_image left blank — no image area shown; client uploads
                     # real photos later via /admin/.
+                    **sections,
                 },
             )
             if created:
@@ -716,7 +740,7 @@ class Command(BaseCommand):
                     neighborhood=neighborhood,
                     title=g["title"],
                     excerpt=g["excerpt"],
-                    intro=g["body"],
+                    **sections,
                 )
                 updated_n += 1
 

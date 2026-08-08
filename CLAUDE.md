@@ -1231,11 +1231,16 @@ govern what happens INSIDE one field. Structure itself now comes from the schema
   `conclusion`. **`conclusion_title` is a free CharField defaulting to «Вывод»**
   — not an enum — because one real article ends «Совет» and whatever is typed is
   what the «Главное» card prints.
-- **DistrictGuide:** five FIXED named fields — `intro`, `housing`,
-  `infrastructure`, `audience`, `conclusion`. Fixed, not repeatable, because
-  every guide has the same shape and ~90 of them are written by one
-  non-technical author. **Each field's `verbose_name` IS the heading the page
-  prints**, so there is no second list to keep in sync.
+- **DistrictGuide:** **SIX** FIXED named fields — `intro`, `housing`,
+  `infrastructure`, `audience`, `caveats`, `conclusion`. (`caveats` was added
+  2026-08-08 — see the pilot-split section below; this entry used to say five.)
+  Fixed, not repeatable, because every guide has the same shape and ~90 of them
+  are written by one non-technical author. **Each field's `verbose_name` IS the
+  heading the page prints**, so there is no second list to keep in sync.
+  - **`DistrictGuide.SECTION_FIELDS` is the one ordered list** that
+    `section_texts()`, `rendered_text_parts()` and therefore `word_count` all
+    read. Adding a seventh section means adding it THERE plus the four other
+    wiring points below — the field alone does nothing.
 - **`intro` (article «Вступление», guide «Что за район») renders with NO
   heading** and contributes no TOC entry — the H1 already names the subject.
   That is what makes the 24 migrated guides byte-identical to before.
@@ -1373,6 +1378,68 @@ writing as much as the blog is.
   the reading column is not editable), so editing anywhere on the site keeps
   stock behaviour. Form fields everywhere stay clean `[measured]`: homepage,
   `/sell`, `/account/login`.
+
+## `caveats` — the sixth guide section, and the pilot split (2026-08-08)
+
+The 24 pilot district guides were written before sections existed, so all 24
+arrived as one block of prose in `intro`. Splitting them revealed that the
+five-field schema was **missing a section**: every guide has a «what to watch
+out for» block (a lead-in line plus a bulleted list), and the only free field
+was «Инфраструктура и транспорт», where parking, building age and coastal
+humidity read wrong.
+
+- **Owner's decision: add the field rather than bend the text.** The shape is
+  uniform across all 24 and the **~90 still to be written follow it**, so the
+  mismatch is structural. `caveats` («На что обратить внимание») sits **after
+  `audience`, before `conclusion`** — deliberately NOT after `infrastructure` —
+  so the admin form is filled top-to-bottom in the order the guides are actually
+  written, with no jumping.
+- **Five wiring points, all required — the model field alone renders nothing:**
+  `DistrictGuide.SECTION_FIELDS` (drives `rendered_text_parts()` → `word_count`),
+  `DistrictGuideAdmin.fieldsets`, `DistrictGuideDetailSerializer.fields`,
+  and on the frontend `PublicDistrictGuideDetail` + `GuideRaw` + `mapGuide()` +
+  **`guideSections()`**, which is what produces both the TOC and the headings.
+  The heading strings in `guideSections()` must stay byte-identical to the
+  Django `verbose_name`s or the index card's clock disagrees with the page's.
+- **22 of 24 were split; the two OVERVIEW guides were deliberately left whole**
+  (`krasnodar-obzor`, `gelendzhik-obzor`). They are section indexes, not area
+  descriptions: no housing paragraph, they enumerate the other guides, and both
+  end on a navigational «read these next» line that would read absurdly as a
+  «Главное» card. They keep rendering single-column with no TOC.
+  `gelendzhik-centr` is the other special case — its audience paragraph comes
+  LAST and it has no closing takeaway, so that paragraph became the `conclusion`
+  and «Кому подойдёт» stays empty.
+- **`infrastructure` is now empty on 20 of 24 guides, and that is CORRECT** —
+  only 4 guides (ХБК, СХИ, Энка, Музыкальный) actually say anything about
+  infrastructure. An empty field renders nothing, so the page is honest about
+  it, and the gap doubles as the author's to-do list. **Do not "fix" this by
+  moving the caveats back in.** Final fill: intro 24, housing 22,
+  infrastructure 4, audience 15, caveats 22, conclusion 22 `[measured]`.
+- **⚠ THE SEED COMMAND HAD TO CHANGE WITH THE SCHEMA, and this is the trap.**
+  `seed_district_guides_pilot` re-ran `update(intro=g["body"])` on every
+  invocation. After the split that would have restored the whole text into
+  `intro` while the six sections kept theirs — **every guide rendered twice**,
+  with no error anywhere. The seed now applies the identical split via
+  `Command.section_values()` and always writes **all six keys**, so a re-run
+  overwrites rather than half-updates. Verified `[measured]`: re-running the seed
+  updated all 24 rows and the split stayed character-identical.
+  **RULE: when a schema change alters what a seed writes, change the seed in the
+  same commit — a stale seed is a silent data-corruption bomb that only fires
+  the next time someone runs it.**
+- **The paragraph map lives in `locations/guide_pilot_sections.py`** (shared with
+  the seed) and is **INLINED again inside migration 0011** — a migration must
+  never import a live app module (`articles.0003` once did and broke the whole
+  graph). The duplication is deliberate; the migration is a historical record.
+- **Both directions are reversible and it is lossless** `[measured]`: forward
+  splits `intro` on blank lines, backward rejoins the six fields in reading
+  order. All 24 guides reassemble **character-identical** to the pre-split text
+  (Δchars 0, Δwords 0 for every one). The migration SKIPS any guide whose other
+  sections are already filled or whose paragraph count no longer matches the
+  map, so a hand-edited guide is never mangled.
+- **Reading time: 0 guides crossed a minute boundary** `[measured]`, and the
+  per-guide word delta equals the added heading words EXACTLY for all 24 — which
+  is the check that proves no body text was lost or duplicated. (The guides are
+  ~200–260 words; +10–13 heading words cannot move a 1-minute read.)
 
 ## ⚠ A column drop cannot be split across commits — bisect will mislead you
 

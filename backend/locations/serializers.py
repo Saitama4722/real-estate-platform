@@ -205,7 +205,8 @@ class DistrictGuideDetailSerializer(_GuideCommonMixin, serializers.ModelSerializ
         model = DistrictGuide
         fields = [
             "slug", "title", "excerpt", "published_at",
-            "intro", "housing", "infrastructure", "audience", "conclusion",
+            "intro", "housing", "infrastructure", "audience", "caveats",
+            "conclusion",
             "cover_image", "city", "catalog_param", "catalog_slug",
             "word_count",
         ]

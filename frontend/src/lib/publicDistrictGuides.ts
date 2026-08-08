@@ -30,15 +30,17 @@ export interface PublicDistrictGuide {
 }
 
 /**
- * The five authored sections. «Что за район» renders WITHOUT a heading (the H1
- * already names the area), which is also why the 24 migrated guides — whose
- * whole text landed in `intro` — look exactly as they did before.
+ * The six authored sections. «Что за район» renders WITHOUT a heading (the H1
+ * already names the area), which is why a guide whose whole text sits in
+ * `intro` — the two overview guides, and any guide before it is split — looks
+ * exactly as it did before the sections existed.
  */
 export interface PublicDistrictGuideDetail extends PublicDistrictGuide {
   intro: string;
   housing: string;
   infrastructure: string;
   audience: string;
+  caveats: string;
   conclusion: string;
 }
 
@@ -56,6 +58,7 @@ interface GuideRaw {
   housing?: string;
   infrastructure?: string;
   audience?: string;
+  caveats?: string;
   conclusion?: string;
 }
 
@@ -76,6 +79,7 @@ function mapGuide(row: GuideRaw): PublicDistrictGuideDetail {
     housing: row.housing ?? "",
     infrastructure: row.infrastructure ?? "",
     audience: row.audience ?? "",
+    caveats: row.caveats ?? "",
     conclusion: row.conclusion ?? "",
   };
 }
@@ -93,6 +97,7 @@ export function guideSections(guide: PublicDistrictGuideDetail) {
     { heading: "Застройка и жильё", text: guide.housing },
     { heading: "Инфраструктура и транспорт", text: guide.infrastructure },
     { heading: "Кому подойдёт", text: guide.audience },
+    { heading: "На что обратить внимание", text: guide.caveats },
   ];
 }
 
