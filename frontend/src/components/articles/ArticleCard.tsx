@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { Icon, Icons } from "@/components/ui/icon";
 import {
-  computeReadingTimeMinutes,
   formatArticleDate,
+  readingTimeFromSections,
 } from "@/lib/articleContent";
 import { articleCategoryLabel } from "@/lib/articleFilters";
-import type { PublicArticle } from "@/lib/publicArticles";
+import {
+  articleSections,
+  articleTakeaway,
+  type PublicArticle,
+} from "@/lib/publicArticles";
 import { cn } from "@/lib/utils";
 
 /**
@@ -34,17 +38,18 @@ export interface ArticleCardData {
   eyebrow?: string;
   publishedAt: string;
   /**
-   * Reading time. OPTIONAL because it is computed from the body text, and not
-   * every list payload carries one: the district-guide LIST serializer omits
-   * `body` (backend/locations/serializers.py) so those cards show no clock
-   * rather than a fabricated number.
+   * Reading time. OPTIONAL because it is computed from the content, and not
+   * every list payload carries the content: the district-guide LIST serializer
+   * sends a `word_count` instead of the section texts
+   * (backend/locations/serializers.py), and a payload with neither shows no
+   * clock rather than a fabricated number.
    */
   minutes?: number;
   /** Read-more affordance; defaults to «Читать». */
   ctaLabel?: string;
 }
 
-/** Server-side projection — strips `body` so full texts never ship as props. */
+/** Server-side projection — drops the section texts so they never ship as props. */
 export function articleCardDataFrom(article: PublicArticle): ArticleCardData {
   return {
     slug: article.slug,
@@ -53,7 +58,10 @@ export function articleCardDataFrom(article: PublicArticle): ArticleCardData {
     excerpt: article.excerpt,
     eyebrow: articleCategoryLabel(article.category),
     publishedAt: article.publishedAt,
-    minutes: computeReadingTimeMinutes(article.body),
+    minutes: readingTimeFromSections(
+      articleSections(article),
+      articleTakeaway(article),
+    ),
   };
 }
 

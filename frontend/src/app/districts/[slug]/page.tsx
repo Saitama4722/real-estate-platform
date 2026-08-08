@@ -4,12 +4,14 @@ import { ArticleCatalogCta } from "@/components/articles/ArticleCatalogCta";
 import { ArticleReadingPage } from "@/components/articles/ArticleReadingPage";
 import { JsonLd } from "@/components/seo/JsonLd";
 import {
-  computeReadingTimeMinutes,
-  parseArticleBody,
+  parsedBodyFromSections,
+  readingTimeFromSections,
 } from "@/lib/articleContent";
 import {
   buildGuideCatalogHref,
   fetchPublicDistrictGuideBySlug,
+  guideSections,
+  guideTakeaway,
 } from "@/lib/publicDistrictGuides";
 import {
   buildGuideDocumentTitle,
@@ -42,6 +44,9 @@ export default async function DistrictGuidePage({ params }: GuidePageProps) {
     notFound();
   }
 
+  const sections = guideSections(guide);
+  const takeaway = guideTakeaway(guide);
+
   const cityCrumb = guide.city
     ? {
         label: guide.city.name,
@@ -66,11 +71,13 @@ export default async function DistrictGuidePage({ params }: GuidePageProps) {
         }
         title={guide.title}
         publishedAt={guide.publishedAt}
-        /* From the body here — the detail payload HAS it. The index derives
-           the same number from `word_count` through the same rule. */
-        minutes={computeReadingTimeMinutes(guide.body)}
+        /* Counted from the sections here — the detail payload HAS them. The
+           index derives the same number from `word_count`, which the
+           serializer sums over the same rendered parts, through the same
+           rule. */
+        minutes={readingTimeFromSections(sections, takeaway)}
         coverImage={guide.coverImage}
-        parsed={parseArticleBody(guide.body)}
+        parsed={parsedBodyFromSections(sections, takeaway)}
         shareUrl={guideCanonicalUrl(guide.slug)}
         /* A guide's "up" is the district index, not the blog. */
         backHref="/districts"

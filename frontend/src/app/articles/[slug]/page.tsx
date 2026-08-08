@@ -5,11 +5,13 @@ import { ArticleReadingPage } from "@/components/articles/ArticleReadingPage";
 import { ArticleSimilarSection } from "@/components/articles/ArticleSimilarSection";
 import { articleCardDataFrom } from "@/components/articles/ArticleCard";
 import {
-  computeReadingTimeMinutes,
-  parseArticleBody,
+  parsedBodyFromSections,
+  readingTimeFromSections,
 } from "@/lib/articleContent";
 import { articleCategoryLabel, articlesHref } from "@/lib/articleFilters";
 import {
+  articleSections,
+  articleTakeaway,
   fetchPublicArticleBySlug,
   fetchPublicArticlesList,
   getSimilarArticles,
@@ -50,6 +52,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     notFound();
   }
 
+  const sections = articleSections(article);
+  const takeaway = articleTakeaway(article);
+
   const similar = getSimilarArticles(
     article.slug,
     allArticles,
@@ -70,9 +75,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         eyebrowHref={articlesHref({ category: article.category, page: 1 })}
         title={article.title}
         publishedAt={article.publishedAt}
-        minutes={computeReadingTimeMinutes(article.body)}
+        minutes={readingTimeFromSections(sections, takeaway)}
         coverImage={article.coverImage}
-        parsed={parseArticleBody(article.body)}
+        parsed={parsedBodyFromSections(sections, takeaway)}
         shareUrl={articleCanonicalUrl(article.slug)}
         cta={<ArticleCatalogCta />}
         after={<ArticleSimilarSection articles={similar} />}

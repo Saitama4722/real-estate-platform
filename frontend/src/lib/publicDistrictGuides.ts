@@ -21,15 +21,25 @@ export interface PublicDistrictGuide {
   /** The slug value to pass to that catalog param. */
   catalogSlug: string;
   /**
-   * Whitespace-token count of the body, sent because the LIST payload has no
-   * `body`. Reading time is derived from it HERE, in TypeScript — the backend
-   * never computes minutes (see articleContent.ts).
+   * Whitespace-token count of everything the page renders, sent because the
+   * LIST payload carries no section texts. Reading time is derived from it
+   * HERE, in TypeScript — the backend never computes minutes (see
+   * articleContent.ts).
    */
   wordCount: number;
 }
 
+/**
+ * The five authored sections. «Что за район» renders WITHOUT a heading (the H1
+ * already names the area), which is also why the 24 migrated guides — whose
+ * whole text landed in `intro` — look exactly as they did before.
+ */
 export interface PublicDistrictGuideDetail extends PublicDistrictGuide {
-  body: string;
+  intro: string;
+  housing: string;
+  infrastructure: string;
+  audience: string;
+  conclusion: string;
 }
 
 interface GuideRaw {
@@ -42,7 +52,11 @@ interface GuideRaw {
   catalog_param: string;
   catalog_slug: string;
   word_count?: number;
-  body?: string;
+  intro?: string;
+  housing?: string;
+  infrastructure?: string;
+  audience?: string;
+  conclusion?: string;
 }
 
 function mapGuide(row: GuideRaw): PublicDistrictGuideDetail {
@@ -58,8 +72,32 @@ function mapGuide(row: GuideRaw): PublicDistrictGuideDetail {
     // 0 only for a stale cached payload predating the field; readingTime's
     // min-1 floor keeps that from rendering «0 мин».
     wordCount: row.word_count ?? 0,
-    body: row.body ?? "",
+    intro: row.intro ?? "",
+    housing: row.housing ?? "",
+    infrastructure: row.infrastructure ?? "",
+    audience: row.audience ?? "",
+    conclusion: row.conclusion ?? "",
   };
+}
+
+/**
+ * Guide sections in reading order, with the headings the page prints.
+ *
+ * ⚠ These labels must stay identical to the Django field verbose_names — the
+ * backend counts them into `word_count` via `rendered_text_parts()`, so a
+ * mismatch would make the index card's clock disagree with the page's.
+ */
+export function guideSections(guide: PublicDistrictGuideDetail) {
+  return [
+    { heading: null, text: guide.intro },
+    { heading: "Застройка и жильё", text: guide.housing },
+    { heading: "Инфраструктура и транспорт", text: guide.infrastructure },
+    { heading: "Кому подойдёт", text: guide.audience },
+  ];
+}
+
+export function guideTakeaway(guide: PublicDistrictGuideDetail) {
+  return { title: "Вывод", text: guide.conclusion };
 }
 
 function normalizeList(data: unknown): GuideRaw[] {

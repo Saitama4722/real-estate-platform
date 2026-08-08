@@ -1,29 +1,33 @@
 /**
- * Article body parsing — plain text in, structured blocks out.
+ * Article + guide content assembly — structured fields in, blocks out.
  *
- * `Article.body` is deliberately plain text (product decision, 2026-08-08):
- * the superadmin writes it in the Django admin textarea following a simple
- * convention, and THIS module — nothing else — turns that convention into
- * headings, lists, callouts and the «Главное» takeaway card. The same parse
- * feeds the table of contents and the reading-time estimate, so the TOC can
- * never drift from the rendered headings.
+ * STRUCTURE COMES FROM FIELDS, NOT FROM TEXT (product decision, 2026-08-08).
+ * The superadmin types into a box labelled «Застройка и жильё» and gets a
+ * section under that heading; there is no markup to remember and no way to
+ * "forget the convention" and silently lose a heading. Articles carry
+ * repeatable `ArticleSection` rows (their headings depend on the subject);
+ * district guides carry five fixed named fields (their sections are always the
+ * same). Both arrive here as `SectionInput[]` and produce the SAME
+ * `ParsedArticleBody`, so rendering, the table of contents and reading time are
+ * one code path for both.
  *
- * The convention (verified against all 15 seeded articles):
- *   - paragraphs are separated by a blank line;
- *   - a SHORT single line without terminal punctuation, alone in its
- *     paragraph, is a subheading («Вывод», «Как понять, что подходит вам»);
- *     ⚠ a heading may CONTAIN a colon («Новостройка: на что обратить
- *     внимание») — only a line ENDING with «:» is a list lead-in, never
- *     a heading;
- *   - lines starting with "- " are list items; the lead-in line may sit in
- *     the same paragraph (single \n before the items) or its own paragraph —
- *     both occur in real data;
- *   - the final «Вывод»/«Совет»/«Итог» section becomes the takeaway card;
- *   - explicit "## " / "### " / "> " markers are also honored, so future
- *     articles can opt into unambiguous structure with no migration.
+ * ⚠ What is NOT here any more: heading detection. A short line without a full
+ * stop is now just a paragraph. The old heuristic — plus the `##` marker and
+ * the "last section called «Вывод» is the takeaway" rule — was replaced by
+ * migrations articles.0005–0007 and locations.0007–0009, which split every
+ * existing body into fields. Do not reintroduce it: the whole point is that
+ * two authors writing the same text get the same page.
  *
- * Django admin help_text documents the authoring side of this contract
- * (backend/articles/models.py ARTICLE_BODY_HELP) — change them together.
+ * What remains is PARAGRAPH-LEVEL ONLY, inside one section's text:
+ *   - blank line between paragraphs;
+ *   - lines starting with «- », «— », «– » or «• » are list items (and «1. »
+ *     for numbered ones); a lead-in line may share the paragraph with them;
+ *   - a paragraph starting with «Важно: » is the blue callout;
+ *   - «> » is a quote.
+ *
+ * The Django admin help_text states the same contract to the author
+ * (backend/articles/models.py SECTION_TEXT_HELP, and the DistrictGuide field
+ * help texts) — change them together.
  */
 
 export type ArticleBlock =
@@ -43,27 +47,20 @@ export interface ArticleTocEntry {
 export interface ParsedArticleBody {
   /** Main flow, everything before the takeaway section. */
   blocks: ArticleBlock[];
-  /** The final «Вывод»-style section, rendered as the «Главное» card. */
+  /** The «Вывод» section, rendered as the «Главное» card. */
   takeaway: { id: string; title: string; blocks: ArticleBlock[] } | null;
   /** h2-level entries in document order; includes the takeaway heading. */
   toc: ArticleTocEntry[];
 }
 
-/* ---- Heading detection ----------------------------------------------------- */
-
-const MAX_HEADING_LEN = 90;
-/** A line ending with any of these is prose (or a list lead-in), not a heading. */
-const TERMINAL_PUNCTUATION = /[.,:;!?…]["»)]?$/;
-/** Real headings start with a capital letter, a digit or an opening quote. */
-const HEADING_START = /^[А-ЯЁA-Z0-9«"]/;
-
-function isBareHeading(line: string): boolean {
-  return (
-    line.length >= 2 &&
-    line.length <= MAX_HEADING_LEN &&
-    HEADING_START.test(line) &&
-    !TERMINAL_PUNCTUATION.test(line)
-  );
+/**
+ * One authored section. `heading: null` means the text renders with NO
+ * subheading and contributes no TOC entry — that is the article's «Вступление»
+ * and the guide's «Что за район», both of which sit directly under the H1.
+ */
+export interface SectionInput {
+  heading: string | null;
+  text: string;
 }
 
 /**
@@ -80,9 +77,6 @@ function isBareHeading(line: string): boolean {
  */
 const LIST_ITEM = /^[-–—•]\s+/;
 const ORDERED_ITEM = /^\d+[.)]\s+/;
-
-/** Case-normalized titles whose section becomes the takeaway card. */
-const TAKEAWAY_TITLES = new Set(["вывод", "совет", "итог", "главное"]);
 
 /* ---- Heading ids ------------------------------------------------------------ */
 
@@ -153,16 +147,8 @@ function blocksFromParagraph(para: string): ArticleBlock[] {
       i += 1;
     }
     const text = run.join(" ");
-    if (text.startsWith("## ")) {
-      out.push({ type: "h2", text: text.slice(3).trim(), id: "" });
-    } else if (text.startsWith("### ")) {
-      out.push({ type: "h3", text: text.slice(4).trim(), id: "" });
-    } else if (/^Важно:\s+/.test(text)) {
+    if (/^Важно:\s+/.test(text)) {
       out.push({ type: "callout", text: text.replace(/^Важно:\s+/, "") });
-    } else if (run.length === 1 && lines.length === 1 && isBareHeading(text)) {
-      // Bare-heading detection applies ONLY to a line that is its own whole
-      // paragraph — a short line inside a mixed lead-in+list paragraph is prose.
-      out.push({ type: "h2", text, id: "" });
     } else {
       out.push({ type: "p", text });
     }
@@ -170,51 +156,63 @@ function blocksFromParagraph(para: string): ArticleBlock[] {
   return out;
 }
 
-export function parseArticleBody(body: string): ParsedArticleBody {
-  const paragraphs = body.replace(/\r\n?/g, "\n").split(/\n{2,}/);
-  const blocks: ArticleBlock[] = [];
-  for (const para of paragraphs) {
-    blocks.push(...blocksFromParagraph(para));
+/** Paragraph-level parse of ONE section's text. Never yields a heading. */
+export function parseSectionText(text: string): ArticleBlock[] {
+  const out: ArticleBlock[] = [];
+  for (const para of (text ?? "").replace(/\r\n?/g, "\n").split(/\n{2,}/)) {
+    out.push(...blocksFromParagraph(para));
   }
+  return out;
+}
 
-  // Deduplicated, stable heading ids.
+/**
+ * Assemble authored sections into the renderable shape.
+ *
+ * An empty section is DROPPED — never a heading with nothing under it and
+ * never a gap in the table of contents. `takeaway` is passed separately
+ * because it is a distinct field on both models, not the last section that
+ * happens to be named «Вывод».
+ */
+export function parsedBodyFromSections(
+  sections: SectionInput[],
+  takeawayInput?: { title: string; text: string } | null,
+): ParsedArticleBody {
+  const blocks: ArticleBlock[] = [];
+  const toc: ArticleTocEntry[] = [];
+
+  // Stable, deduplicated heading ids — two sections may legitimately share a
+  // title («Кому подойдёт» in two different guides is fine, but twice in ONE
+  // article would collide and break TOC anchors).
   const seen = new Map<string, number>();
-  for (const block of blocks) {
-    if (block.type !== "h2" && block.type !== "h3") continue;
-    const base = slugifyHeading(block.text);
+  const idFor = (text: string) => {
+    const base = slugifyHeading(text);
     const n = seen.get(base) ?? 0;
     seen.set(base, n + 1);
-    block.id = n === 0 ? base : `${base}-${n + 1}`;
-  }
+    return n === 0 ? base : `${base}-${n + 1}`;
+  };
 
-  // The final «Вывод»-style h2 section becomes the takeaway card.
-  let takeawayStart = -1;
-  for (let i = blocks.length - 1; i >= 0; i -= 1) {
-    const b = blocks[i];
-    if (b.type === "h2") {
-      if (TAKEAWAY_TITLES.has(b.text.trim().toLowerCase())) takeawayStart = i;
-      break; // only the LAST h2 qualifies
+  for (const section of sections) {
+    const body = parseSectionText(section.text);
+    if (body.length === 0) continue;
+    const heading = section.heading?.trim();
+    if (heading) {
+      const id = idFor(heading);
+      blocks.push({ type: "h2", text: heading, id });
+      toc.push({ id, label: heading });
     }
+    blocks.push(...body);
   }
 
   let takeaway: ParsedArticleBody["takeaway"] = null;
-  let main = blocks;
-  if (takeawayStart >= 0) {
-    const head = blocks[takeawayStart] as Extract<ArticleBlock, { type: "h2" }>;
-    takeaway = {
-      id: head.id,
-      title: head.text,
-      blocks: blocks.slice(takeawayStart + 1),
-    };
-    main = blocks.slice(0, takeawayStart);
+  const takeawayBlocks = takeawayInput ? parseSectionText(takeawayInput.text) : [];
+  if (takeawayInput && takeawayBlocks.length > 0) {
+    const title = takeawayInput.title.trim() || "Вывод";
+    const id = idFor(title);
+    takeaway = { id, title, blocks: takeawayBlocks };
+    toc.push({ id, label: title });
   }
 
-  const toc: ArticleTocEntry[] = main
-    .filter((b): b is Extract<ArticleBlock, { type: "h2" }> => b.type === "h2")
-    .map((b) => ({ id: b.id, label: b.text }));
-  if (takeaway) toc.push({ id: takeaway.id, label: takeaway.title });
-
-  return { blocks: main, takeaway, toc };
+  return { blocks, takeaway, toc };
 }
 
 /* ---- Reading time ----------------------------------------------------------- */
@@ -223,8 +221,9 @@ export function parseArticleBody(body: string): ParsedArticleBody {
  * Average Russian silent-reading speed; deliberately conservative.
  *
  * ⚠ THIS FILE IS THE ONLY DEFINITION OF READING TIME. The backend deliberately
- * does NOT compute minutes: `DistrictGuideListSerializer` omits `body` (too
- * heavy for an index of ~90 guides), so it sends a raw `word_count` instead —
+ * does NOT compute minutes: `DistrictGuideListSerializer` omits the section
+ * texts (too heavy for an index of ~90 guides), so it sends a raw `word_count`
+ * summed over the five section fields instead —
  * a MEASUREMENT, not a policy. The rate, the min-1 floor and the rounding mode
  * all live here, once. Do not add a second implementation server-side: a
  * shared constant would still leave the algorithm duplicated, and Python's
@@ -243,8 +242,36 @@ export function readingTimeFromWordCount(words: number): number {
   return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
 }
 
-export function computeReadingTimeMinutes(body: string): number {
-  return readingTimeFromWordCount(countWords(body));
+/**
+ * Words in everything the page actually renders: each non-empty section's
+ * heading AND text, plus the takeaway's title and text.
+ *
+ * Headings are counted because they are on the page and were counted before
+ * the content became structured — with them, reading times are unchanged by
+ * that migration. `DistrictGuide.rendered_text_parts()` counts the same parts
+ * server-side for the index card, so the card and the page agree.
+ */
+export function countSectionsWords(
+  sections: SectionInput[],
+  takeaway?: { title: string; text: string } | null,
+): number {
+  let words = 0;
+  for (const section of sections) {
+    if (!section.text.trim()) continue;
+    if (section.heading?.trim()) words += countWords(section.heading);
+    words += countWords(section.text);
+  }
+  if (takeaway && takeaway.text.trim()) {
+    words += countWords(takeaway.title) + countWords(takeaway.text);
+  }
+  return words;
+}
+
+export function readingTimeFromSections(
+  sections: SectionInput[],
+  takeaway?: { title: string; text: string } | null,
+): number {
+  return readingTimeFromWordCount(countSectionsWords(sections, takeaway));
 }
 
 /* ---- Shared presentation helpers ------------------------------------------- */
