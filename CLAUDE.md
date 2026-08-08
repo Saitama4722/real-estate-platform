@@ -1017,8 +1017,23 @@ seeded-then-deleted QA articles), plus a 32-width scroll sweep per page.
   same parse feeds the TOC and heading ids (RU-translit slugs, deduped), so TOC
   and body cannot drift. Reading time = words/170, min 1, computed from the
   body — no stored field. Django admin `help_text` documents the authoring
-  convention (`ARTICLE_BODY_HELP` in `backend/articles/models.py`) — change
-  parser and help text together.
+  convention (`ARTICLE_BODY_HELP` in `backend/articles/models.py`), and
+  **`docs/articles-writing-guide.md` is the human-facing version** (Russian,
+  for the superadmin) — parser, help text and guide change together.
+  - **Audited across all 15 articles `[measured]`, zero warnings:** 4–6 h2
+    each, 1–3 lists, li count equals the raw `- ` line count exactly, every
+    article ends in a takeaway card (14× «Вывод», 1× «Совет» —
+    `rayony-krasnodara-dlya-pokupatelya`), drop cap on all 15, and **0
+    callouts** — no article starts a paragraph with «Важно:» (the one in
+    `oformlenie-sdelki…` sits mid-paragraph, which correctly stays prose).
+    The audit also flags loose convention (a short unpunctuated line left as a
+    `<p>`, a `:` lead-in with no list, a literal `- ` paragraph); none fired.
+  - **⚠ The parser is wired to ARTICLES ONLY.** `/districts/[slug]` still
+    renders `guide.body` through a `whitespace-pre-line` div, so a guide's
+    headings and `- ` lists show as flat text. Writing guides to the
+    convention is still correct and forward-compatible — the day that
+    renderer is swapped, all of them gain structure with no content edits —
+    but do not claim district guides are parsed today.
   - **Heading-detection trap:** «Новостройка: на что обратить внимание» is a
     heading that CONTAINS a colon; only a line ENDING with «:» is a list
     lead-in. Don't "simplify" the rule to `contains(':')`.
@@ -1071,14 +1086,26 @@ seeded-then-deleted QA articles), plus a 32-width scroll sweep per page.
   settle-and-correct rAF loop (`scrollToEntry` in `ArticleToc.tsx`): wait for 3
   stable frames, then one instant `scrollBy` if the heading missed the line.
   Headings carry matching `scroll-mt-[76px]` — keep the two in sync.
-- **THE article card is `components/articles/ArticleCard.tsx`** — used by the
-  /articles grid, «Другие статьи» (`ArticleSimilarSection`) and the homepage
-  «Статьи» section. `ArticlePreviewCard` and `ArticleCatalogLinksBlock` were
-  DELETED (replaced by `ArticleCard` / `ArticleCatalogCta`). Card data flows
-  through `articleCardDataFrom()` which STRIPS `body` — don't pass full
-  articles as client props. **Known divergence:** `DistrictGuideCard`
-  hand-mirrors the OLD card markup; /districts now looks intentionally
-  different and was deliberately not touched (out of scope).
+- **THE editorial card is `components/articles/ArticleCard.tsx`** — the /articles
+  grid, «Другие статьи» (`ArticleSimilarSection`), the homepage «Статьи» section
+  AND the /districts guide grid all render it. `ArticlePreviewCard`,
+  `ArticleCatalogLinksBlock` and `DistrictGuideCard` were DELETED (replaced by
+  `ArticleCard` / `ArticleCatalogCta`). **Per-surface differences travel as
+  DATA, never as a second component** — `ArticleCardData` carries `href`,
+  optional `eyebrow`, optional `minutes` and optional `ctaLabel`, and each
+  domain supplies its own mapper: `articleCardDataFrom()` (in the card file)
+  and `districtGuideCardDataFrom()` (in `lib/publicDistrictGuides.ts`). Both
+  STRIP `body` — don't pass full texts as client props. If a fourth surface
+  needs the card, add a mapper, not a variant.
+  - **`minutes` is optional for a real reason:** `DistrictGuideListSerializer`
+    omits `body` (only the detail serializer has it), so guide cards show **no
+    clock** rather than a fabricated number. Do not "fix" this by adding
+    `body` to the guide list payload — that ships ~90 full texts to render a
+    clock. A backend-computed `reading_minutes` would also mean two
+    definitions of reading time; keep the one in `articleContent.ts`.
+  - Guide eyebrow is the AREA KIND («Район» / «Микрорайон»), derived from the
+    `catalogParam` the API already sends — **not** the city, which /districts
+    already prints as the group heading.
 - **Deliberate deviations from the mockup (do not "fix" back):** meta text uses
   `fg-muted` instead of the mockup's `#94A3B8` and the featured meta is
   white/70 not /55 — the mockup grays measure ~2.6:1, below WCAG AA; drop cap
