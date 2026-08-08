@@ -80,7 +80,24 @@ class DistrictGuideAdmin(admin.ModelAdmin):
             "Привязка (заполните ТОЛЬКО одно поле — район ИЛИ микрорайон)",
             {"fields": ("district", "neighborhood")},
         ),
-        ("Содержание", {"fields": ("title", "slug", "excerpt", "body", "cover_image")}),
+        ("Заголовок и анонс", {"fields": ("title", "slug", "excerpt", "cover_image")}),
+        (
+            "Текст гида",
+            {
+                "description": (
+                    "Пять разделов в порядке чтения. Пишите обычным текстом — "
+                    "подзаголовки подставляются сами. Любой раздел можно "
+                    "оставить пустым: он просто не появится на странице."
+                ),
+                "fields": (
+                    "intro",
+                    "housing",
+                    "infrastructure",
+                    "audience",
+                    "conclusion",
+                ),
+            },
+        ),
         ("Публикация", {"fields": ("status", "published_at")}),
         ("Даты", {"fields": ("created_at", "updated_at")}),
     )
