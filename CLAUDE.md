@@ -1028,12 +1028,30 @@ seeded-then-deleted QA articles), plus a 32-width scroll sweep per page.
     `oformlenie-sdelki…` sits mid-paragraph, which correctly stays prose).
     The audit also flags loose convention (a short unpunctuated line left as a
     `<p>`, a `:` lead-in with no list, a literal `- ` paragraph); none fired.
-  - **⚠ The parser is wired to ARTICLES ONLY.** `/districts/[slug]` still
-    renders `guide.body` through a `whitespace-pre-line` div, so a guide's
-    headings and `- ` lists show as flat text. Writing guides to the
-    convention is still correct and forward-compatible — the day that
-    renderer is swapped, all of them gain structure with no content edits —
-    but do not claim district guides are parsed today.
+  - **The parser now serves BOTH `/articles/[slug]` and `/districts/[slug]`**
+    (2026-08-08). One convention, one parser, one layout — see the shared
+    shell entry below.
+  - **Bullets accept `- `, `— `, `– ` and `• `** (`LIST_ITEM` in
+    articleContent.ts). The em dash is there because it is the natural Russian
+    habit: all 24 district guides were written with it `[measured]`, and the
+    user chose one regex over 24 text edits plus a retrained habit for the ~90
+    guides still to come. Verified non-regressive — all 15 articles kept their
+    exact h2/list/li counts `[measured]`; em dashes there occur only
+    mid-sentence, where the anchored pattern cannot see them.
+  - **⚠ READING TIME HAS EXACTLY ONE DEFINITION, and it is in TypeScript.**
+    `DistrictGuideListSerializer` omits `body` (too heavy for ~90 guides), so
+    it sends **`word_count`** — a MEASUREMENT. The rate, the min-1 floor and
+    the rounding all live in `articleContent.ts`
+    (`readingTimeFromWordCount`). **Do not add `reading_minutes` server-side**
+    even with a shared constant: the algorithm would still be duplicated, and
+    Python's banker's `round()` disagrees with JS `Math.round` at exact .5.
+    Python's `str.split()` == `trim().split(/\s+/).filter(Boolean)`, so the
+    counts agree by construction — verified `[measured]`: index card minutes
+    == detail page minutes for all 25 guides.
+  - **Existing guide corpus is unstructured prose** `[measured]`, all 24:
+    lists work (em dash), but **0 headings and 0 «Вывод» blocks**, so no TOC
+    and no takeaway card until the text is edited. Not a code bug — recorded
+    in `docs/articles-writing-guide.md` §10.
   - **Heading-detection trap:** «Новостройка: на что обратить внимание» is a
     heading that CONTAINS a colon; only a line ENDING with «:» is a list
     lead-in. Don't "simplify" the rule to `contains(':')`.
@@ -1106,6 +1124,23 @@ seeded-then-deleted QA articles), plus a 32-width scroll sweep per page.
   - Guide eyebrow is the AREA KIND («Район» / «Микрорайон»), derived from the
     `catalogParam` the API already sends — **not** the city, which /districts
     already prints as the group heading.
+- **THE long-form layout is `components/articles/ArticleReadingPage.tsx`** —
+  both `/articles/[slug]` and `/districts/[slug]` render it, so each page file
+  is now just data + composition. It owns the progress bar, breadcrumbs,
+  accent rule, eyebrow, H1, meta row, cover, parsed body, share row, CTA slot
+  and an `after` slot. Differences arrive as props (`eyebrowHref`, `backHref`/
+  `backLabel`, `cta`, `after`) — do not fork it.
+  - **⚠ The 3-column grid is CONDITIONAL on having a TOC** (`toc.length >= 2`).
+    With no headings the rail column must not be reserved, or the body sits
+    behind an empty 264px gutter — which is every one of the 24 current
+    guides. In the no-TOC branch the column is **`max-w-[680px]`, not 720**:
+    it has to equal the body's own measure or the text lands 40px left of true
+    centre while the wrapper is centred `[measured]`. With a TOC the 720/680
+    offset is deliberate — the rail balances it.
+  - `ArticleCatalogCta` and `ArticleShareRow` take optional overrides so a
+    guide gets an AREA-FILTERED catalog link (`buildGuideCatalogHref` →
+    `?neighborhood_slug=…&city_slug=…`) and a «Все районы» back-link instead of
+    «Все статьи». A guide's "up" is /districts, not the blog.
 - **Deliberate deviations from the mockup (do not "fix" back):** meta text uses
   `fg-muted` instead of the mockup's `#94A3B8` and the featured meta is
   white/70 not /55 — the mockup grays measure ~2.6:1, below WCAG AA; drop cap
