@@ -168,9 +168,13 @@ class _GuideCommonMixin(serializers.Serializer):
 
     def get_word_count(self, obj):
         """
-        Whitespace-token count of the body — a MEASUREMENT, not a reading time.
+        Whitespace-token count of the text — a MEASUREMENT, not a reading time.
 
-        The list endpoint deliberately omits `body` (an index of ~90 guides
+        Sums every section field, because that is what the page renders. A
+        section left empty contributes nothing, which is also what it does
+        visually.
+
+        The list endpoint deliberately omits the section texts (an index of ~90 guides
         would ship every full text just to render a clock), so the card needs
         some measure of length from here. It is a raw count on purpose: the
         reading-time RULE — 170 wpm, a one-minute floor, the rounding mode —
@@ -183,7 +187,7 @@ class _GuideCommonMixin(serializers.Serializer):
         drops empties — identical to the frontend's
         `trim().split(/\\s+/).filter(Boolean)`.
         """
-        return len((obj.body or "").split())
+        return sum(len(part.split()) for part in obj.rendered_text_parts())
 
 
 class DistrictGuideListSerializer(_GuideCommonMixin, serializers.ModelSerializer):
@@ -200,7 +204,8 @@ class DistrictGuideDetailSerializer(_GuideCommonMixin, serializers.ModelSerializ
     class Meta:
         model = DistrictGuide
         fields = [
-            "slug", "title", "excerpt", "body", "published_at",
+            "slug", "title", "excerpt", "published_at",
+            "intro", "housing", "infrastructure", "audience", "conclusion",
             "cover_image", "city", "catalog_param", "catalog_slug",
             "word_count",
         ]
