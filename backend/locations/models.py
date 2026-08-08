@@ -145,7 +145,7 @@ class DistrictGuide(BaseTimestampedModel):
     layer on top of the existing location taxonomy (NOT a new Article row, NOT a
     new location table). Each guide targets exactly one of `district` /
     `neighborhood`; the paired one stays null. Mirrors the Article pattern
-    (title/slug/excerpt/body/cover_image + draft/published status) so it is
+    (title/slug/excerpt/sections/cover_image + draft/published status) so it is
     editable and photo-uploadable via Django admin the same way articles are.
     """
 
@@ -180,7 +180,40 @@ class DistrictGuide(BaseTimestampedModel):
         verbose_name="ЧПУ (slug)",
     )
     excerpt = models.CharField(max_length=500, verbose_name="Анонс")
-    body = models.TextField(verbose_name="Текст")
+    # Структурированные разделы (2026-08-08). ФИКСИРОВАННЫЕ поля, а не
+    # повторяемые блоки: каждый гид состоит из одних и тех же разделов, и пять
+    # подписанных полей в порядке чтения — самая простая форма для одного
+    # нетехнического автора ~90 гидов. Пустое поле просто не выводится: ни
+    # заголовка без текста, ни дырки в оглавлении.
+    #
+    # ⚠ «Что за район» выводится КАК ВСТУПЛЕНИЕ, без подзаголовка: H1 уже
+    # называет район, и перенесённые гиды (весь старый текст в этом поле)
+    # обязаны выглядеть в точности как раньше.
+    intro = models.TextField(
+        verbose_name="Что за район",
+        blank=True,
+        help_text=(
+            "Вступление под заголовком, выводится без подзаголовка. "
+            "Абзацы — через пустую строку; «- » или «— » в начале строки — список; "
+            "«Важно: » в начале абзаца — синяя врезка."
+        ),
+    )
+    housing = models.TextField(
+        verbose_name="Застройка и жильё", blank=True,
+        help_text="Пустое поле не выводится на странице.",
+    )
+    infrastructure = models.TextField(
+        verbose_name="Инфраструктура и транспорт", blank=True,
+        help_text="Пустое поле не выводится на странице.",
+    )
+    audience = models.TextField(
+        verbose_name="Кому подойдёт", blank=True,
+        help_text="Пустое поле не выводится на странице.",
+    )
+    conclusion = models.TextField(
+        verbose_name="Вывод", blank=True,
+        help_text="Выводится карточкой «Главное» в конце гида.",
+    )
     cover_image = models.ImageField(
         upload_to="districts/covers/",
         blank=True,
@@ -217,6 +250,42 @@ class DistrictGuide(BaseTimestampedModel):
 
     def __str__(self) -> str:
         return self.title
+
+    #: Section fields in reading order. One definition, so a sixth section
+    #: cannot be added to the model and silently missed by word_count.
+    SECTION_FIELDS = ("intro", "housing", "infrastructure", "audience", "conclusion")
+
+    def section_texts(self):
+        """Non-empty section texts in reading order."""
+        return [
+            text
+            for text in (getattr(self, name) or "" for name in self.SECTION_FIELDS)
+            if text.strip()
+        ]
+
+    def rendered_text_parts(self):
+        """
+        Every string the rendered guide shows, in order: each non-empty
+        section's HEADING and text, «Вывод» included.
+
+        The headings are the fields' own verbose_names — the same labels the
+        admin shows and the page prints — so there is no second list to keep in
+        sync. Counting them matters because the frontend counts them too
+        (`countSectionsWords` in lib/articleContent.ts); otherwise the index
+        card's clock and the page's clock could disagree by a minute.
+
+        `intro` is the exception: it renders as the lead paragraph, with no
+        heading of its own.
+        """
+        parts = []
+        for name in self.SECTION_FIELDS:
+            text = (getattr(self, name) or "").strip()
+            if not text:
+                continue
+            if name != "intro":
+                parts.append(str(self._meta.get_field(name).verbose_name))
+            parts.append(text)
+        return parts
 
     @property
     def city(self):
