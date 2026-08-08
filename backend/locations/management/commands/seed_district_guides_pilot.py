@@ -696,7 +696,11 @@ class Command(BaseCommand):
                     "neighborhood": neighborhood,
                     "title": g["title"],
                     "excerpt": g["excerpt"],
-                    "body": g["body"],
+                    # These pilot texts are one continuous piece with no
+                    # headings, so they are the guide's «Что за район» intro —
+                    # which renders unheaded. The other four sections stay
+                    # empty until the superadmin fills them in.
+                    "intro": g["body"],
                     "status": DistrictGuide.GuideStatus.PUBLISHED,
                     "published_at": published_at,
                     # cover_image left blank — no image area shown; client uploads
@@ -712,7 +716,7 @@ class Command(BaseCommand):
                     neighborhood=neighborhood,
                     title=g["title"],
                     excerpt=g["excerpt"],
-                    body=g["body"],
+                    intro=g["body"],
                 )
                 updated_n += 1
 

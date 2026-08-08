@@ -12,6 +12,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from articles.choices import ArticleStatus
+from articles.content import apply_plain_body
 from articles.models import Article
 
 # slug prefix used to identify placeholder rows (for idempotency + --clear).
@@ -73,7 +74,6 @@ class Command(BaseCommand):
                 defaults={
                     "title": data["title"],
                     "excerpt": data["excerpt"],
-                    "body": _BODY,
                     "status": ArticleStatus.PUBLISHED,
                     # Stagger published_at so ordering (-published_at) is stable.
                     "published_at": now - timezone.timedelta(days=i),
@@ -81,6 +81,7 @@ class Command(BaseCommand):
             )
             if created:
                 created_n += 1
+                apply_plain_body(obj, _BODY)
         self.stdout.write(
             self.style.SUCCESS(
                 f"Placeholder articles: created {created_n}, "

@@ -20,6 +20,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from articles.choices import ArticleStatus
+from articles.content import apply_plain_body
 from articles.models import Article
 
 # Every article slug this command owns (for idempotency + --clear).
@@ -346,7 +347,6 @@ class Command(BaseCommand):
                 defaults={
                     "title": data["title"],
                     "excerpt": data["excerpt"],
-                    "body": data["body"],
                     "status": ArticleStatus.PUBLISHED,
                     "published_at": published_at,
                     # cover_image intentionally left blank — client adds real photos.
@@ -359,8 +359,11 @@ class Command(BaseCommand):
                 Article.objects.filter(pk=obj.pk).update(
                     title=data["title"],
                     excerpt=data["excerpt"],
-                    body=data["body"],
                 )
+            # The literals below are still one plain-text blob, so they are split
+            # into lead/sections/conclusion here. Human editing happens in the
+            # admin form, which has those fields directly.
+            apply_plain_body(obj, data["body"])
         self.stdout.write(
             self.style.SUCCESS(
                 f"Real articles: created {created_n}, "

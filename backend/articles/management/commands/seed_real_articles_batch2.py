@@ -27,6 +27,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from articles.choices import ArticleStatus
+from articles.content import apply_plain_body
 from articles.models import Article
 
 # Every article slug this command owns (for idempotency + --clear).
@@ -429,7 +430,6 @@ class Command(BaseCommand):
                 defaults={
                     "title": data["title"],
                     "excerpt": data["excerpt"],
-                    "body": data["body"],
                     "status": ArticleStatus.PUBLISHED,
                     "published_at": published_at,
                     # cover_image intentionally left blank — renders with no image
@@ -443,8 +443,9 @@ class Command(BaseCommand):
                 Article.objects.filter(pk=obj.pk).update(
                     title=data["title"],
                     excerpt=data["excerpt"],
-                    body=data["body"],
                 )
+            # Literals are one plain-text blob; split into lead/sections/conclusion.
+            apply_plain_body(obj, data["body"])
         self.stdout.write(
             self.style.SUCCESS(
                 f"Batch-2 real articles: created {created_n}, "
