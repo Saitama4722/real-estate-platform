@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Container } from "@/components/layout/container";
-import { PageHeading } from "@/components/layout/page-heading";
-import { Breadcrumbs } from "@/components/layout/breadcrumbs";
+import { ArticleCatalogCta } from "@/components/articles/ArticleCatalogCta";
+import { ArticleReadingPage } from "@/components/articles/ArticleReadingPage";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { isPropertyImageUrl } from "@/lib/propertyMedia";
 import {
-  fetchPublicDistrictGuideBySlug,
+  computeReadingTimeMinutes,
+  parseArticleBody,
+} from "@/lib/articleContent";
+import {
   buildGuideCatalogHref,
+  fetchPublicDistrictGuideBySlug,
 } from "@/lib/publicDistrictGuides";
 import {
   buildGuideDocumentTitle,
-  buildGuideMetaDescription,
   buildGuideJsonLd,
+  buildGuideMetaDescription,
   guideCanonicalUrl,
 } from "@/lib/districtGuideSeo";
 
@@ -41,10 +42,6 @@ export default async function DistrictGuidePage({ params }: GuidePageProps) {
     notFound();
   }
 
-  const jsonLd = buildGuideJsonLd(guide);
-  const catalogHref = buildGuideCatalogHref(guide);
-
-  // Breadcrumbs: Главная > Районы > [город] > [название].
   const cityCrumb = guide.city
     ? {
         label: guide.city.name,
@@ -53,51 +50,45 @@ export default async function DistrictGuidePage({ params }: GuidePageProps) {
     : null;
 
   return (
-    <Container className="py-6">
-      <JsonLd data={jsonLd} />
-      <Breadcrumbs
-        items={[
+    <>
+      <JsonLd data={buildGuideJsonLd(guide)} />
+      <ArticleReadingPage
+        breadcrumbs={[
           { label: "Главная", href: "/" },
           { label: "Районы", href: "/districts" },
           ...(cityCrumb ? [cityCrumb] : []),
           { label: guide.title },
         ]}
-        className="mb-4"
+        /* Same eyebrow the guide card shows. Not a link: there is no
+           /districts?kind= filter to send the reader to. */
+        eyebrow={
+          guide.catalogParam === "neighborhood_slug" ? "Микрорайон" : "Район"
+        }
+        title={guide.title}
+        publishedAt={guide.publishedAt}
+        /* From the body here — the detail payload HAS it. The index derives
+           the same number from `word_count` through the same rule. */
+        minutes={computeReadingTimeMinutes(guide.body)}
+        coverImage={guide.coverImage}
+        parsed={parseArticleBody(guide.body)}
+        shareUrl={guideCanonicalUrl(guide.slug)}
+        /* A guide's "up" is the district index, not the blog. */
+        backHref="/districts"
+        backLabel="Все районы"
+        cta={
+          /* The guide's CTA is area-targeted: the catalog is pre-filtered to
+             THIS district/neighborhood, which beats the article version's
+             generic links. Same component, different data. */
+          <ArticleCatalogCta
+            title="Объекты в этом районе"
+            description="Каталог уже отфильтрован по этому месту — посмотрите, что продаётся здесь сейчас."
+            primaryHref={buildGuideCatalogHref(guide)}
+            primaryLabel="Смотреть объекты"
+            links={[{ label: "Все районы", href: "/districts" }]}
+            glyph="Р"
+          />
+        }
       />
-
-      <article>
-        <PageHeading title={guide.title} />
-
-        {guide.coverImage && isPropertyImageUrl(guide.coverImage) && (
-          <div className="mt-6 aspect-[16/9] w-full max-w-3xl overflow-hidden rounded-lg bg-gray-200">
-            <img
-              src={guide.coverImage}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          </div>
-        )}
-
-        <div className="mt-8 max-w-3xl whitespace-pre-line text-base leading-relaxed text-gray-800">
-          {guide.body}
-        </div>
-
-        {/* CTA: read about the area → browse real listings filtered to it. */}
-        <div className="mt-10 max-w-3xl rounded-xl border border-blue-100 bg-blue-50 p-6">
-          <p className="text-base font-medium text-gray-900">
-            Хотите посмотреть объекты в этом районе?
-          </p>
-          <p className="mt-1 text-sm text-gray-600">
-            Мы уже отфильтровали каталог по этому месту — переходите и выбирайте.
-          </p>
-          <Link
-            href={catalogHref}
-            className="mt-4 inline-flex items-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-          >
-            Смотреть объекты в этом районе
-          </Link>
-        </div>
-      </article>
-    </Container>
+    </>
   );
 }

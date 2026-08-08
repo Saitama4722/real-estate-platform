@@ -16,12 +16,20 @@ import { Icon, Icons } from "@/components/ui/icon";
 interface ArticleShareRowProps {
   url: string;
   title: string;
+  /** Where "back to the index" goes — /articles for a post, /districts for a guide. */
+  backHref?: string;
+  backLabel?: string;
 }
 
 const PILL_CLASS =
   "inline-flex h-10 items-center gap-[7px] rounded-full border border-border bg-surface-raised px-[15px] text-[13.5px] font-semibold text-fg-secondary transition-colors duration-[150ms] hover:border-gray-400 hover:text-fg focus-ring-brand";
 
-export function ArticleShareRow({ url, title }: ArticleShareRowProps) {
+export function ArticleShareRow({
+  url,
+  title,
+  backHref = "/articles",
+  backLabel = "Все статьи",
+}: ArticleShareRowProps) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<number | null>(null);
 
@@ -50,11 +58,11 @@ export function ArticleShareRow({ url, title }: ArticleShareRowProps) {
   return (
     <div className="mt-11 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6 font-sans">
       <Link
-        href="/articles"
+        href={backHref}
         className="inline-flex min-h-11 items-center gap-1.5 text-small font-semibold text-brand transition-colors duration-[150ms] hover:text-brand-hover focus-ring-brand"
       >
         <Icon icon={Icons.ArrowLeft} size={16} />
-        Все статьи
+        {backLabel}
       </Link>
 
       <div className="flex flex-wrap items-center gap-2">
