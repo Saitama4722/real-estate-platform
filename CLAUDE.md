@@ -1005,6 +1005,12 @@ All behaviour verified `[measured]` by 100/100 Playwright checks (90 in phase 1
 across 3 articles incl. shortest/longest, 10 pagination checks against 13
 seeded-then-deleted QA articles), plus a 32-width scroll sweep per page.
 
+- **⚠ SUPERSEDED LATER THE SAME DAY — see «Structured section FIELDS replaced
+  the plain-text `body`» below. `Article.body` NO LONGER EXISTS**, and heading
+  detection, `##` markers and the «last section named Вывод is the takeaway»
+  rule are all gone. What survives from this bullet is only the paragraph-level
+  behaviour INSIDE one field (lists, «Важно:», quotes) and the reading-time
+  definition. Read it as history, not as current behaviour.
 - **`Article.body` stays PLAIN TEXT; structure is parsed at render time** (user
   decision, 2026-08-08 — chosen over a Markdown migration). The single parser is
   `frontend/src/lib/articleContent.ts`: `\n\n` paragraphs; a short bare line
@@ -1200,6 +1206,125 @@ seeded-then-deleted QA articles), plus a 32-width scroll sweep per page.
   same-category, then recency. Remember the **`revalidate: 120`** on both
   article fetches: after editing an article (or its status) the site can serve
   the old payload for up to 2 minutes — poll before declaring a change broken.
+
+## ⭐ Structured section FIELDS replaced the plain-text `body` (2026-08-08)
+
+**`Article.body` and `DistrictGuide.body` NO LONGER EXIST.** The entry above
+("`Article.body` stays PLAIN TEXT; structure is parsed at render time") describes
+the PREVIOUS design and is kept only because the parser rules it documents still
+govern what happens INSIDE one field. Structure itself now comes from the schema.
+
+- **Article:** `intro` + `ArticleSection` rows (`heading`, `text`, `order`;
+  `related_name="sections"`, ordering `["order", "id"]`) + `conclusion_title` /
+  `conclusion`. **`conclusion_title` is a free CharField defaulting to «Вывод»**
+  — not an enum — because one real article ends «Совет» and whatever is typed is
+  what the «Главное» card prints.
+- **DistrictGuide:** five FIXED named fields — `intro`, `housing`,
+  `infrastructure`, `audience`, `conclusion`. Fixed, not repeatable, because
+  every guide has the same shape and ~90 of them are written by one
+  non-technical author. **Each field's `verbose_name` IS the heading the page
+  prints**, so there is no second list to keep in sync.
+- **`intro` (article «Вступление», guide «Что за район») renders with NO
+  heading** and contributes no TOC entry — the H1 already names the subject.
+  That is what makes the 24 migrated guides byte-identical to before.
+- **An empty field is omitted entirely** — no heading, no gap, no TOC row. The
+  serializer also drops any section whose heading OR text is blank, so a
+  half-filled section can never reach the page.
+
+### What the parser still does — and what it must never do again
+
+`lib/articleContent.ts` is now **paragraph-level only, within one section's
+text**: blank-line paragraphs, `- `/`— `/`– `/`• ` and `1. ` lists (lead-in may
+share the paragraph), «Важно: » callout, `> ` quote.
+
+**⚠ HEADING DETECTION IS GONE. Do not reintroduce it.** The old heuristic (short
+line, no terminal punctuation → h2), the explicit `##`/`###` markers, and the
+"last section named Вывод/Совет/Итог/Главное is the takeaway" rule are all
+deleted. A short line without a full stop is now just a paragraph. The point is
+that two authors writing the same text get the same page, and that a heading
+cannot be silently lost by forgetting a convention.
+`docs/articles-writing-guide.md` is the author-facing version and was rewritten
+to match — **parser, `help_text` (`SECTION_TEXT_HELP` in `articles/models.py`
+plus the DistrictGuide field help texts) and that guide change together.**
+
+### How the migration was proven lossless — reuse this method
+
+Three reversible steps per app (add fields → copy/split → drop `body`):
+`articles.0005–0007`, `locations.0007–0009`. All applied.
+
+**The verification that worked, and is worth repeating for any destructive data
+migration:**
+
+1. **Reassemble the post-migration state using the migration's OWN `backwards()`
+   logic**, in memory — not a hand-written inverse, which can disagree with the
+   real one.
+2. **Compare against the seed-command literals at the pre-refactor commit**
+   (`git show HEAD:…`), which are the exact strings that were written to the DB.
+   The seeds' `body` literals were untouched by the refactor, so HEAD is a clean
+   source.
+3. **Compare four independent measures, not just equality:** character count,
+   paragraph count, list-item count, word count. Equality alone hides a
+   whitespace-normalisation change; the counts localise it.
+4. **Check the render-layer droppers too** — here, sections with empty
+   `heading`/`text`, which the serializer removes (0 found).
+
+Result `[measured]`: 15/15 articles and 24/24 guides round-tripped
+character-identical; 69 sections, 0 empty; reading time identical for all 39
+(headings were counted before and are counted now — `countSectionsWords` and
+`DistrictGuide.rendered_text_parts()` deliberately agree so the index card's
+clock matches the page's).
+
+**⚠ HONEST LIMITATION, state it whenever quoting this result:** it proves the
+TRANSFORMATION is lossless for records whose body still equalled the seed text
+when the migration ran. **It cannot detect loss in a record hand-edited in admin
+after seeding** — such a record would show as a mismatch indistinguishable from
+a genuine edit. No mismatches occurred, so the question never arose. There is no
+pre-migration dump; this is the best available evidence, not a byte diff.
+
+**Migration gotcha that bit here:** `articles.0003` imported
+`articles.models.ARTICLE_BODY_HELP`, which this refactor deleted — that breaks
+the whole migration graph ON IMPORT. The constant is now inlined in 0003.
+**Never reference a live app-module attribute from a migration**; a migration is
+a historical record.
+
+## ⚠ A column drop cannot be split across commits — bisect will mislead you
+
+The refactor above landed as five thematic commits (models+migrations, content
+module+seeds, admin, serializers, frontend). **They are coherent as a set and
+NOT individually runnable.** The commit that removes `body` leaves the old
+serializer still naming it, so any single intermediate commit is broken by
+construction — there is no ordering that avoids this, because the field cannot
+exist and not exist at once.
+
+- **Consequence for debugging:** `git bisect` across that range will report
+  failures that are artefacts of the split, not regressions. Bisect to the
+  BOUNDARY (the commit before the first, and the commit after the last) and
+  treat the range as atomic.
+- **RULE:** when a schema change forces this, say so in the commit message or
+  here. Do not silently leave a five-commit range where four states 500.
+- The alternative — one giant commit — was rejected because the review value of
+  separate serializer/admin/frontend diffs outweighs bisectability across a
+  range this small.
+
+## ⚠ After a schema refactor, `revalidate: 120` serves the OLD payload
+
+**A correct page can render EMPTY and look like the refactor broke it.**
+Happened here `[measured]`: after the body→sections migration,
+`/articles/ipoteka-v-krasnodare-kak-vybrat-bank` rendered a body with 0
+headings, 0 list items and 0 text, while the API for the same slug returned
+intro 562 chars + 5 sections + conclusion 484. Next's data cache was still
+holding a payload fetched BEFORE the migration, whose now-absent fields the
+mapper defaults to `""`.
+
+- **The tell:** the API is right and the page is empty; other pages of the same
+  type are fine (they simply had not been cached).
+- **The fix is to burn the cache, not to debug:** request the URL 2–3 times, or
+  wait out the window, then re-check. Three warm requests fixed it and the page
+  rendered in full.
+- **RULE: after ANY migration that changes a serialized shape, warm every URL
+  you intend to inspect BEFORE concluding anything is broken.** Same rule
+  already recorded for fixture cleanup ("fetch TWICE"), same mechanism —
+  stale-while-revalidate — different trigger.
 
 ## Authentication (redesigned 2026-08-08): shared shell, one 401, real throttle
 
