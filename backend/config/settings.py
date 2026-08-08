@@ -7,6 +7,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 from common.media_storage import default_storages_entry
@@ -249,6 +250,24 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+
+# Periodic tasks.
+#
+# ⚠ REQUIRES A RUNNING BEAT PROCESS — `celery -A config.celery beat -l info`.
+# scripts\start_local.ps1 starts a WORKER only, so nothing here fires until
+# beat is started. Deliberately not added to the launcher: that script is
+# foundational and has a history of breaking (see the Windows Terminal section
+# in CLAUDE.md). Starting beat is a go-live step; the manual fallback is
+# `python manage.py flushexpiredtokens`.
+CELERY_BEAT_SCHEDULE = {
+    # Daily at 04:00 Europe/Moscow — outside working hours, and frequent enough
+    # that the blacklist tables never hold more than a couple of days of rows
+    # (refresh tokens live 48 h).
+    "flush-expired-jwt-tokens": {
+        "task": "users.flush_expired_tokens",
+        "schedule": crontab(hour=4, minute=0),
+    },
+}
 
 # --- Public site URL (used to build absolute links in notifications, etc.) ---
 # No trailing slash. Override per environment via the SITE_URL env var.

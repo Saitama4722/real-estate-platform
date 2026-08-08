@@ -1253,6 +1253,90 @@ against a disposable account (created, used, hard-deleted; 3 real users intact).
   scope alert selectors to the form. A sync Playwright route handler cannot call
   a Playwright API (the route auto-handles) — use CDP
   `Network.emulateNetworkConditions` latency to observe the submitting state.
+## 🚀 PRE-PRODUCTION CHECKLIST — do these when going live, not before
+
+The project runs **locally only** today; Railway is not active or paid, and the
+owner has never opened its console. Several security decisions were deliberately
+DEFERRED to go-live because they only make sense once the site is exposed and a
+server shell exists. Work this list top to bottom.
+
+### 1. Confirm Railway shell access FIRST
+
+Everything below assumes you can run `manage.py` on the server. **Verify it
+before you change anything**, because the recovery commands in step 3 need it
+and there is no in-product password recovery by design.
+
+### 2. Start Celery **beat**
+
+`CELERY_BEAT_SCHEDULE` exists but no beat process runs — the JWT blacklist
+cleanup never fires without it:
+
+```
+celery -A config.celery beat -l info
+```
+
+On Railway that is a **separate service** from the worker. Until it runs, do
+`python manage.py flushexpiredtokens` by hand periodically (see the token
+lifetimes section for the growth numbers).
+
+### 3. Deactivate superadmin id 1 (`daitama@yandex.ru`)
+
+The model is ONE superadmin. Id 1 is the bootstrap account from
+`create_initial_admin`: last signed in **27 June 2026**, owns **no properties,
+no leads, no clients — nothing**, and its only trace is two `admin.LogEntry`
+rows, which survive deactivation and keep displaying its email.
+
+**Owner's decision, 2026-08-08: HOLD until go-live.** While the site is local an
+unused admin account is exposed to nothing, and deactivating it would remove the
+only spare way in before Railway shell access is proven.
+
+**Steps** (deactivate — do NOT delete, and do NOT demote to realtor, which would
+make it appear in the staff panel as a manageable employee):
+
+1. Sign in to `/admin/` as the working superadmin (`i@bussinesw.ru`).
+2. **Пользователи** → `daitama@yandex.ru`.
+3. Untick **Активен** (`is_active`). Leave role, `is_staff` and `is_superuser`
+   as they are — that is what keeps it revivable.
+4. **Сохранить**.
+
+**Verify, in this order:**
+
+- The admin page still loads as `i@bussinesw.ru`.
+- In a **private window**, sign in at `/account/login` as `i@bussinesw.ru` — this
+  proves the working account authenticates independently of the session you hold.
+- `/account/staff` loads there (superadmin powers intact).
+- `daitama@yandex.ru` can no longer sign in at `/admin/` — that is the proof it
+  took effect.
+- Property PID000001 still shows its realtor (it will: links are FKs by id).
+
+**Recovery commands, if the working superadmin is ever lost.** All require a
+server shell — there is no web path:
+
+```
+# Re-enable the spare, then set a password for it
+python manage.py shell -c "from django.contrib.auth import get_user_model as G; G().objects.filter(pk=1).update(is_active=True)"
+python manage.py changepassword daitama@yandex.ru
+
+# Or reset the working account directly
+python manage.py changepassword i@bussinesw.ru
+
+# Or make a brand-new superuser
+python manage.py createsuperuser
+```
+
+Keep the working superadmin's password somewhere that survives losing the
+laptop. If you would rather keep a warm spare instead of deactivating id 1,
+the alternative is to leave it active with a password stored offline — less
+clean, but it keeps a second door.
+
+### 4. Re-check the security posture under real conditions
+
+- `CACHES` is LocMemCache and **per process** — under multiple Gunicorn workers
+  the login IP throttle multiplies by worker count. Point `CACHES` at the Redis
+  already running for Celery if exact limiting matters.
+- Confirm `DEBUG=False`, real `ALLOWED_HOSTS`, and HTTPS (the access cookie only
+  gets `Secure` over https).
+
 ## ⛔ Password recovery by email: DECIDED AGAINST (2026-08-08). Do not build it.
 
 **The user closed this permanently.** Do not propose an email reset flow, a
@@ -1270,6 +1354,31 @@ screens (§04 of the auth export) stay unbuilt reference art.
 **What we built instead — the admin-initiated path (see the section below):**
 a superadmin sets the new password directly in the staff panel and passes it on
 out of band. No email, no tokens, no expiry windows, nothing to phish.
+
+## ⛔ NEVER STAGE BY DIRECTORY — this has swept the owner's work into a commit twice
+
+**Both incidents were the same file and the same cause.** `frontend/src/app/
+privacy/page.tsx` has carried an uncommitted edit of the owner's since
+2026-08-03 (see the 0xC0000409 recovery section, where its mtime was the
+evidence). `git add frontend/` and `git add backend/` swallow it silently, and
+it then lands inside a commit whose message describes something else entirely.
+Caught both times only because someone read `git show --stat` afterwards.
+
+**RULES, not suggestions:**
+
+1. **Stage explicit paths.** `git add path/to/file.tsx path/to/other.ts` — never
+   `git add .`, never `git add -A`, never a bare directory.
+2. **Run `git status --short` BEFORE every commit** and account for every line.
+   A `M` you did not cause belongs to someone else.
+3. **Run `git show --stat HEAD` AFTER committing** and confirm the file list is
+   exactly what you intended.
+4. **If something unrelated got in and you have NOT pushed:**
+   `git reset --soft HEAD~1`, then
+   `git restore --staged <the unrelated file>`, then re-commit. That restores it
+   to an unstaged modification, untouched. (Done on 2026-08-08; verified the
+   file came back as ` M` in `git status`.)
+5. Do not "helpfully" commit it either — an uncommitted file is the owner's work
+   in progress, and its age may be the only clue to what it was.
 
 ## ⚠ LocMemCache is PER PROCESS — no shared counter may live in the cache
 
@@ -1353,10 +1462,36 @@ and `BLACKLIST_AFTER_ROTATION` both **on**.
 
 - **⚠ Rotation without the blacklist is theatre** — the spent refresh would stay
   valid for its full 48 h. That is why `rest_framework_simplejwt.token_blacklist`
-  is in INSTALLED_APPS. **Cost: `OutstandingToken` gains a row per refresh
-  issued** (~100/user/day at a 15-min access lifetime), so
-  `manage.py flushexpiredtokens` must run periodically or the table grows
-  without bound. Not yet scheduled — this is an open operational task.
+  is in INSTALLED_APPS.
+
+### The blacklist tables grow, and the cleanup is NOT running yet
+
+Every refresh writes one `OutstandingToken` row and blacklists the spent one, so
+both tables grow forever unless `flushexpiredtokens` runs.
+
+**Sizing at 50 realtors** (access 15 min, refresh 48 h; an 8-hour working day is
+32 refreshes/user):
+
+| | rows/day | uncleaned after a year | with the daily flush |
+| --- | --- | --- | --- |
+| 50 realtors, 8 h/day | ~3 250 | ~1.19 M rows, **~475 MB** | ~6 500 rows, **~3 MB** |
+
+Token strings measure **238 bytes** `[measured]`; ~400 B/row all-in including
+index entries is `[inferred]` — the live tables are too small (21 rows) to
+measure marginal cost, since `pg_total_relation_size` there is mostly empty
+8 KB pages. Treat 475 MB as the order of magnitude, not a precise figure.
+
+- **`users/tasks.py: flush_expired_tokens`** wraps the management command and is
+  scheduled in `CELERY_BEAT_SCHEDULE` for **04:00 daily**. Verified `[measured]`:
+  the task registers with the app and runs clean.
+- **⚠ IT DOES NOT FIRE YET. `scripts\start_local.ps1` starts a Celery WORKER but
+  no BEAT process**, so the schedule is declarative only. Beat was deliberately
+  NOT added to the launcher — that script is foundational and has a documented
+  history of breaking (see **Windows Terminal / Launcher Scripts**). Starting it
+  is a go-live step (see the pre-production checklist below).
+- **Manual fallback, valid any time:** `python manage.py flushexpiredtokens`.
+- Nothing breaks if it never runs — the tables just grow. At the current three
+  users that is a few thousand rows a year.
 - **⚠ `VersionedTokenRefreshSerializer` must read the token's claims BEFORE
   calling `super().validate()`.** With rotation, that call blacklists the
   incoming token, so re-parsing the same string afterwards raises "token is
