@@ -106,6 +106,25 @@ class User(AbstractBaseUser, PermissionsMixin):
     #: и refresh-токены умирают немедленно, а не доживают до истечения срока.
     token_version = models.PositiveIntegerField("Поколение токенов", default=0)
 
+    #: Подряд идущие неудачные попытки входа. Сбрасывается при успешном входе и
+    #: при установке нового пароля суперадмином.
+    #:
+    #: ⚠ ЖИВЁТ В БАЗЕ, А НЕ В КЕШЕ. CACHES — это LocMemCache, то есть счётчик в
+    #: кеше был бы свой у каждого воркера Gunicorn (этим же страдает throttle по
+    #: IP). Блокировка обязана быть общей и переживать перезапуск.
+    failed_login_count = models.PositiveIntegerField(
+        "Неудачных попыток входа подряд", default=0
+    )
+    #: Момент, до которого вход запрещён. NULL — блокировки нет.
+    locked_until = models.DateTimeField(
+        "Заблокирован до", null=True, blank=True, db_index=True
+    )
+    #: Пароль задан суперадмином — сотрудник обязан сменить его при входе, чтобы
+    #: администратор не остался владельцем рабочего пароля.
+    must_change_password = models.BooleanField(
+        "Требуется смена пароля", default=False
+    )
+
     objects = UserManager()
 
     USERNAME_FIELD = "email"
@@ -188,13 +207,30 @@ class EmployeeActivityLog(models.Model):
         PASSWORD_RESET = "password_reset", "Сброс пароля"
         #: Смена собственного email (email — это логин).
         EMAIL_CHANGE = "email_change", "Смена email"
+        #: Неудачная попытка входа. Пароль НИКОГДА не сохраняется — только
+        #: аккаунт (или введённый адрес), причина, IP и User-Agent.
+        LOGIN_FAILED = "login_failed", "Неудачный вход"
+        #: Суперадмин снял блокировку аккаунта.
+        UNLOCK = "unlock", "Снятие блокировки"
+        #: Суперадмин принудительно завершил все сессии сотрудника.
+        SESSIONS_TERMINATED = "sessions_terminated", "Завершение сессий"
 
+    class FailureReason(models.TextChoices):
+        BAD_CREDENTIALS = "bad_credentials", "Неверные данные"
+        LOCKED = "locked", "Аккаунт заблокирован"
+        THROTTLED = "throttled", "Слишком много попыток"
+
+    #: NULL только для неудачного входа по НЕСУЩЕСТВУЮЩЕМУ адресу — записывать
+    #: такую попытку не на кого, а знать о ней нужно. Введённый адрес тогда
+    #: лежит в `attempted_email`.
     user = models.ForeignKey(
         "User",
         on_delete=models.CASCADE,
         related_name="activity_logs",
         verbose_name="Пользователь",
         help_text="Кто выполнил действие.",
+        null=True,
+        blank=True,
     )
     #: Над кем выполнено действие, если это не сам пользователь. Заполняется для
     #: сброса пароля: `user` — суперадмин, `target_user` — сотрудник. Для входа
@@ -212,6 +248,19 @@ class EmployeeActivityLog(models.Model):
         max_length=32,
         choices=ActionType.choices,
         db_index=True,
+    )
+    #: Что ввели в поле «Email» при неудачном входе. Нужен, когда такого
+    #: аккаунта нет и `user` пуст. Это идентификатор, а не секрет; пароль сюда
+    #: не попадает никогда.
+    attempted_email = models.CharField(
+        "Введённый email", max_length=254, blank=True
+    )
+    #: Почему вход не удался. Заполняется только для login_failed.
+    reason = models.CharField(
+        "Причина",
+        max_length=32,
+        choices=FailureReason.choices,
+        blank=True,
     )
     created_at = models.DateTimeField("Дата и время", auto_now_add=True, db_index=True)
     ip_address = models.GenericIPAddressField(

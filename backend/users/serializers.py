@@ -1,10 +1,14 @@
 """
 Serializers for auth and current user.
 """
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from rest_framework import serializers
+from django.db.models import F
+from django.utils import timezone
+from rest_framework import exceptions, serializers
 from rest_framework.validators import UniqueValidator
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.serializers import (
@@ -20,6 +24,40 @@ User = get_user_model()
 #: Один текст для всех мест, где email занят. DRF по умолчанию отдаёт английское
 #: «This field must be unique.» — сотруднику это ничего не объясняет.
 EMAIL_TAKEN_MESSAGE = "Этот email уже используется другой учётной записью."
+
+#: Порог блокировки аккаунта. Совпадает с 10/min у LoginThrottle, чтобы два
+#: правила срабатывали в одной точке и не противоречили друг другу. Обычная
+#: опечатка стоит 2–4 попыток, так что до порога живой сотрудник не доходит.
+MAX_FAILED_LOGINS = 10
+#: Остывание. 15 минут превращают онлайновый подбор в 40 попыток в час и при
+#: этом не требуют звонить суперадмину — блокировка временная, не постоянная.
+LOCKOUT_DURATION = timedelta(minutes=15)
+
+
+def is_locked_out(user) -> bool:
+    """True, пока не истёк `locked_until`."""
+    return bool(user.locked_until and user.locked_until > timezone.now())
+
+
+def register_failed_login(user) -> None:
+    """+1 к счётчику и, при достижении порога, установка блокировки."""
+    # F() — счётчик может расти из нескольких воркеров одновременно.
+    User.objects.filter(pk=user.pk).update(
+        failed_login_count=F("failed_login_count") + 1
+    )
+    user.refresh_from_db(fields=["failed_login_count"])
+    if user.failed_login_count >= MAX_FAILED_LOGINS:
+        User.objects.filter(pk=user.pk).update(
+            locked_until=timezone.now() + LOCKOUT_DURATION
+        )
+
+
+def reset_failed_logins(user) -> None:
+    """Успешный вход (или новый пароль) обнуляет счётчик и снимает блокировку."""
+    if user.failed_login_count or user.locked_until:
+        User.objects.filter(pk=user.pk).update(
+            failed_login_count=0, locked_until=None
+        )
 
 # Максимальная длина публичной «продающей» биографии риэлтора. Ограничение
 # держим синхронным с фронтендом (textarea maxLength).
@@ -82,6 +120,10 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "role",
             "is_active",
             "is_staff",
+            # The client reads this to route to the forced-change screen. The
+            # server is still the enforcement (VersionedJWTAuthentication);
+            # this only saves the user from discovering it via a 403.
+            "must_change_password",
             "crm_capabilities",
             "short_bio",
             "public_name",
@@ -167,11 +209,46 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = User.USERNAME_FIELD  # "email"
 
     def validate(self, attrs):
-        data = super().validate(attrs)
-        from .activity import record_employee_activity
+        from .activity import record_employee_activity, record_login_failure
 
+        request = self.context.get("request")
+        attempted = (attrs.get(self.username_field) or "").strip()
+        candidate = User.objects.filter(email__iexact=attempted).first()
+
+        # ── Lockout is checked BEFORE the credentials ────────────────────────
+        # so a locked account cannot be probed for password correctness. It
+        # raises the SAME AuthenticationFailed as a wrong password, with the
+        # same detail string: from outside, locked / wrong / nonexistent are
+        # indistinguishable. Do not add a 423, a distinct code, or a
+        # "try again in N minutes" — each would be an enumeration oracle.
+        if candidate is not None and is_locked_out(candidate):
+            record_login_failure(
+                request, candidate, attempted, EmployeeActivityLog.FailureReason.LOCKED
+            )
+            raise exceptions.AuthenticationFailed(
+                self.error_messages["no_active_account"], "no_active_account"
+            )
+
+        try:
+            data = super().validate(attrs)
+        except exceptions.AuthenticationFailed:
+            # Only an EXISTING account can accumulate failures — an invented
+            # address has no row to count on, and inventing one would create
+            # exactly the enumeration surface we are avoiding. Spraying across
+            # made-up addresses is the IP throttle's job.
+            if candidate is not None:
+                register_failed_login(candidate)
+            record_login_failure(
+                request,
+                candidate,
+                attempted,
+                EmployeeActivityLog.FailureReason.BAD_CREDENTIALS,
+            )
+            raise
+
+        reset_failed_logins(self.user)
         record_employee_activity(
-            self.context.get("request"),
+            request,
             self.user,
             EmployeeActivityLog.ActionType.LOGIN,
         )
@@ -200,7 +277,11 @@ class VersionedTokenRefreshSerializer(TokenRefreshSerializer):
     """
 
     def validate(self, attrs):
-        data = super().validate(attrs)
+        # ⚠ READ THE CLAIMS BEFORE super().validate(). With
+        # BLACKLIST_AFTER_ROTATION that call blacklists the incoming refresh
+        # token, so re-parsing the same string afterwards raises "token is
+        # blacklisted" and EVERY refresh 401s [measured — this shipped broken
+        # for about ten minutes].
         refresh = self.token_class(attrs["refresh"])
         user_id = refresh.get("user_id")
         claimed = refresh.get(TOKEN_VERSION_CLAIM, 0)
@@ -211,7 +292,9 @@ class VersionedTokenRefreshSerializer(TokenRefreshSerializer):
         )
         if current is None or int(claimed) != int(current):
             raise InvalidToken("Сессия завершена: пароль был изменён. Войдите заново.")
-        return data
+        # Rotation happens in here; the returned refresh keeps our custom
+        # claims (role, tv) because simplejwt reuses the same token object.
+        return super().validate(attrs)
 
 
 class SetEmployeePasswordSerializer(serializers.Serializer):
@@ -233,6 +316,38 @@ class SetEmployeePasswordSerializer(serializers.Serializer):
         except DjangoValidationError as exc:
             raise serializers.ValidationError(list(exc.messages))
         return value
+
+
+class ChangeOwnPasswordSerializer(serializers.Serializer):
+    """
+    Сотрудник задаёт себе новый пароль.
+
+    Текущий пароль спрашиваем всегда: при принудительной смене он только что
+    введён (это одно поле), зато та же ручка безопасна и для добровольной
+    смены, когда чужая захваченная сессия иначе меняла бы пароль молча.
+    """
+
+    current_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_current_password(self, value):
+        if not self.context["user"].check_password(value):
+            raise serializers.ValidationError("Неверный текущий пароль.")
+        return value
+
+    def validate_new_password(self, value):
+        try:
+            validate_password(value, user=self.context["user"])
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
+        return value
+
+    def validate(self, attrs):
+        if attrs["current_password"] == attrs["new_password"]:
+            raise serializers.ValidationError(
+                {"new_password": ["Новый пароль должен отличаться от текущего."]}
+            )
+        return attrs
 
 
 class ChangeOwnEmailSerializer(serializers.Serializer):
@@ -312,6 +427,12 @@ class RealtorCrmReadSerializer(serializers.ModelSerializer):
             "is_active",
             "avatar",
             "last_login",
+            # Lock state, so the panel can show it and offer «Разблокировать»
+            # without a second request. Null = not locked.
+            "locked_until",
+            "failed_login_count",
+            # True while the employee still holds an admin-issued password.
+            "must_change_password",
             "perm_create_property",
             "perm_edit_property",
             "perm_delete_property",

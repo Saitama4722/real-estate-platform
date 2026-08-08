@@ -95,6 +95,11 @@ INSTALLED_APPS = [
     "storages",
     "rest_framework",
     "rest_framework_simplejwt",
+    # Required for BLACKLIST_AFTER_ROTATION. ⚠ OutstandingToken gains a row per
+    # refresh issued (~100/user/day at a 15-min access lifetime), so
+    # `manage.py flushexpiredtokens` needs to run periodically or the table
+    # grows without bound. See CLAUDE.md.
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     # Local apps
     "users",
@@ -314,10 +319,25 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": _rest_framework_renderers,
 }
 
-# JWT token lifetimes (minimal config)
+# JWT token lifetimes. Tightened 2026-08-08 with the owner's explicit approval
+# of each number — see CLAUDE.md; do not change these without asking again.
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    # 60 → 15 min. This was the weak number: the window in which a stolen access
+    # token works and nothing can intervene. token_version revokes on a
+    # DELIBERATE act (reset / terminate), but nothing catches a silent theft, so
+    # the lifetime itself has to be short. Invisible to employees — the client
+    # refreshes transparently (fetchWithCrmAuthRetry).
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    # 7 days → 48 h. Owner's call over the 12 h I suggested: still ~70% off the
+    # stolen-token window, and re-authentication every couple of days rather
+    # than every morning.
+    "REFRESH_TOKEN_LIFETIME": timedelta(hours=48),
+    # Each refresh issues a NEW refresh token…
+    "ROTATE_REFRESH_TOKENS": True,
+    # …and blacklists the one just spent. ⚠ Rotation WITHOUT this is theatre:
+    # the old refresh would stay valid for its full 48 h, so a stolen token
+    # would be unaffected. Requires the token_blacklist app in INSTALLED_APPS.
+    "BLACKLIST_AFTER_ROTATION": True,
 }
 
 # Templates (required for admin)

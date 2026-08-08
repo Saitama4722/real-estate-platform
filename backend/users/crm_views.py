@@ -81,7 +81,23 @@ class CrmRealtorViewSet(viewsets.ModelViewSet):
         target.set_password(serializer.validated_data["password"])
         # F() so the bump cannot lose a concurrent increment.
         target.token_version = F("token_version") + 1
-        target.save(update_fields=["password", "token_version"])
+        # A password the admin knows is a temporary credential: the employee
+        # must replace it at next sign-in, after which the log can attribute
+        # actions to them rather than to the admin acting as them.
+        target.must_change_password = True
+        # A fresh password also clears any lockout — the old one is gone, so
+        # counting failures against it is meaningless.
+        target.failed_login_count = 0
+        target.locked_until = None
+        target.save(
+            update_fields=[
+                "password",
+                "token_version",
+                "must_change_password",
+                "failed_login_count",
+                "locked_until",
+            ]
+        )
         target.refresh_from_db(fields=["token_version"])
 
         record_employee_activity(
@@ -92,6 +108,67 @@ class CrmRealtorViewSet(viewsets.ModelViewSet):
         )
         # Body carries no password and no token — only confirmation.
         return Response(
-            {"detail": "Пароль обновлён. Прежние сессии сотрудника завершены."},
+            {
+                "detail": (
+                    "Пароль обновлён. Прежние сессии сотрудника завершены; "
+                    "при входе он должен задать свой пароль."
+                )
+            },
             status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="terminate-sessions",
+        permission_classes=[IsAuthenticated, IsSuperAdmin],
+    )
+    def terminate_sessions(self, request, pk=None):
+        """
+        POST /api/crm/realtors/<pk>/terminate-sessions/
+
+        «Завершить все сессии» — для потерянного ноутбука или ушедшего
+        сотрудника. Отдельно от сброса пароля: пароль НЕ меняется, сотрудник
+        просто входит заново теми же данными.
+
+        Механизм тот же самый token_version, второго не заводим.
+        """
+        target = self.get_object()
+        target.token_version = F("token_version") + 1
+        target.save(update_fields=["token_version"])
+        target.refresh_from_db(fields=["token_version"])
+        record_employee_activity(
+            request,
+            request.user,
+            EmployeeActivityLog.ActionType.SESSIONS_TERMINATED,
+            target_user=target,
+        )
+        return Response(
+            {"detail": "Все сессии сотрудника завершены."},
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsAuthenticated, IsSuperAdmin],
+    )
+    def unlock(self, request, pk=None):
+        """
+        POST /api/crm/realtors/<pk>/unlock/
+
+        Снять блокировку немедленно, не дожидаясь окончания остывания.
+        """
+        target = self.get_object()
+        User.objects.filter(pk=target.pk).update(
+            failed_login_count=0, locked_until=None
+        )
+        record_employee_activity(
+            request,
+            request.user,
+            EmployeeActivityLog.ActionType.UNLOCK,
+            target_user=target,
+        )
+        return Response(
+            {"detail": "Блокировка снята."}, status=status.HTTP_200_OK
         )

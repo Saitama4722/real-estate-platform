@@ -10,10 +10,19 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .activity import record_employee_activity
 from .models import EmployeeActivityLog
-from .permissions import IsCrmStaffManager, IsCrmUser
+from .permissions import IsCrmStaffManager, IsCrmUser, IsSuperAdmin
 from .throttles import LoginThrottle, ThrottledRu
+from datetime import timedelta
+
+from django.contrib.auth import get_user_model
+from django.db.models import F
+from django.utils import timezone
+
+User = get_user_model()
+
 from .serializers import (
     ChangeOwnEmailSerializer,
+    ChangeOwnPasswordSerializer,
     CurrentUserSerializer,
     CurrentUserUpdateSerializer,
     EmailTokenObtainPairSerializer,
@@ -129,6 +138,107 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
         self.perform_update(serializer)
         return Response(
             CurrentUserSerializer(instance, context=self.get_serializer_context()).data
+        )
+
+
+class SecuritySummaryView(APIView):
+    """
+    GET /api/auth/security-summary/ — суперадмину.
+
+    Три числа за последние 24 часа плюс список заблокированных. Это НЕ система
+    мониторинга: ни порогов, ни истории, ни графиков, ни писем. Смысл в том,
+    что при 50 риэлторах листать журнал по дате бессмысленно, а агрегат не
+    растёт вместе со штатом: обычное состояние — нули, и любое ненулевое число
+    само по себе является сигналом.
+    """
+
+    permission_classes = [IsCrmUser, IsSuperAdmin]
+    http_method_names = ["get", "head", "options"]
+
+    def get(self, request, *args, **kwargs):
+        since = timezone.now() - timedelta(hours=24)
+        failures = EmployeeActivityLog.objects.filter(
+            action_type=EmployeeActivityLog.ActionType.LOGIN_FAILED,
+            created_at__gte=since,
+        )
+        # Distinct targets counts identified accounts and unknown addresses
+        # alike — a spray across invented emails must not read as "0 accounts".
+        distinct_accounts = (
+            failures.values("user_id", "attempted_email").distinct().count()
+        )
+        locked = User.objects.filter(locked_until__gt=timezone.now()).order_by(
+            "crm_id", "id"
+        )
+        return Response(
+            {
+                "window_hours": 24,
+                "failed_attempts": failures.count(),
+                "accounts_targeted": distinct_accounts,
+                "locked": [
+                    {
+                        "id": u.pk,
+                        "crm_id": u.crm_id,
+                        "email": u.email,
+                        "locked_until": u.locked_until,
+                        "failed_login_count": u.failed_login_count,
+                    }
+                    for u in locked
+                ],
+            }
+        )
+
+
+class ChangeOwnPasswordView(APIView):
+    """
+    POST /api/auth/password/change/  {"current_password": "...", "new_password": "..."}
+
+    Смена собственного пароля, в том числе принудительная после сброса
+    суперадмином. Успех снимает `must_change_password` и поднимает
+    token_version: сессия, созданная выданным админом паролем, умирает, и с
+    этого момента журнал однозначно относит действия к сотруднику, а не к
+    админу под его именем. Клиент получает новую пару токенов, чтобы человека
+    не выбрасывало на форму входа сразу после смены.
+    """
+
+    permission_classes = [IsCrmUser]
+    http_method_names = ["post", "head", "options"]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ChangeOwnPasswordSerializer(
+            data=request.data, context={"user": request.user}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        user.set_password(serializer.validated_data["new_password"])
+        user.must_change_password = False
+        user.token_version = F("token_version") + 1
+        user.failed_login_count = 0
+        user.locked_until = None
+        user.save(
+            update_fields=[
+                "password",
+                "must_change_password",
+                "token_version",
+                "failed_login_count",
+                "locked_until",
+            ]
+        )
+        user.refresh_from_db(fields=["token_version"])
+
+        record_employee_activity(
+            request, user, EmployeeActivityLog.ActionType.PASSWORD_RESET
+        )
+
+        # Fresh pair carrying the new token_version — without this the client's
+        # tokens are already stale and the very next request would 401.
+        refresh = EmailTokenObtainPairSerializer.get_token(user)
+        return Response(
+            {
+                "detail": "Пароль изменён.",
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            }
         )
 
 

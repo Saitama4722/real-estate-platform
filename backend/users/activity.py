@@ -55,3 +55,30 @@ def record_employee_activity(
         ip_address=ip,
         user_agent=ua,
     )
+
+
+def record_login_failure(
+    request: HttpRequest | None,
+    user: User | None,
+    attempted_email: str,
+    reason: EmployeeActivityLog.FailureReason | str,
+) -> None:
+    """
+    Записать неудачную попытку входа.
+
+    Отдельная функция, а не флаг у record_employee_activity: там стоит проверка
+    `user.is_authenticated`, а здесь пользователя может не быть вовсе — попытка
+    входа по несуществующему адресу тоже должна попадать в журнал.
+
+    ⚠ НИКОГДА не передавайте сюда пароль или его часть. Сохраняются только
+    аккаунт (или введённый адрес), причина, IP и User-Agent.
+    """
+    value = reason.value if isinstance(reason, EmployeeActivityLog.FailureReason) else str(reason)
+    EmployeeActivityLog.objects.create(
+        user=user,
+        action_type=EmployeeActivityLog.ActionType.LOGIN_FAILED,
+        attempted_email=(attempted_email or "")[:254],
+        reason=value,
+        ip_address=client_ip_from_request(request),
+        user_agent=user_agent_from_request(request),
+    )

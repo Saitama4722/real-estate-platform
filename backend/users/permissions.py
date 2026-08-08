@@ -225,6 +225,32 @@ class IsCrmStaffManager(permissions.BasePermission):
         return request.user.has_staff_level_access
 
 
+class PasswordChangeNotRequired(permissions.BasePermission):
+    """
+    Блокирует CRM, пока у пользователя стоит `must_change_password`.
+
+    Пароль, который знает администратор, — временный. Пока сотрудник его не
+    заменил, читать данные клиентов нельзя: иначе админ остаётся владельцем
+    рабочего доступа, а в журнале не отличить сотрудника от админа под его
+    именем.
+
+    ⚠ Это ЕДИНСТВЕННОЕ место, где запрет вводится серверно. Редирект на
+    фронтенде — удобство; здесь — правило. Разрешены только те ручки, без
+    которых смену пароля не выполнить: /auth/me/, /auth/logout/ и сама смена
+    (у них этого класса просто нет в permission_classes).
+    """
+
+    message = "Сначала задайте новый пароль."
+    code = "password_change_required"
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            # Пусть отказывает класс аутентификации, а не этот.
+            return True
+        return not getattr(user, "must_change_password", False)
+
+
 class IsCrmPropertyStaffOrOwner(permissions.BasePermission):
     """
     Object-level CRM access for properties and nested media.
@@ -294,6 +320,7 @@ __all__ = [
     "IsStaffRole",
     "IsCrmUser",
     "IsCrmStaffManager",
+    "PasswordChangeNotRequired",
     "IsCrmPropertyStaffOrOwner",
     "IsCrmLeadStaffOrOwner",
     "IsCrmImportJobOwnerOrStaff",

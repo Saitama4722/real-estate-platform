@@ -15,4 +15,17 @@ urlpatterns = [
     # Отдельная ручка, а не поле в PATCH /me/: смена логина требует пароля и
     # пишется в журнал, и мешать это с правкой имени и телефона не стоит.
     path("me/email/", views.ChangeOwnEmailView.as_view(), name="me-email"),
+    # ⚠ Этот путь перечислен в PASSWORD_CHANGE_EXEMPT_PATHS
+    # (users/authentication.py) — менять его нужно в обоих местах, иначе
+    # сотрудник с флагом must_change_password окажется заперт.
+    path(
+        "password/change/",
+        views.ChangeOwnPasswordView.as_view(),
+        name="password-change",
+    ),
+    path(
+        "security-summary/",
+        views.SecuritySummaryView.as_view(),
+        name="security-summary",
+    ),
 ]
