@@ -11,7 +11,6 @@ import {
   bannerForStatus,
   formatCountdown,
   parseRetryAfter,
-  throttleBanner,
   validateEmail,
   validatePassword,
   type AuthBanner,
