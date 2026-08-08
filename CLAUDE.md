@@ -1253,11 +1253,78 @@ against a disposable account (created, used, hard-deleted; 3 real users intact).
   scope alert selectors to the form. A sync Playwright route handler cannot call
   a Playwright API (the route auto-handles) — use CDP
   `Network.emulateNetworkConditions` latency to observe the submitting state.
-- **Password recovery does not exist** — no route, endpoint, token model, and
-  **zero `EMAIL_*` settings** anywhere, so Django would post to `localhost:25`.
-  The blocker is operational (SMTP provider, sender domain, SPF/DKIM), not code.
-  The four screens are already designed in the mockup's §04. A cheaper option
-  for a staff-only system: admin-initiated reset via the CRM, no email at all.
+## ⛔ Password recovery by email: DECIDED AGAINST (2026-08-08). Do not build it.
+
+**The user closed this permanently.** Do not propose an email reset flow, a
+reset-token model, SMTP configuration, or the four §04 screens again.
+
+**Reasoning, recorded so it is not relitigated:** employee accounts are created
+by the superadmin and there are three of them. A reset flow would cost a token
+model + two endpoints + a Celery task + templates, and — the real blocker —
+**email infrastructure that does not exist**: `settings.py` has zero `EMAIL_*`
+keys, so Django would post to `localhost:25`. Standing it up means choosing an
+SMTP provider, configuring a sender domain and setting up SPF/DKIM, all
+to serve a handful of people who sit near the superadmin. The mockup's recovery
+screens (§04 of the auth export) stay unbuilt reference art.
+
+**What we built instead — the admin-initiated path (see the section below):**
+a superadmin sets the new password directly in the staff panel and passes it on
+out of band. No email, no tokens, no expiry windows, nothing to phish.
+
+## CRM staff panel: email editing + superadmin password reset (2026-08-08)
+
+Verified `[measured]` by 23 API checks against four disposable `.invalid`
+accounts, all hard-deleted afterwards (users back to 3, 0 leftovers); property
+#18 unchanged (price 5 000 000, 3 photos, 3 history rows, all 12 media files
+present) and the three real users all still `token_version=0`.
+
+- **Email is editable, because email IS the login.** An account created with a
+  typo used to be unfixable outside Django admin. The realtor row in the staff
+  panel now allows it (the field was `disabled={Boolean(editing)}`), and every
+  employee can change their OWN address on `/account/profile`.
+  - **⚠ Nothing keys off the email string.** Every reference to `User` in the
+    schema is an FK by integer id — 15 of them, including
+    `Property.created_by` / `assigned_realtor` `[measured]`. Proven live: the
+    user renamed realtor id 3 from `vl@vl.ru` to `79288497980@yandex.ru` in
+    Django admin and #18 still points at id 3. Do not add an email-valued
+    reference anywhere.
+  - Uniqueness returns `EMAIL_TAKEN_MESSAGE` («Этот email уже используется…»)
+    via a `UniqueValidator(lookup="iexact")`, not DRF's English default and not
+    a 500 on the DB constraint. Addresses are lower-cased on save.
+- **Changing your OWN email requires your current password** (decision:
+  yes-but-scoped). Email is the credential, so swapping it at an unlocked
+  machine is a silent account takeover. A superadmin changing SOMEONE ELSE's
+  email is not prompted — already privileged, and the act is logged under their
+  name. Endpoint: `POST /api/auth/me/email/`, deliberately separate from
+  `PATCH /api/auth/me/` so fixing a phone number never asks for a password.
+- **Password reset is `POST /api/crm/realtors/<pk>/set-password/`, superadmin
+  ONLY** (`IsSuperAdmin`, not the view's `IsCrmStaffManager`, which also admits
+  role=admin). Strength comes from Django's configured
+  `AUTH_PASSWORD_VALIDATORS` — no bespoke rule. The password is shown once to
+  the superadmin, never emailed, never logged, never returned in the response,
+  never in a URL.
+  - **⚠ `password` is now IGNORED by `PATCH /api/crm/realtors/<pk>/`.** It used
+    to work there, which let any *admin* take over a realtor account. Password
+    on CREATE is still accepted — that is how accounts are made.
+- **⚠ Session invalidation is by `User.token_version`, and it is immediate.**
+  JWTs are stateless: a password change does not touch them, and simplejwt's
+  blacklist app can only revoke the REFRESH token, leaving the access token
+  alive for up to 60 minutes. Instead every token carries a `tv` claim;
+  `VersionedJWTAuthentication` (wired as the DRF default) rejects any token
+  whose `tv` is behind the user's counter, and a reset bumps it with `F()`.
+  Measured: the target's access AND refresh tokens both 401 on the next
+  request, other users unaffected.
+  - `VersionedTokenRefreshSerializer` repeats the check on `/api/auth/refresh/`
+    so a stale refresh fails there rather than minting an access token that the
+    auth layer rejects a moment later.
+  - **A missing `tv` claim is treated as generation 0** on purpose, so tokens
+    issued before this shipped keep working through the deploy instead of
+    logging everyone out.
+  - Changing your own email does NOT bump the counter — you are still you.
+- **`EmployeeActivityLog` gained `target_user`** (nullable) plus the
+  `password_reset` and `email_change` actions, so the log answers *who reset
+  whose* password. `action_type` widened 16 → 32 chars. The password itself is
+  never written — `record_employee_activity` stores ids, IP and User-Agent only.
 
 ## Realtor profiles are a TEMPLATE: default bio, publish gate, link gating
 

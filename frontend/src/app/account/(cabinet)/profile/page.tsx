@@ -7,19 +7,25 @@ import { Input } from "@/components/ui/input";
 import { authBearerHeaders } from "@/lib/crmAuth";
 import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 import { parseEmployeeUser } from "@/lib/employeeUser";
-import { useSetEmployeeUser } from "@/components/account/EmployeeAuthContext";
+import {
+  useEmployeeUser,
+  useSetEmployeeUser,
+} from "@/components/account/EmployeeAuthContext";
+import { ChangeOwnEmailCard } from "@/components/account/ChangeOwnEmailCard";
 import { UploadProgressBar, useUploadProgress } from "@/components/ui/upload-progress";
 
 /** Синхронно с бэкендом (users.serializers.SHORT_BIO_MAX). */
 const SHORT_BIO_MAX = 1500;
 
 export default function AccountProfilePage() {
+  const employee = useEmployeeUser();
   const setEmployeeUser = useSetEmployeeUser();
   const upload = useUploadProgress();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -38,7 +44,8 @@ export default function AccountProfilePage() {
         setError("Не удалось загрузить профиль.");
         return;
       }
-      const data = (await res.json()) as { first_name?: string; last_name?: string; phone?: string; short_bio?: string; avatar?: string | null };
+      const data = (await res.json()) as { email?: string; first_name?: string; last_name?: string; phone?: string; short_bio?: string; avatar?: string | null };
+      setEmail(data.email ?? "");
       setFirstName(data.first_name ?? "");
       setLastName(data.last_name ?? "");
       setPhone(data.phone ?? "");
@@ -268,6 +275,22 @@ export default function AccountProfilePage() {
             {saving || upload.state.busy ? "Сохранение…" : "Сохранить"}
           </Button>
         </form>
+      )}
+
+      {/* Login email lives OUTSIDE the profile form: it is a credential, so it
+          is confirmed with the current password and saved on its own. */}
+      {!loading && email && (
+        <div className="mt-8">
+          <ChangeOwnEmailCard
+            currentEmail={email}
+            onChanged={(next) => {
+              setEmail(next);
+              // Keep the header chip and the rest of the cabinet in sync with
+              // the new login without a reload.
+              setEmployeeUser({ ...employee, email: next });
+            }}
+          />
+        </div>
       )}
     </>
   );

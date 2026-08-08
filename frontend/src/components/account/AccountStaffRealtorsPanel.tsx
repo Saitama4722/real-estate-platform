@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { fetchWithCrmAuthRetry } from "@/lib/crmAuth";
+import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
 
 export type RealtorRow = {
   id: number;
@@ -114,6 +115,64 @@ export function AccountStaffRealtorsPanel() {
     ...DEFAULT_PERMS,
   });
   const [saving, setSaving] = useState(false);
+
+  /* ---- Superadmin-only password reset ---------------------------------- */
+  const employee = useEmployeeUser();
+  const isSuperadmin = employee?.role === "superadmin";
+  const [pwTarget, setPwTarget] = useState<RealtorRow | null>(null);
+  const [pwValue, setPwValue] = useState("");
+  const [pwShown, setPwShown] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwDone, setPwDone] = useState<string | null>(null);
+  const [pwSaving, setPwSaving] = useState(false);
+
+  const closePwModal = () => {
+    setPwTarget(null);
+    // Clear the typed password from state the moment the dialog closes — it
+    // must not linger in memory or survive into the next target's dialog.
+    setPwValue("");
+    setPwShown(false);
+    setPwError(null);
+    setPwSaving(false);
+  };
+
+  const submitPassword = async () => {
+    if (!pwTarget || !pwValue) return;
+    setPwSaving(true);
+    setPwError(null);
+    try {
+      const res = await fetchWithCrmAuthRetry(
+        `/api/crm/realtors/${pwTarget.id}/set-password/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: pwValue }),
+          credentials: "same-origin",
+        },
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = "Не удалось изменить пароль.";
+        try {
+          const j = JSON.parse(text) as Record<string, unknown>;
+          if (Array.isArray(j.password)) msg = (j.password as string[]).join(" ");
+          else if (typeof j.detail === "string") msg = j.detail;
+        } catch {
+          /* keep the fallback */
+        }
+        setPwError(msg);
+        return;
+      }
+      setPwDone(
+        `Пароль для ${pwTarget.email} обновлён. Прежние сессии сотрудника завершены.`,
+      );
+      closePwModal();
+    } catch {
+      setPwError("Ошибка соединения. Попробуйте позже.");
+    } finally {
+      setPwSaving(false);
+    }
+  };
 
   const setPermStatesFromRow = (row: RealtorRow | null) => {
     if (!row) {
@@ -241,9 +300,9 @@ export function AccountStaffRealtorsPanel() {
         (Object.keys(formPerms) as RealtorPermField[]).forEach((key) => {
           fd.set(key, formPerms[key] ? "true" : "false");
         });
+        // Пароль отправляем только при СОЗДАНИИ. Смена пароля существующего
+        // сотрудника — отдельная ручка set-password под суперадмином.
         if (!editing && formPassword.trim()) {
-          fd.set("password", formPassword.trim());
-        } else if (editing && formPassword.trim()) {
           fd.set("password", formPassword.trim());
         }
         fd.set("avatar", formAvatar);
@@ -261,8 +320,6 @@ export function AccountStaffRealtorsPanel() {
           ...permPayload,
         };
         if (!editing) {
-          payload.password = formPassword.trim();
-        } else if (formPassword.trim()) {
           payload.password = formPassword.trim();
         }
         body = JSON.stringify(payload);
@@ -437,6 +494,27 @@ export function AccountStaffRealtorsPanel() {
                       >
                         Изменить
                       </Button>
+                      {/* Superadmin only. An admin can edit a realtor but must
+                          not be able to take over their account, and a realtor
+                          never reaches this panel at all. The server enforces
+                          the same rule with IsSuperAdmin — this only hides a
+                          control that would 403. */}
+                      {isSuperadmin && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setPwDone(null);
+                            setPwError(null);
+                            setPwValue("");
+                            setPwShown(false);
+                            setPwTarget(row);
+                          }}
+                        >
+                          Сменить пароль
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         variant="outline"
@@ -473,28 +551,30 @@ export function AccountStaffRealtorsPanel() {
         </h2>
         <div className="flex flex-col gap-3">
           <label className="block text-sm">
-            <span className="text-slate-600">Email</span>
+            <span className="text-slate-600">Email (логин)</span>
+            {/* Editable on edit too: an account created with a typo used to be
+                unfixable outside Django admin. Links to properties and leads
+                are by user id, so changing this breaks nothing. */}
             <Input
               className="mt-1"
               type="email"
               autoComplete="off"
               value={formEmail}
               onChange={(e) => setFormEmail(e.target.value)}
-              disabled={Boolean(editing)}
             />
           </label>
-          <label className="block text-sm">
-            <span className="text-slate-600">
-              Пароль {editing ? "(оставьте пустым, чтобы не менять)" : ""}
-            </span>
-            <Input
-              className="mt-1"
-              type="password"
-              autoComplete="new-password"
-              value={formPassword}
-              onChange={(e) => setFormPassword(e.target.value)}
-            />
-          </label>
+          {!editing && (
+            <label className="block text-sm">
+              <span className="text-slate-600">Пароль</span>
+              <Input
+                className="mt-1"
+                type="password"
+                autoComplete="new-password"
+                value={formPassword}
+                onChange={(e) => setFormPassword(e.target.value)}
+              />
+            </label>
+          )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-sm">
               <span className="text-slate-600">Имя</span>
@@ -601,6 +681,64 @@ export function AccountStaffRealtorsPanel() {
           </div>
         </div>
       </Modal>
+
+      {/* Смена пароля сотрудника — только суперадмин. */}
+      <Modal isOpen={Boolean(pwTarget)} onClose={closePwModal}>
+        <h2 className="mb-1 text-lg font-semibold text-slate-900">Новый пароль</h2>
+        <p className="mb-4 text-sm text-slate-600">
+          {pwTarget?.email}
+        </p>
+        <div className="flex flex-col gap-3">
+          <label className="block text-sm">
+            <span className="text-slate-600">Пароль</span>
+            <div className="relative mt-1">
+              <Input
+                className="pr-24"
+                /* Shown once, on purpose: the superadmin has to be able to read
+                   back what they typed to pass it on. It is never emailed,
+                   never logged and never stored in plain text. */
+                type={pwShown ? "text" : "password"}
+                autoComplete="new-password"
+                value={pwValue}
+                onChange={(e) => setPwValue(e.target.value)}
+                disabled={pwSaving}
+              />
+              <button
+                type="button"
+                onClick={() => setPwShown((v) => !v)}
+                className="absolute inset-y-0 right-2 my-auto h-7 rounded px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-ring-brand"
+                aria-pressed={pwShown}
+              >
+                {pwShown ? "Скрыть" : "Показать"}
+              </button>
+            </div>
+          </label>
+          <p className="text-xs text-slate-500">
+            Требования проверяются на сервере: минимум 8 символов, не только
+            цифры, не слишком простой и не похожий на email сотрудника.
+            Сотрудник будет разлогинен на всех устройствах.
+          </p>
+          {pwError && <p className="text-sm text-red-600">{pwError}</p>}
+          <div className="mt-2 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={closePwModal} disabled={pwSaving}>
+              Отмена
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void submitPassword()}
+              disabled={pwSaving || !pwValue}
+            >
+              {pwSaving ? "Сохранение…" : "Установить пароль"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {pwDone && (
+        <p role="status" className="mt-3 text-sm text-green-700">
+          {pwDone}
+        </p>
+      )}
     </div>
   );
 }
