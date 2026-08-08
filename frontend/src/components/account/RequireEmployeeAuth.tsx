@@ -51,6 +51,17 @@ export function RequireEmployeeAuth({ children }: { children: React.ReactNode })
           if (!cancelled) setState("session_error");
           return;
         }
+        // An employee still holding an admin-issued password is sent to set
+        // their own. Typing a cabinet URL directly lands here too, so there is
+        // no way round it — and the API refuses everything regardless, so this
+        // is convenience rather than the enforcement.
+        if (
+          (raw as { must_change_password?: boolean } | null)
+            ?.must_change_password
+        ) {
+          if (!cancelled) router.replace("/account/change-password");
+          return;
+        }
         if (!cancelled) {
           setUser(me);
           setState("ok");

@@ -1271,6 +1271,101 @@ screens (§04 of the auth export) stay unbuilt reference art.
 a superadmin sets the new password directly in the staff panel and passes it on
 out of band. No email, no tokens, no expiry windows, nothing to phish.
 
+## ⚠ LocMemCache is PER PROCESS — no shared counter may live in the cache
+
+`CACHES` is `django.core.cache.backends.locmem.LocMemCache` (config/settings.py).
+Under more than one Gunicorn worker **each worker keeps its own copy**, so
+anything counted in the cache is counted N times over.
+
+- **The 10/min IP throttle on login already has this weakness.** `LoginThrottle`
+  is a `SimpleRateThrottle`, which stores counters in the cache, so the
+  effective limit in production is roughly `rate × worker_count`. This is a
+  KNOWN LIMITATION, recorded here so it is not discovered as a surprise. It is
+  acceptable because the per-ACCOUNT lockout below is the real defence and does
+  not use the cache.
+- **RULE: any counter that must be shared or must survive a restart goes in the
+  DATABASE, not the cache.** That is why `failed_login_count` / `locked_until`
+  are columns on `User`. Do not "optimise" them into the cache.
+- Redis is already running for Celery (`REDIS_URL`). Pointing `CACHES` at it
+  would fix the throttle and is the one-line change to make if exact rate
+  limiting ever matters.
+
+## CRM hardening: lockout, failure log, forced sign-out, forced change (2026-08-08)
+
+Scope model: **exactly one superadmin, many realtors.** Every administrative
+action here is `IsSuperAdmin` — not `IsCrmStaffManager`, which also admits
+role=admin. Verified `[measured]`: 36/36 API checks plus a 37-endpoint sweep,
+all against disposable `.invalid` accounts, hard-deleted after (users 3 → 6 → 3).
+
+- **Per-account lockout: 10 consecutive failures → 15 minutes.** Verified: locks
+  on attempt 10, cooldown reads 15 min. 10 matches the IP throttle so both rules
+  bite at the same point; a real typo costs 2–4 attempts. Fields live on `User`
+  (see the cache note above).
+  - **⚠ THE LOCKOUT MUST NOT LEAK ACCOUNT EXISTENCE.** The check runs BEFORE the
+    credential check and raises the SAME `AuthenticationFailed` with the SAME
+    detail as a wrong password. Verified byte-identical against an unknown
+    address `[measured]`. Never add a 423, a distinct code, or "try again in N
+    minutes" — each is an enumeration oracle, same reasoning that keeps the
+    401s merged.
+  - Only EXISTING accounts accumulate failures; an invented address has no row,
+    and inventing one would itself be the oracle. Spraying across made-up
+    addresses is the IP throttle's job.
+  - A successful sign-in, a superadmin reset, and `unlock` all clear it.
+- **Failed attempts are logged** as `login_failed` with a `reason`
+  (`bad_credentials` / `locked` / `throttled`), IP and User-Agent. **Never the
+  password** — verified by grepping every log row for the test password.
+  `EmployeeActivityLog.user` is now NULLABLE: an attempt on an unknown address
+  has nobody to attribute, so the typed address goes in `attempted_email`.
+- **The dashboard band (`SecuritySummaryBand`) renders NOTHING when all three
+  numbers are zero.** That is the design, not an oversight: with dozens of
+  realtors nobody scans a log, an aggregate does not grow with headcount, and
+  silence being normal makes the band's appearance the signal. Superadmin only;
+  a 403 is swallowed silently. Do not grow it into a monitoring system.
+- **Forced sign-out** (`POST /crm/realtors/<pk>/terminate-sessions/`) reuses
+  `token_version` — no second mechanism. It does NOT change the password;
+  verified the employee can still sign in with the same credentials afterwards.
+- **Forced password change.** A superadmin reset sets `must_change_password`;
+  the employee's own change clears it AND bumps `token_version`, killing the
+  session the admin's credential created — after that the log provably belongs
+  to the employee.
+  - **⚠ THE GATE LIVES IN `VersionedJWTAuthentication.authenticate()`, NOT IN A
+    PERMISSION CLASS.** DRF REPLACES `DEFAULT_PERMISSION_CLASSES` whenever a
+    view declares its own, and 31 views across 10 files declare theirs — a
+    "CRM-wide" permission would really be 31 edits and one missed view is a
+    silent hole. Exactly ONE view overrides `authentication_classes` (the public
+    homepage text blocks, anonymous by design), so authentication is the only
+    chokepoint every authenticated request passes. A new view cannot forget it.
+  - It raises 403 with `{"detail": …, "code": "password_change_required"}`.
+    DRF's `code=` argument does NOT reach the body — pass a dict as `detail`.
+  - `PASSWORD_CHANGE_EXEMPT_PATHS` (auth/me, auth/logout, auth/password/change)
+    is **mirrored in `frontend/src/lib/crmAuthConstants.ts`** — change both or
+    the user is locked out of the only screen that frees them.
+  - `/account/change-password` sits OUTSIDE `account/(cabinet)`; the cabinet
+    redirects there, so hosting it inside would loop.
+- **⚠ Endpoint sweep is the regression test for the gate.** 37 parameterless
+  `/api/` endpoints, two passes (flag clear / flag set): **0 wrongly gated when
+  clear, 0 reachable when set.** Re-run it if you touch authentication.
+
+## Token lifetimes (owner-approved 2026-08-08 — ask before changing)
+
+access **15 min** (was 60), refresh **48 h** (was 7 days), `ROTATE_REFRESH_TOKENS`
+and `BLACKLIST_AFTER_ROTATION` both **on**.
+
+- **⚠ Rotation without the blacklist is theatre** — the spent refresh would stay
+  valid for its full 48 h. That is why `rest_framework_simplejwt.token_blacklist`
+  is in INSTALLED_APPS. **Cost: `OutstandingToken` gains a row per refresh
+  issued** (~100/user/day at a 15-min access lifetime), so
+  `manage.py flushexpiredtokens` must run periodically or the table grows
+  without bound. Not yet scheduled — this is an open operational task.
+- **⚠ `VersionedTokenRefreshSerializer` must read the token's claims BEFORE
+  calling `super().validate()`.** With rotation, that call blacklists the
+  incoming token, so re-parsing the same string afterwards raises "token is
+  blacklisted" and EVERY refresh 401s `[measured] — this shipped broken until
+  the verification suite caught it`.
+- `ACCESS_COOKIE_MAX_AGE_SEC` in `lib/crmAuth.ts` mirrors the refresh lifetime
+  by hand; a longer value there lets the cabinet's cookie gate admit people
+  whose refresh has already died.
+
 ## CRM staff panel: email editing + superadmin password reset (2026-08-08)
 
 Verified `[measured]` by 23 API checks against four disposable `.invalid`

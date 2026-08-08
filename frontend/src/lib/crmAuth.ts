@@ -6,8 +6,13 @@ import {
   employeeAuthAbsoluteUrl,
 } from "@/lib/crmAuthConstants";
 
-/** Align with SIMPLE_JWT refresh lifetime so middleware still sees the cookie while refresh can restore access. */
-const ACCESS_COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 7;
+/**
+ * Align with SIMPLE_JWT REFRESH_TOKEN_LIFETIME so the server layout still sees
+ * the cookie for as long as a refresh could restore access. Kept in step with
+ * the backend by hand — 48 h since 2026-08-08. A longer value here would leave
+ * the cabinet's cookie gate letting people through after their refresh died.
+ */
+const ACCESS_COOKIE_MAX_AGE_SEC = 60 * 60 * 48;
 
 function syncAccessCookie(access: string | null): void {
   if (typeof document === "undefined") return;

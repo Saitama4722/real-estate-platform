@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { AccountDashboardUserSummary } from "@/components/account/AccountDashboardUserSummary";
+import { SecuritySummaryBand } from "@/components/account/SecuritySummaryBand";
 import { PageHeading } from "@/components/layout/page-heading";
 
 export default function AccountDashboardPage() {
   return (
     <>
       <PageHeading title="Панель" subtitle="Обзор личного кабинета сотрудника" />
+      {/* Superadmin only, and invisible unless something actually happened. */}
+      <div className="mt-6">
+        <SecuritySummaryBand />
+      </div>
       <div className="mt-6">
         <AccountDashboardUserSummary />
       </div>

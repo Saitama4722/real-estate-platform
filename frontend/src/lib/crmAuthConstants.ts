@@ -13,6 +13,10 @@ const AUTH_PATHS = {
   me: "auth/me/",
   refresh: "auth/refresh/",
   logout: "auth/logout/",
+  // ⚠ Mirrored in PASSWORD_CHANGE_EXEMPT_PATHS (backend users/authentication.py).
+  // Change one and you must change the other, or a user carrying
+  // must_change_password is locked out of the only screen that clears it.
+  "password-change": "auth/password/change/",
 } as const;
 
 export type EmployeeAuthEndpoint = keyof typeof AUTH_PATHS;

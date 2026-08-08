@@ -12,6 +12,9 @@ export type RealtorRow = {
   id: number;
   crm_id: string;
   email: string;
+  locked_until?: string | null;
+  failed_login_count?: number;
+  must_change_password?: boolean;
   first_name: string;
   last_name: string;
   display_name: string;
@@ -64,6 +67,11 @@ const ROLE_LABEL: Record<string, string> = {
   admin: "Администратор",
   superadmin: "Суперадминистратор",
 };
+
+/** A lock is live only until `locked_until` passes; the server agrees. */
+function isLocked(row: RealtorRow): boolean {
+  return Boolean(row.locked_until && new Date(row.locked_until) > new Date());
+}
 
 function roleLabel(role: string): string {
   return ROLE_LABEL[role] ?? role;
@@ -125,6 +133,25 @@ export function AccountStaffRealtorsPanel() {
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwDone, setPwDone] = useState<string | null>(null);
   const [pwSaving, setPwSaving] = useState(false);
+
+  /** Superadmin row actions that need no dialog: unlock, terminate sessions. */
+  const rowAction = async (row: RealtorRow, path: string, done: string) => {
+    setError(null);
+    try {
+      const res = await fetchWithCrmAuthRetry(
+        `/api/crm/realtors/${row.id}/${path}/`,
+        { method: "POST", credentials: "same-origin" },
+      );
+      if (!res.ok) {
+        setError("Не удалось выполнить действие.");
+        return;
+      }
+      setPwDone(`${row.email}: ${done}`);
+      await load();
+    } catch {
+      setError("Ошибка соединения. Попробуйте позже.");
+    }
+  };
 
   const closePwModal = () => {
     setPwTarget(null);
@@ -500,20 +527,51 @@ export function AccountStaffRealtorsPanel() {
                           the same rule with IsSuperAdmin — this only hides a
                           control that would 403. */}
                       {isSuperadmin && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPwDone(null);
-                            setPwError(null);
-                            setPwValue("");
-                            setPwShown(false);
-                            setPwTarget(row);
-                          }}
-                        >
-                          Сменить пароль
-                        </Button>
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setPwDone(null);
+                              setPwError(null);
+                              setPwValue("");
+                              setPwShown(false);
+                              setPwTarget(row);
+                            }}
+                          >
+                            Сменить пароль
+                          </Button>
+                          {/* Separate from a password reset on purpose: lost
+                              laptop or departed employee — same credentials,
+                              all sessions gone. */}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              void rowAction(
+                                row,
+                                "terminate-sessions",
+                                "все сессии завершены.",
+                              )
+                            }
+                          >
+                            Завершить сессии
+                          </Button>
+                          {isLocked(row) && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                void rowAction(row, "unlock", "блокировка снята.")
+                              }
+                            >
+                              Разблокировать
+                            </Button>
+                          )}
+                        </>
                       )}
                       <Button
                         type="button"
