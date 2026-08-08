@@ -13,6 +13,7 @@ class ArticlePublicSerializer(serializers.ModelSerializer):
             "title",
             "excerpt",
             "body",
+            "category",
             "published_at",
             "cover_image",
         ]
