@@ -1201,6 +1201,64 @@ seeded-then-deleted QA articles), plus a 32-width scroll sweep per page.
   article fetches: after editing an article (or its status) the site can serve
   the old payload for up to 2 minutes — poll before declaring a change broken.
 
+## Authentication (redesigned 2026-08-08): shared shell, one 401, real throttle
+
+Verified `[measured]` by 38 Playwright checks plus a 4-check success path run
+against a disposable account (created, used, hard-deleted; 3 real users intact).
+
+- **`components/auth/AuthShell.tsx` is the shared surface** — a future auth page
+  (recovery, expired link, set-new-password) means writing ONLY its right-hand
+  panel. `AuthBrandPanel` reuses the realtor hero treatment; its grain filter id
+  is `ctr-auth-grain`, **distinct from `ctr-rp-grain`** because SVG filter ids
+  are document-global (verified both pages, no collision).
+- **⚠ The mockup's 792/648 split is PROPORTIONAL here (55%), not fixed px.**
+  Copying the literal widths made the document 1440px wide at EVERY desktop
+  viewport, so 1025–1439 all scrolled horizontally `[measured]`. Any future
+  pixel width lifted from a 1440-wide Claude Design export deserves the same
+  suspicion.
+- **⚠ Auth pages used to render Header + Footer** — a «Вход в личный кабинет»
+  button in the header OF the login page. `components/layout/SiteChrome.tsx`
+  withholds chrome for `/account/login` and `/crm/login` by exact path.
+  Header/Footer are untouched and still server components, passed through as
+  slots. The cabinet slate band moved from `account/layout.tsx` (which also
+  wraps login) into `account/(cabinet)/layout.tsx`.
+- **⚠ WRONG PASSWORD AND A DISABLED ACCOUNT ARE ONE 401, DELIBERATELY.**
+  simplejwt returns an identical body for both so the form is not an
+  account-enumeration oracle. The design draws a separate «Учётная запись
+  заблокирована» banner; it is NOT implemented, by decision (2026-08-08). Do
+  not "fix" this by distinguishing them server-side.
+  - The old frontend matched the ENGLISH simplejwt string, but the backend runs
+    `LANGUAGE_CODE="ru-ru"` with simplejwt's ru catalogue, so the match never
+    fired and users saw the raw library text. Error copy now lives in
+    `components/auth/authErrors.ts`, keyed on STATUS, never on server prose.
+- **Login is throttled: `LoginThrottle`, 10/minute per IP, POST only**
+  (`backend/users/throttles.py`). `[measured]`: attempt 11 → 429 with
+  `Retry-After: 55`. `ThrottledRu` exists because DRF appends an untranslated
+  "Expected available in N seconds." to any custom detail. **Caveat: CACHES is
+  locmem, i.e. per process** — under several Gunicorn workers the effective
+  limit is rate × workers. Point the cache at the existing Redis to make it exact.
+- **The `.ctr-auth-*` class kit is unlayered and opt-in**, like the `.ctr-field`
+  form kit. It is 52px/r10 where that kit is 48px/r12 — the mockup's ladder for
+  a full-page single-focus form. Keeping them separate is what stops an auth
+  tweak from restyling every cabinet input.
+- **Chrome autofill defeat** (`.ctr-auth-control:-webkit-autofill`):
+  `-webkit-text-fill-color` + `box-shadow: 0 0 0 1000px … inset` +
+  `caret-color` + `transition: background-color 9999s`, and the focus ring must
+  be STACKED onto the inset shadow or setting one drops the other. Present in
+  the compiled stylesheet `[measured]`.
+- **Test-harness notes for anyone re-verifying:** the CDP keyboard cannot set
+  the CapsLock modifier — `keyboard.down("CapsLock")` leaves `getModifierState`
+  false; dispatch a `KeyboardEvent` with `modifierCapsLock: true` instead. Next
+  injects its own empty `<div role="alert" id="__next-route-announcer__">`, so
+  scope alert selectors to the form. A sync Playwright route handler cannot call
+  a Playwright API (the route auto-handles) — use CDP
+  `Network.emulateNetworkConditions` latency to observe the submitting state.
+- **Password recovery does not exist** — no route, endpoint, token model, and
+  **zero `EMAIL_*` settings** anywhere, so Django would post to `localhost:25`.
+  The blocker is operational (SMTP provider, sender domain, SPF/DKIM), not code.
+  The four screens are already designed in the mockup's §04. A cheaper option
+  for a staff-only system: admin-initiated reset via the CRM, no email at all.
+
 ## Realtor profiles are a TEMPLATE: default bio, publish gate, link gating
 
 - **`is_public` («Показывать на сайте») is now ENFORCED** in
