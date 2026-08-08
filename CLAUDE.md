@@ -1124,6 +1124,47 @@ seeded-then-deleted QA articles), plus a 32-width scroll sweep per page.
   - Guide eyebrow is the AREA KIND («Район» / «Микрорайон»), derived from the
     `catalogParam` the API already sends — **not** the city, which /districts
     already prints as the group heading.
+- **THE index layout is `components/editorial/EditorialIndexExplorer.tsx`** —
+  /articles and /districts render the same component: filter chips with live
+  counts, the lead card(s), the 14-card span-rhythm grid, `CatalogPagination`,
+  the empty state and the whole URL/history idiom. It is GENERIC over the
+  page's state type; each route supplies `hrefOf`, per-facet
+  `valueOf`/`apply`, and `withPage`.
+  - **⚠ Those are FUNCTIONS, so a Server Component cannot pass them.** Each
+    route therefore has a thin `"use client"` wrapper —
+    `ArticlesExplorer` / `DistrictsExplorer` — that owns the callbacks and
+    receives only plain data from the page. Do not try to render the shared
+    explorer straight from a server page (load-bearing lesson #3).
+  - **⚠ Featured exclusion must NOT be page-gated, only the RENDER is.**
+    Deciding `gridSource` per page gives page 1 and page 2 different source
+    lists, so slice boundaries slide across the page break `[measured]`:
+    /districts page 2 showed 10 cards instead of 8. Exclude leads from the
+    grid on EVERY page; pass `featured={page === 1 ? … : []}`.
+- **The /districts index (2026-08-08) mirrors /articles with TWO facets.**
+  City (`?city=`, real City.slug values) and kind (`?kind=rayon|mikrorayon`),
+  combining with AND, each row with its own «Все» first. `lib/districtFilters.ts`
+  is the single interpreter, same contract as articleFilters/catalogFilters.
+  - **Counts are narrowed by the OTHER facet's active value**
+    (`districtFacetCounts`), so a chip always predicts what clicking it
+    yields — picking «Краснодар» re-renders the kind row as Район 1 /
+    Микрорайон 13 `[measured]`.
+  - **City chips REPLACED the «Краснодар»/«Геленджик» group headings**
+    (decision, 2026-08-08). Both at once restates the same fact, and the
+    span-rhythm grid needs ONE continuous list — per-city sections would
+    restart the rhythm mid-page and make pagination incoherent.
+  - **The leads are the two city OVERVIEW guides**, not "the newest": every
+    guide shares a publish date, so recency is meaningless here.
+    `DISTRICT_OVERVIEW_SLUGS`. Both lead side by side under «Все»; with a city
+    chip active only that city's overview leads, full width; with a KIND
+    filter active there is no lead at all (the reader is slicing by type, so
+    an overview is just another result). `ArticleFeaturedCard` gained an
+    additive `size="half"` for the side-by-side pair — `"full"` is unchanged,
+    so /articles keeps the mockup proportions.
+  - **No filter combination of the current 24 guides returns zero**
+    (КР/Район 1, КР/Микро 13, ГЕ/Район 6, ГЕ/Микро 4), so the empty state
+    cannot be reached by filtering alone. It was verified live by temporarily
+    drafting `krasnodar-obzor` (recorded, restored, re-verified against the
+    recorded value) `[measured]` — 7/7.
 - **THE long-form layout is `components/articles/ArticleReadingPage.tsx`** —
   both `/articles/[slug]` and `/districts/[slug]` render it, so each page file
   is now just data + composition. It owns the progress bar, breadcrumbs,
@@ -2077,6 +2118,26 @@ Index of what changed this session; details live in the linked sections above.
   own later, and once `NODE_ENV=development` was used, a clean rebuild served
   perfectly. Lesson: **check `NODE_ENV` and the startup warnings before assuming
   `.next` corruption.**
+
+### ⚠ After deleting fixture data, verify the RENDERED PAGE — not just rows
+
+- **This shipped a visible defect to the user 2026-08-08.** A disposable
+  district guide («QA тест разметки гида») was hard-deleted with per-row
+  asserts, and the cleanup verified the DB: 24 rows, `QA_LEFT 0`. The user
+  then **saw the QA card live on /districts**, first in Краснодар.
+- **The delete was correct; the page was stale.** Re-measured afterwards: DB
+  24 rows / 0 QA, API list 24 / 0 QA, detail endpoint **404**, and the page
+  clean across 3 consecutive requests `[measured]`. The only mechanism that
+  puts a row on screen that no longer exists in the DB or the API is Next's
+  **`revalidate: 120` data cache** — a request after the window serves the
+  stale payload once (stale-while-revalidate) before refreshing.
+- **The protocol gap:** row counts were checked, the surface was not. This is
+  the same lesson already recorded for photos («Verify media, not just rows,
+  after fixture cleanup») — it applies to any cached READ SURFACE too.
+- **RULE: fixture cleanup is not done until the page that renders it has been
+  fetched TWICE and shows the fixture gone.** Once to burn the stale
+  stale-while-revalidate hit, once to confirm. Cheap, and it is the only check
+  that matches what the user will actually look at.
 
 ## Test-data protocol that worked (catalog sessions, 2026-08-04) — reuse it
 
