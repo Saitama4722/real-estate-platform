@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
 import { PageHeading } from "@/components/layout/page-heading";
-import { DistrictGuideCard } from "@/components/districts/DistrictGuideCard";
+import { ArticleCard } from "@/components/articles/ArticleCard";
 import { districtsIndexCanonicalUrl } from "@/lib/districtGuideSeo";
 import {
+  districtGuideCardDataFrom,
   fetchPublicDistrictGuidesList,
   groupGuidesByCity,
 } from "@/lib/publicDistrictGuides";
@@ -42,9 +43,12 @@ export default async function DistrictsPage() {
               <h2 className="text-xl font-semibold text-gray-900">
                 {group.city.name}
               </h2>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {group.guides.map((guide) => (
-                  <DistrictGuideCard key={guide.slug} guide={guide} />
+                  <ArticleCard
+                    key={guide.slug}
+                    article={districtGuideCardDataFrom(guide)}
+                  />
                 ))}
               </div>
             </section>

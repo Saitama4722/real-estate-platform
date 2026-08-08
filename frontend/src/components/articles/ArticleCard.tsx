@@ -9,9 +9,11 @@ import type { PublicArticle } from "@/lib/publicArticles";
 import { cn } from "@/lib/utils";
 
 /**
- * THE article card (articles mockup) — used by the /articles grid, the
- * «Другие статьи» block on the detail page and the homepage «Статьи» section.
- * One component, one style; do not fork per surface.
+ * THE editorial card (articles mockup) — used by the /articles grid, the
+ * «Другие статьи» block on the detail page, the homepage «Статьи» section AND
+ * the /districts guide grid. One component, one style; do not fork per
+ * surface. Anything a surface needs differently arrives as DATA
+ * (`href`, `eyebrow`, `minutes`, `ctaLabel`), never as a second component.
  *
  * Text-only by design: the mockup's card system has no image slot, which
  * matches the data (covers are optional and currently absent everywhere).
@@ -22,21 +24,34 @@ import { cn } from "@/lib/utils";
  */
 
 export interface ArticleCardData {
+  /** React key / identity only — navigation uses `href`. */
   slug: string;
+  /** Full destination, so one card serves /articles and /districts alike. */
+  href: string;
   title: string;
   excerpt: string;
-  category: string;
+  /** Small uppercase brand label over the title (category, area kind, …). */
+  eyebrow?: string;
   publishedAt: string;
-  minutes: number;
+  /**
+   * Reading time. OPTIONAL because it is computed from the body text, and not
+   * every list payload carries one: the district-guide LIST serializer omits
+   * `body` (backend/locations/serializers.py) so those cards show no clock
+   * rather than a fabricated number.
+   */
+  minutes?: number;
+  /** Read-more affordance; defaults to «Читать». */
+  ctaLabel?: string;
 }
 
 /** Server-side projection — strips `body` so full texts never ship as props. */
 export function articleCardDataFrom(article: PublicArticle): ArticleCardData {
   return {
     slug: article.slug,
+    href: `/articles/${article.slug}`,
     title: article.title,
     excerpt: article.excerpt,
-    category: article.category,
+    eyebrow: articleCategoryLabel(article.category),
     publishedAt: article.publishedAt,
     minutes: computeReadingTimeMinutes(article.body),
   };
@@ -49,11 +64,9 @@ interface ArticleCardProps {
 }
 
 export function ArticleCard({ article, size = "md", className }: ArticleCardProps) {
-  const categoryLabel = articleCategoryLabel(article.category);
-
   return (
     <Link
-      href={`/articles/${article.slug}`}
+      href={article.href}
       /* The WHOLE card is one link — safe because an article card contains no
          nested interactive elements (see ArticlesSection for the precedent).
          Transition names `translate`, NOT `transform`: in Tailwind v4 the lift
@@ -68,19 +81,23 @@ export function ArticleCard({ article, size = "md", className }: ArticleCardProp
         className,
       )}
     >
+      {/* Meta row. Either slot can be absent (a guide has no reading time);
+          the spacer keeps a lone clock right-aligned under justify-between. */}
       <div className="flex items-start justify-between gap-3">
-        {categoryLabel ? (
+        {article.eyebrow ? (
           <span className="text-[11px] font-bold tracking-[0.08em] uppercase text-brand">
-            {categoryLabel}
+            {article.eyebrow}
           </span>
         ) : (
           <span aria-hidden="true" />
         )}
-        {/* fg-muted, not the mockup's #94A3B8: readable meta must clear AA. */}
-        <span className="inline-flex items-center gap-1.5 text-caption font-normal text-fg-muted">
-          <Icon icon={Icons.Clock} size={16} className="h-[13px] w-[13px]" />
-          {article.minutes} мин
-        </span>
+        {article.minutes !== undefined && (
+          /* fg-muted, not the mockup's #94A3B8: readable meta must clear AA. */
+          <span className="inline-flex items-center gap-1.5 text-caption font-normal text-fg-muted">
+            <Icon icon={Icons.Clock} size={16} className="h-[13px] w-[13px]" />
+            {article.minutes} мин
+          </span>
+        )}
       </div>
 
       <h3
@@ -104,7 +121,7 @@ export function ArticleCard({ article, size = "md", className }: ArticleCardProp
           aria-hidden="true"
           className="inline-flex items-center gap-1.5 text-small font-semibold text-brand"
         >
-          Читать
+          {article.ctaLabel ?? "Читать"}
           <Icon icon={Icons.ArrowRight} size={16} className="h-[15px] w-[15px]" />
         </span>
       </div>

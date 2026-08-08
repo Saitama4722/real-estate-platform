@@ -1,3 +1,4 @@
+import type { ArticleCardData } from "@/components/articles/ArticleCard";
 import { getPublicApiBaseUrl } from "@/lib/publicProperty";
 
 /** City shape nested in a guide (mirrors the backend CityShortSerializer). */
@@ -105,6 +106,38 @@ export function buildGuideCatalogHref(guide: PublicDistrictGuide): string {
   q.set(guide.catalogParam, guide.catalogSlug);
   if (guide.city?.slug) q.set("city_slug", guide.city.slug);
   return `/catalog?${q.toString()}`;
+}
+
+/**
+ * Project a guide onto the SHARED editorial card shape (components/articles/
+ * ArticleCard). District guides and articles are the same kind of object to a
+ * reader — a titled, dated, excerpted piece of writing — so /districts uses
+ * that card rather than a look-alike of its own.
+ *
+ * Two fields differ from an article and both travel as data, not as a second
+ * component:
+ *  - `eyebrow` is the AREA KIND («Район» / «Микрорайон»), derived from the
+ *    catalogParam the backend already sends. Not the city: /districts groups
+ *    by city under a heading, so a city eyebrow would repeat it on every card,
+ *    while the kind genuinely distinguishes neighbours in the same group.
+ *  - `minutes` is OMITTED: DistrictGuideListSerializer does not include `body`
+ *    (only the detail serializer does), so there is no text to measure. A
+ *    guessed number would be worse than none, and adding ~90 full bodies to
+ *    the list payload to win a clock is a bad trade.
+ */
+export function districtGuideCardDataFrom(
+  guide: PublicDistrictGuide,
+): ArticleCardData {
+  return {
+    slug: guide.slug,
+    href: `/districts/${guide.slug}`,
+    title: guide.title,
+    excerpt: guide.excerpt,
+    eyebrow:
+      guide.catalogParam === "neighborhood_slug" ? "Микрорайон" : "Район",
+    publishedAt: guide.publishedAt,
+    ctaLabel: "Читать гид",
+  };
 }
 
 /** Group guides by city, preserving the API's publish-ordered sequence within each. */

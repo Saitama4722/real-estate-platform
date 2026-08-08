@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Icon, Icons } from "@/components/ui/icon";
 import { formatArticleDate } from "@/lib/articleContent";
-import { articleCategoryLabel } from "@/lib/articleFilters";
 import type { ArticleCardData } from "@/components/articles/ArticleCard";
 
 /**
@@ -20,24 +19,22 @@ interface ArticleFeaturedCardProps {
 }
 
 export function ArticleFeaturedCard({ article }: ArticleFeaturedCardProps) {
-  const categoryLabel = articleCategoryLabel(article.category);
-
   return (
     <Link
-      href={`/articles/${article.slug}`}
+      href={article.href}
       /* Transition names `translate`, NOT `transform` — the v4 lift trap; see
          ArticleCard. */
       className="group relative mt-7 block overflow-hidden rounded-[20px] bg-surface-dark p-7 text-white transition-[box-shadow,translate] duration-[200ms] ease-out hover:-translate-y-[3px] hover:shadow-article-featured-hover motion-reduce:transition-none motion-reduce:hover:translate-y-0 focus-ring-brand md:p-[52px]"
     >
       <div className="relative z-[1] max-w-[720px]">
         <div className="flex flex-wrap items-center gap-3">
-          {categoryLabel && (
+          {article.eyebrow && (
             <span className="inline-flex items-center gap-2 text-[11px] font-bold tracking-[0.1em] uppercase text-blue-300">
               <span
                 aria-hidden="true"
                 className="h-1.5 w-1.5 rounded-full bg-accent"
               />
-              {categoryLabel}
+              {article.eyebrow}
             </span>
           )}
           <span aria-hidden="true" className="h-1 w-1 rounded-full bg-white/30" />
