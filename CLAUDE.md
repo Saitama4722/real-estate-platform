@@ -999,6 +999,105 @@ All verified `[measured]` by a 34-check before/after Playwright+API run
   ASCII-space convention). A mapper calling `Intl.NumberFormat` directly is
   how U+202F reached the cards.
 
+## Articles (redesigned 2026-08-08): parsed plain-text bodies, category enum, URL-driven index
+
+All behaviour verified `[measured]` by 100/100 Playwright checks (90 in phase 1
+across 3 articles incl. shortest/longest, 10 pagination checks against 13
+seeded-then-deleted QA articles), plus a 32-width scroll sweep per page.
+
+- **`Article.body` stays PLAIN TEXT; structure is parsed at render time** (user
+  decision, 2026-08-08 — chosen over a Markdown migration). The single parser is
+  `frontend/src/lib/articleContent.ts`: `\n\n` paragraphs; a short bare line
+  (≤90 chars, no terminal punctuation, uppercase start) alone in its paragraph =
+  h2; `- ` lines = list items (the lead-in may share the paragraph or not —
+  both occur in the seeded data); a standalone paragraph starting «Важно:» =
+  callout; the LAST h2 named Вывод/Совет/Итог/Главное + everything after it =
+  the «Главное» takeaway card; explicit `## `/`### `/`> ` markers also honored
+  (future articles can opt into unambiguous structure with no migration). The
+  same parse feeds the TOC and heading ids (RU-translit slugs, deduped), so TOC
+  and body cannot drift. Reading time = words/170, min 1, computed from the
+  body — no stored field. Django admin `help_text` documents the authoring
+  convention (`ARTICLE_BODY_HELP` in `backend/articles/models.py`) — change
+  parser and help text together.
+  - **Heading-detection trap:** «Новостройка: на что обратить внимание» is a
+    heading that CONTAINS a colon; only a line ENDING with «:» is a list
+    lead-in. Don't "simplify" the rule to `contains(':')`.
+- **`Article.category` is a CharField whose VALUES ARE THE PUBLIC URL SLUGS**
+  (`pokupka`, `prodazha`, `ipoteka-i-finansy`, `rayony-i-lokacii`,
+  `investicii`, `yuridicheskie-voprosy`) — `ArticleCategory` in
+  `backend/articles/choices.py`, mirrored by `ARTICLE_CATEGORIES` in
+  `frontend/src/lib/articleFilters.ts`. **Treat both lists as append-only**:
+  renaming a value breaks shared `?category=` URLs. Backfill migration 0004
+  assigned the 15 seeded articles (counts 6/1/1/4/2/1, matching the design
+  mockup exactly). New articles pick the category in Django admin (no default —
+  the form forces a choice).
+- **/articles mirrors the catalog's URL-as-single-source-of-truth pattern**:
+  `articleFilters.ts` (parse/serialize, defaults omitted), server page filters +
+  slices, `ArticlesExplorer` navigates via the SAME sync-pushState→
+  router.replace-in-transition idiom (all three catalog mechanisms copied:
+  lastNavigatedRef/currentState, popstate reset, same-URL no-op). Page size 14 =
+  one full pass of the desktop card-span rhythm [3,3,2,2,2,3,3,2,2,2,3,3,3,3].
+  **Featured card = the NEWEST article, only on «Все» page 1, and it is
+  excluded from the grid on every page** — no "pinned" model flag exists.
+  `CatalogPagination` is reused as-is. Chip counts are computed from the full
+  list — never hardcode. The empty-category state renders from the same
+  server-computed filter result (`items.length === 0`); with current data every
+  category is non-empty, so it was code-verified but could not be exercised
+  live (deliberately: creating the state meant unpublishing a real article,
+  which the permission layer refused — to see it, set the one «Продажа» article
+  to draft in admin).
+- **⚠ A `@theme` token must NOT reference a PAGE-scoped next/font variable.**
+  `--font-article-serif: var(--font-literata), …` in `@theme` silently rendered
+  the whole body in Golos `[measured]`: @theme variables substitute their
+  `var()` refs at `:root`, where the detail-page-only `--font-literata`
+  (injected by `app/articles/fonts.ts` on a wrapper div) does not exist → the
+  token computes to guaranteed-invalid → the utility no-ops with no warning.
+  (`--font-sans` dodges this only because `--font-golos` sits on `<html>`
+  itself.) **Fix pattern:** keep a plain local stack in `@theme` and re-declare
+  the token in a scope class that lives on the SAME element as the font
+  variable (`.ctr-article-serif-scope` in globals.css). If a serif body ever
+  renders in Golos again, check this before anything else.
+- **Literata is self-hosted via next/font, scoped to the detail page only** —
+  `app/articles/fonts.ts` is imported by `articles/[slug]/page.tsx` alone, so
+  its preload/woff2 (2 files, ~78 KB: normal 51 + italic 27 `[measured]`) is
+  emitted only there; Golos remains 59 KB sitewide. CLS on article load 0.002
+  `[measured]`. Source Serif 4 / PT Serif are named fallbacks in the stack, not
+  shipped files.
+- **⚠ Anchor scrolling must assume the COMPACT header.** A pre-computed
+  `scrollTo(rect.top + scrollY − offset)` from the top of the page lands 12px
+  off `[measured]`: the sticky header compacts 64→52px DURING the scroll and
+  shifts the whole document. The TOC uses offset **76** (compact 52 + room —
+  the catalog's `scroll-mt-[76px]` convention, NOT the mockup's 92) and then a
+  settle-and-correct rAF loop (`scrollToEntry` in `ArticleToc.tsx`): wait for 3
+  stable frames, then one instant `scrollBy` if the heading missed the line.
+  Headings carry matching `scroll-mt-[76px]` — keep the two in sync.
+- **THE article card is `components/articles/ArticleCard.tsx`** — used by the
+  /articles grid, «Другие статьи» (`ArticleSimilarSection`) and the homepage
+  «Статьи» section. `ArticlePreviewCard` and `ArticleCatalogLinksBlock` were
+  DELETED (replaced by `ArticleCard` / `ArticleCatalogCta`). Card data flows
+  through `articleCardDataFrom()` which STRIPS `body` — don't pass full
+  articles as client props. **Known divergence:** `DistrictGuideCard`
+  hand-mirrors the OLD card markup; /districts now looks intentionally
+  different and was deliberately not touched (out of scope).
+- **Deliberate deviations from the mockup (do not "fix" back):** meta text uses
+  `fg-muted` instead of the mockup's `#94A3B8` and the featured meta is
+  white/70 not /55 — the mockup grays measure ~2.6:1, below WCAG AA; drop cap
+  is CSS `::first-letter`, not the mockup's duplicated `aria-hidden` span
+  (screen readers would read a broken word); scroll-spy and reveals use
+  position sweeps, never the mockup's IntersectionObserver (documented ban);
+  TOC anchor offset is 76, not 92 (compact header, above); the mockup's
+  «Спецификация» section is design documentation and was not built.
+- **Tablet/desktop TOC breakpoints:** the sticky rail is `min-[1140px]:` (the
+  mockup's own threshold — between stock `lg` and `xl`); the accordion wrapper
+  is `hidden md:max-[1139px]:block`. **Use the stacked variant, not
+  `md:block min-[1140px]:hidden`** — that pair has equal specificity, so the
+  winner would depend on stylesheet order.
+- The public articles API now returns `category`; `PublicArticle.category`
+  falls back to `""` for stale cached payloads. `getSimilarArticles` prefers
+  same-category, then recency. Remember the **`revalidate: 120`** on both
+  article fetches: after editing an article (or its status) the site can serve
+  the old payload for up to 2 minutes — poll before declaring a change broken.
+
 ## Realtor profiles are a TEMPLATE: default bio, publish gate, link gating
 
 - **`is_public` («Показывать на сайте») is now ENFORCED** in
