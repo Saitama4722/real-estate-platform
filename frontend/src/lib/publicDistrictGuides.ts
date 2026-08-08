@@ -1,4 +1,5 @@
 import type { ArticleCardData } from "@/components/articles/ArticleCard";
+import { readingTimeFromWordCount } from "@/lib/articleContent";
 import { getPublicApiBaseUrl } from "@/lib/publicProperty";
 
 /** City shape nested in a guide (mirrors the backend CityShortSerializer). */
@@ -19,6 +20,12 @@ export interface PublicDistrictGuide {
   catalogParam: string;
   /** The slug value to pass to that catalog param. */
   catalogSlug: string;
+  /**
+   * Whitespace-token count of the body, sent because the LIST payload has no
+   * `body`. Reading time is derived from it HERE, in TypeScript — the backend
+   * never computes minutes (see articleContent.ts).
+   */
+  wordCount: number;
 }
 
 export interface PublicDistrictGuideDetail extends PublicDistrictGuide {
@@ -34,6 +41,7 @@ interface GuideRaw {
   city: GuideCity | null;
   catalog_param: string;
   catalog_slug: string;
+  word_count?: number;
   body?: string;
 }
 
@@ -47,6 +55,9 @@ function mapGuide(row: GuideRaw): PublicDistrictGuideDetail {
     city: row.city,
     catalogParam: row.catalog_param,
     catalogSlug: row.catalog_slug,
+    // 0 only for a stale cached payload predating the field; readingTime's
+    // min-1 floor keeps that from rendering «0 мин».
+    wordCount: row.word_count ?? 0,
     body: row.body ?? "",
   };
 }
@@ -120,10 +131,10 @@ export function buildGuideCatalogHref(guide: PublicDistrictGuide): string {
  *    catalogParam the backend already sends. Not the city: /districts groups
  *    by city under a heading, so a city eyebrow would repeat it on every card,
  *    while the kind genuinely distinguishes neighbours in the same group.
- *  - `minutes` is OMITTED: DistrictGuideListSerializer does not include `body`
- *    (only the detail serializer does), so there is no text to measure. A
- *    guessed number would be worse than none, and adding ~90 full bodies to
- *    the list payload to win a clock is a bad trade.
+ *  - `minutes` is derived from the serializer's `word_count`, not from the
+ *    body (the list payload has none). The RULE lives in articleContent.ts,
+ *    so the guide index and the article index cannot disagree about what a
+ *    minute of reading is.
  */
 export function districtGuideCardDataFrom(
   guide: PublicDistrictGuide,
@@ -136,6 +147,7 @@ export function districtGuideCardDataFrom(
     eyebrow:
       guide.catalogParam === "neighborhood_slug" ? "Микрорайон" : "Район",
     publishedAt: guide.publishedAt,
+    minutes: readingTimeFromWordCount(guide.wordCount),
     ctaLabel: "Читать гид",
   };
 }

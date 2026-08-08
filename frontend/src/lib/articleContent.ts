@@ -66,7 +66,19 @@ function isBareHeading(line: string): boolean {
   );
 }
 
-const LIST_ITEM = /^[-•]\s+/;
+/**
+ * Bullet markers. The hyphen is the documented form, but «— » (em dash) is the
+ * natural Russian typographic habit: ALL 24 district guides were written with
+ * it `[measured]`, so it is accepted rather than requiring 24 text edits and a
+ * retrained habit across the ~90 guides still to be written (user decision,
+ * 2026-08-08). En dash and • ride along for free.
+ *
+ * Accepted risk: a line that legitimately OPENS with a dash — dialogue, or a
+ * dash-led clause — becomes a list item. No such line exists in any of the 39
+ * bodies on record `[measured]`; em dashes there appear only mid-sentence,
+ * where this anchored pattern cannot see them.
+ */
+const LIST_ITEM = /^[-–—•]\s+/;
 const ORDERED_ITEM = /^\d+[.)]\s+/;
 
 /** Case-normalized titles whose section becomes the takeaway card. */
@@ -207,12 +219,32 @@ export function parseArticleBody(body: string): ParsedArticleBody {
 
 /* ---- Reading time ----------------------------------------------------------- */
 
-/** Average Russian silent-reading speed; deliberately conservative. */
+/**
+ * Average Russian silent-reading speed; deliberately conservative.
+ *
+ * ⚠ THIS FILE IS THE ONLY DEFINITION OF READING TIME. The backend deliberately
+ * does NOT compute minutes: `DistrictGuideListSerializer` omits `body` (too
+ * heavy for an index of ~90 guides), so it sends a raw `word_count` instead —
+ * a MEASUREMENT, not a policy. The rate, the min-1 floor and the rounding mode
+ * all live here, once. Do not add a second implementation server-side: a
+ * shared constant would still leave the algorithm duplicated, and Python's
+ * banker's rounding disagrees with Math.round at exact .5 (user decision,
+ * 2026-08-08).
+ */
 const WORDS_PER_MINUTE = 170;
 
-export function computeReadingTimeMinutes(body: string): number {
-  const words = body.trim().split(/\s+/).filter(Boolean).length;
+/** Whitespace-token count — matches Python's `str.split()` exactly. */
+export function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** The rule. Everything reading-time-shaped goes through this function. */
+export function readingTimeFromWordCount(words: number): number {
   return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
+}
+
+export function computeReadingTimeMinutes(body: string): number {
+  return readingTimeFromWordCount(countWords(body));
 }
 
 /* ---- Shared presentation helpers ------------------------------------------- */

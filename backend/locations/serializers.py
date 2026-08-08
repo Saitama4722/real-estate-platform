@@ -147,6 +147,7 @@ class _GuideCommonMixin(serializers.Serializer):
     catalog_param = serializers.SerializerMethodField()
     catalog_slug = serializers.SerializerMethodField()
     cover_image = serializers.SerializerMethodField()
+    word_count = serializers.SerializerMethodField()
 
     def get_city(self, obj):
         city = obj.city
@@ -165,6 +166,25 @@ class _GuideCommonMixin(serializers.Serializer):
         path = obj.cover_image.url
         return request.build_absolute_uri(path) if request else path
 
+    def get_word_count(self, obj):
+        """
+        Whitespace-token count of the body — a MEASUREMENT, not a reading time.
+
+        The list endpoint deliberately omits `body` (an index of ~90 guides
+        would ship every full text just to render a clock), so the card needs
+        some measure of length from here. It is a raw count on purpose: the
+        reading-time RULE — 170 wpm, a one-minute floor, the rounding mode —
+        stays in exactly one place, frontend/src/lib/articleContent.ts. Do not
+        turn this into `reading_minutes`; that would be a second definition
+        that can silently drift from the first (and `round()` here is banker's
+        rounding, which already disagrees with JS `Math.round` at .5).
+
+        `str.split()` with no argument splits on arbitrary whitespace runs and
+        drops empties — identical to the frontend's
+        `trim().split(/\\s+/).filter(Boolean)`.
+        """
+        return len((obj.body or "").split())
+
 
 class DistrictGuideListSerializer(_GuideCommonMixin, serializers.ModelSerializer):
     class Meta:
@@ -172,6 +192,7 @@ class DistrictGuideListSerializer(_GuideCommonMixin, serializers.ModelSerializer
         fields = [
             "slug", "title", "excerpt", "published_at",
             "cover_image", "city", "catalog_param", "catalog_slug",
+            "word_count",
         ]
 
 
@@ -181,5 +202,6 @@ class DistrictGuideDetailSerializer(_GuideCommonMixin, serializers.ModelSerializ
         fields = [
             "slug", "title", "excerpt", "body", "published_at",
             "cover_image", "city", "catalog_param", "catalog_slug",
+            "word_count",
         ]
 
