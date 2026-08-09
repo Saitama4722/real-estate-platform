@@ -113,7 +113,16 @@ services:
       - app
 
   frontend:
-    build: ./frontend
+    # ⚠ Dockerfile.dev, NOT Dockerfile — and the name is load-bearing.
+    # This image runs `next dev` on a fixed port with NODE_ENV=development, which
+    # is right for Compose (source is volume-mounted, hot reload) and completely
+    # wrong for production. While it was named plain `Dockerfile`, Railway
+    # auto-detected it, switched from its Next.js builder to the Docker builder,
+    # and served production traffic from `next dev` on a hardcoded 3000 while the
+    # proxy targeted $PORT. Do not rename it back.
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
     image: real-estate-frontend:latest
     container_name: real-estate-frontend
     restart: unless-stopped
