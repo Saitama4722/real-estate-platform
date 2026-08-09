@@ -14,6 +14,14 @@ from .models import PriceHistory, Property
 
 @receiver(post_save, sender=Property, dispatch_uid="properties.record_price_history")
 def record_price_history(sender, instance: Property, created: bool, **kwargs):
+    # ⚠ `loaddata` fires post_save with raw=True. Without this guard, loading a
+    # Property fixture writes an EXTRA PriceHistory row stamped with the load
+    # time, on top of the history rows the fixture itself carries — so a
+    # property with 3 recorded prices arrives in the new database with 4.
+    # A fixture is a verbatim restore; it must not trigger derived writes.
+    if kwargs.get("raw"):
+        return
+
     # `update_fields` saves that don't touch price can't have changed it — skip
     # the extra query. (The intricate Property.save() re-saves title/slug via
     # QuerySet.update(), which does NOT emit post_save, so no double-counting.)

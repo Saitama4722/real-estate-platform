@@ -29,6 +29,14 @@ def create_realtor_profile(sender, instance, created, **kwargs):
     touches an existing profile — the bio is a starting point, never a
     reset, so re-saving a user cannot overwrite edited copy.
     """
+    # ⚠ `loaddata` fires post_save with raw=True. Without this guard, loading a
+    # realtor User fixture auto-creates a profile here, and the RealtorProfile
+    # fixture that follows then collides with it on the OneToOne user_id —
+    # aborting the whole load with an IntegrityError. A fixture restores the
+    # profile it actually had; it must not race against a generated one.
+    if kwargs.get("raw"):
+        return
+
     if not created or instance.role != User.Role.REALTOR:
         return
     RealtorProfile.objects.get_or_create(
