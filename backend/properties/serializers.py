@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework import serializers
 
+from common.media_urls import MediaURLField, media_url
+
 from users.models import User
 
 from owners.models import Owner
@@ -73,9 +75,7 @@ class RealtorShortSerializer(serializers.Serializer):
     is_public = serializers.SerializerMethodField()
 
     def get_avatar(self, obj):
-        from users.serializers import _absolute_media_url
-
-        return _absolute_media_url(self.context.get("request"), getattr(obj, "avatar", None))
+        return media_url(getattr(obj, "avatar", None))
 
     def get_is_public(self, obj) -> bool:
         from users.models import realtor_profile_is_public
@@ -131,14 +131,7 @@ class PropertyPhotoPublicSerializer(serializers.ModelSerializer):
         fields = ["url", "sort_order", "is_main"]
 
     def get_url(self, obj):
-        f = obj.image_medium or obj.image_thumb or obj.original_file
-        if not f:
-            return None
-        request = self.context.get("request")
-        path = f.url
-        if request:
-            return request.build_absolute_uri(path)
-        return path
+        return media_url(obj.image_medium or obj.image_thumb or obj.original_file)
 
 
 class PropertyVideoPublicSerializer(serializers.ModelSerializer):
@@ -232,13 +225,9 @@ class PropertyListSerializer(serializers.ModelSerializer):
 
     def get_preview_image(self, obj):
         for photo in obj.photos.all()[:1]:
-            f = photo.image_medium or photo.image_thumb or photo.original_file
-            if f:
-                request = self.context.get("request")
-                path = f.url
-                if request:
-                    return request.build_absolute_uri(path)
-                return path
+            url = media_url(photo.image_medium or photo.image_thumb or photo.original_file)
+            if url:
+                return url
         return None
 
 
@@ -756,6 +745,16 @@ class CrmPropertyWriteSerializer(serializers.ModelSerializer):
 
 class CrmPropertyPhotoSerializer(serializers.ModelSerializer):
     """CRM read representation for property photos."""
+
+    # Declared explicitly so these render through `media_url` like every other
+    # media path. Left to DRF, ModelSerializer would use its own FileField, which
+    # applies build_absolute_uri and would put `http://<backend-host>/media/…`
+    # here under the local backend while the public photo serializer next door
+    # returned `/media/…`. That split is what common/media_urls.py removed.
+    original_file = MediaURLField()
+    image_large = MediaURLField()
+    image_medium = MediaURLField()
+    image_thumb = MediaURLField()
 
     class Meta:
         model = PropertyPhoto

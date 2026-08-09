@@ -2,6 +2,8 @@ import re
 
 from rest_framework import serializers
 
+from common.media_urls import media_url
+
 from .models import Owner
 
 # Name: Cyrillic + Latin letters (incl. ё/Ё), spaces, hyphen, dot (initials). No digits.
@@ -82,8 +84,4 @@ class OwnerShortSerializer(serializers.ModelSerializer):
         fields = ["id", "full_name", "phone", "photo", "note"]
 
     def get_photo(self, obj):
-        if not obj.photo:
-            return None
-        request = self.context.get("request")
-        url = obj.photo.url
-        return request.build_absolute_uri(url) if request else url
+        return media_url(obj.photo)

@@ -9,8 +9,10 @@ from rest_framework.views import APIView
 from properties.choices import PropertyStatus
 from properties.models import Property
 
+from common.media_urls import media_url
+
 from .models import RealtorProfile, User
-from .serializers import PublicRealtorSerializer, _absolute_media_url
+from .serializers import PublicRealtorSerializer
 
 
 class PublicRealtorDetailView(APIView):
@@ -57,9 +59,9 @@ class PublicRealtorDetailView(APIView):
 
         avatar = None
         if profile and profile.photo:
-            avatar = _absolute_media_url(request, profile.photo)
+            avatar = media_url(profile.photo)
         if not avatar:
-            avatar = _absolute_media_url(request, user.avatar)
+            avatar = media_url(user.avatar)
 
         short_bio = ""
         if profile and (profile.short_bio or "").strip():

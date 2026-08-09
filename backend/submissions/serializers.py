@@ -3,6 +3,7 @@ import re
 from django.core.cache import cache
 from rest_framework import serializers
 
+from common.media_urls import media_url
 from locations.models import City, District, Neighborhood
 
 from .choices import SaleRequestStatus
@@ -26,11 +27,7 @@ class SaleRequestPhotoPublicSerializer(serializers.Serializer):
     image = serializers.SerializerMethodField()
 
     def get_image(self, obj):
-        if not obj.image:
-            return None
-        request = self.context.get("request")
-        url = obj.image.url
-        return request.build_absolute_uri(url) if request else url
+        return media_url(obj.image)
 
 
 class PublicSaleRequestCreateSerializer(serializers.ModelSerializer):
@@ -190,11 +187,7 @@ class CrmSaleRequestPhotoSerializer(serializers.ModelSerializer):
         fields = ["id", "image", "sort_order"]
 
     def get_image(self, obj):
-        if not obj.image:
-            return None
-        request = self.context.get("request")
-        url = obj.image.url
-        return request.build_absolute_uri(url) if request else url
+        return media_url(obj.image)
 
 
 class _CrmLocationShortSerializer(serializers.Serializer):

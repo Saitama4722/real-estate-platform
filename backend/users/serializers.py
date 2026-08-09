@@ -16,6 +16,8 @@ from rest_framework_simplejwt.serializers import (
     TokenRefreshSerializer,
 )
 
+from common.media_urls import media_url
+
 from .authentication import TOKEN_VERSION_CLAIM
 from .models import EmployeeActivityLog, RealtorProfile
 
@@ -86,16 +88,11 @@ def _apply_realtor_profile_fields(user, fields: dict) -> None:
     profile.save()
 
 
-def _absolute_media_url(request, file_field):
-    # Return relative /media/... so Next.js can proxy it (build_absolute_uri would
-    # embed the private backend host, unreachable from the browser in production).
-    if not file_field:
-        return None
-    try:
-        url = file_field.url
-    except ValueError:
-        return None
-    return url
+# `_absolute_media_url` used to live here and was the only correct
+# implementation of the three the codebase had. It moved to
+# common/media_urls.py as `media_url` so every app shares it; the name went with
+# it because "absolute" was misleading — under the local backend it returns a
+# relative path, which is the point.
 
 
 class CurrentUserSerializer(serializers.ModelSerializer):
@@ -132,7 +129,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_avatar(self, obj):
-        return _absolute_media_url(self.context.get("request"), obj.avatar)
+        return media_url(obj.avatar)
 
     def get_short_bio(self, obj):
         profile = _realtor_profile_or_none(obj)
@@ -451,7 +448,7 @@ class RealtorCrmReadSerializer(serializers.ModelSerializer):
         return name or obj.email
 
     def get_avatar(self, obj):
-        return _absolute_media_url(self.context.get("request"), obj.avatar)
+        return media_url(obj.avatar)
 
     def get_short_bio(self, obj):
         profile = _realtor_profile_or_none(obj)
@@ -475,10 +472,12 @@ class PublicRealtorSerializer(serializers.Serializer):
 
     crm_id = serializers.CharField()
     display_name = serializers.CharField()
-    # CharField (not URLField): `_absolute_media_url` intentionally returns a
+    # CharField (not URLField): under the local backend `media_url` returns a
     # relative `/media/...` path so Next.js can proxy it (an absolute URL would
     # leak the private backend host in prod). URLField rejects relative paths and
-    # would 400 for any realtor that actually has an avatar/photo.
+    # would 400 for any realtor that actually has an avatar/photo. Under r2 the
+    # value IS absolute, which CharField accepts too — so this stays correct
+    # either way and must not be "tightened" to URLField.
     avatar = serializers.CharField(allow_null=True)
     phone = serializers.CharField(allow_blank=True)
     published_properties_count = serializers.IntegerField()

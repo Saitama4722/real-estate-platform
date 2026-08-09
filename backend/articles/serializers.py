@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from common.media_urls import media_url
+
 from articles.models import Article, ArticleSection
 
 
@@ -36,10 +38,4 @@ class ArticlePublicSerializer(serializers.ModelSerializer):
         return ArticleSectionSerializer(sections, many=True).data
 
     def get_cover_image(self, obj):
-        if not obj.cover_image:
-            return None
-        request = self.context.get("request")
-        path = obj.cover_image.url
-        if request:
-            return request.build_absolute_uri(path)
-        return path
+        return media_url(obj.cover_image)

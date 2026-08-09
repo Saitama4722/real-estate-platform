@@ -2,6 +2,8 @@ from django.utils.text import slugify
 
 from rest_framework import serializers
 
+from common.media_urls import media_url
+
 from .models import City, District, DistrictGuide, Neighborhood, ResidentialComplex
 
 
@@ -160,11 +162,7 @@ class _GuideCommonMixin(serializers.Serializer):
         return obj.catalog_filter[1]
 
     def get_cover_image(self, obj):
-        if not obj.cover_image:
-            return None
-        request = self.context.get("request")
-        path = obj.cover_image.url
-        return request.build_absolute_uri(path) if request else path
+        return media_url(obj.cover_image)
 
     def get_word_count(self, obj):
         """
