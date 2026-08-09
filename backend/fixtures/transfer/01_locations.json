@@ -1,0 +1,3007 @@
+[
+  {
+    "model": "locations.city",
+    "pk": 1,
+    "fields": {
+      "created_at": "2026-06-27T22:21:39.771Z",
+      "updated_at": "2026-06-27T22:21:39.771Z",
+      "name": "Краснодар",
+      "slug": "krasnodar",
+      "region_name": "Краснодарский край",
+      "is_active": true
+    }
+  },
+  {
+    "model": "locations.city",
+    "pk": 2,
+    "fields": {
+      "created_at": "2026-06-27T22:21:39.776Z",
+      "updated_at": "2026-06-27T22:21:39.776Z",
+      "name": "Геленджик",
+      "slug": "gelendzhik",
+      "region_name": "Краснодарский край",
+      "is_active": true
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 117,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.705Z",
+      "updated_at": "2026-06-28T10:02:24.705Z",
+      "city": 1,
+      "name": "Микрорайоны Краснодара",
+      "slug": "krd-микрорайоны-краснодара",
+      "district_type": "city_district",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 148,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.736Z",
+      "updated_at": "2026-06-28T10:28:52.736Z",
+      "city": 2,
+      "name": "Геленджик",
+      "slug": "gel-геленджик",
+      "district_type": "suburb",
+      "sort_order": 100
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 149,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.786Z",
+      "updated_at": "2026-06-28T10:28:52.786Z",
+      "city": 2,
+      "name": "Кабардинка",
+      "slug": "gel-кабардинка",
+      "district_type": "suburb",
+      "sort_order": 101
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 150,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.788Z",
+      "updated_at": "2026-06-28T10:28:52.788Z",
+      "city": 2,
+      "name": "Дивноморское",
+      "slug": "gel-дивноморское",
+      "district_type": "suburb",
+      "sort_order": 102
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 151,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.791Z",
+      "updated_at": "2026-06-28T10:28:52.791Z",
+      "city": 2,
+      "name": "Архипо-Осиповка",
+      "slug": "gel-архипо-осиповка",
+      "district_type": "suburb",
+      "sort_order": 103
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 152,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.794Z",
+      "updated_at": "2026-06-28T10:28:52.794Z",
+      "city": 2,
+      "name": "Криница",
+      "slug": "gel-криница",
+      "district_type": "suburb",
+      "sort_order": 104
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 153,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.796Z",
+      "updated_at": "2026-06-28T10:28:52.796Z",
+      "city": 2,
+      "name": "Бетта",
+      "slug": "gel-бетта",
+      "district_type": "suburb",
+      "sort_order": 105
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 154,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.798Z",
+      "updated_at": "2026-06-28T10:28:52.798Z",
+      "city": 2,
+      "name": "Джанхот",
+      "slug": "gel-джанхот",
+      "district_type": "suburb",
+      "sort_order": 106
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 155,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.800Z",
+      "updated_at": "2026-06-28T10:28:52.801Z",
+      "city": 2,
+      "name": "Прасковеевка",
+      "slug": "gel-прасковеевка",
+      "district_type": "suburb",
+      "sort_order": 107
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 156,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.802Z",
+      "updated_at": "2026-06-28T10:28:52.802Z",
+      "city": 2,
+      "name": "Береговое",
+      "slug": "gel-береговое",
+      "district_type": "suburb",
+      "sort_order": 108
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 157,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.804Z",
+      "updated_at": "2026-06-28T10:28:52.804Z",
+      "city": 2,
+      "name": "Пшада",
+      "slug": "gel-пшада",
+      "district_type": "suburb",
+      "sort_order": 109
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 158,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.807Z",
+      "updated_at": "2026-06-28T10:28:52.807Z",
+      "city": 2,
+      "name": "Текос",
+      "slug": "gel-текос",
+      "district_type": "suburb",
+      "sort_order": 110
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 159,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.809Z",
+      "updated_at": "2026-06-28T10:28:52.809Z",
+      "city": 2,
+      "name": "Тешебс",
+      "slug": "gel-тешебс",
+      "district_type": "suburb",
+      "sort_order": 111
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 160,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.811Z",
+      "updated_at": "2026-06-28T10:28:52.811Z",
+      "city": 2,
+      "name": "Возрождение",
+      "slug": "gel-возрождение",
+      "district_type": "suburb",
+      "sort_order": 112
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 161,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.813Z",
+      "updated_at": "2026-06-28T10:28:52.813Z",
+      "city": 2,
+      "name": "Адербиевка",
+      "slug": "gel-адербиевка",
+      "district_type": "suburb",
+      "sort_order": 113
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 162,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.816Z",
+      "updated_at": "2026-06-28T10:28:52.816Z",
+      "city": 2,
+      "name": "Марьина Роща",
+      "slug": "gel-марьина-роща",
+      "district_type": "suburb",
+      "sort_order": 114
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 163,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.818Z",
+      "updated_at": "2026-06-28T10:28:52.818Z",
+      "city": 2,
+      "name": "Михайловский перевал",
+      "slug": "gel-михайловский-перевал",
+      "district_type": "suburb",
+      "sort_order": 115
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 164,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.819Z",
+      "updated_at": "2026-06-28T10:28:52.819Z",
+      "city": 2,
+      "name": "Голубая бухта",
+      "slug": "gel-голубая-бухта",
+      "district_type": "suburb",
+      "sort_order": 116
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 165,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.821Z",
+      "updated_at": "2026-06-28T10:28:52.821Z",
+      "city": 2,
+      "name": "СНТ Сосновое",
+      "slug": "gel-снт-сосновое",
+      "district_type": "suburb",
+      "sort_order": 117
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 170,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.535Z",
+      "updated_at": "2026-06-29T12:02:01.535Z",
+      "city": 1,
+      "name": "ст. Елизаветинская",
+      "slug": "krd-ст-елизаветинская",
+      "district_type": "suburb",
+      "sort_order": 100
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 171,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.545Z",
+      "updated_at": "2026-06-29T12:02:01.545Z",
+      "city": 1,
+      "name": "п. Белозёрный",
+      "slug": "krd-п-белозёрный",
+      "district_type": "suburb",
+      "sort_order": 101
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 172,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.547Z",
+      "updated_at": "2026-06-29T12:02:01.547Z",
+      "city": 1,
+      "name": "ст. Старокорсунская",
+      "slug": "krd-ст-старокорсунская",
+      "district_type": "suburb",
+      "sort_order": 102
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 173,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.548Z",
+      "updated_at": "2026-06-29T12:02:01.548Z",
+      "city": 1,
+      "name": "п. Дорожный",
+      "slug": "krd-п-дорожный",
+      "district_type": "suburb",
+      "sort_order": 103
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 174,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.551Z",
+      "updated_at": "2026-06-29T12:02:01.551Z",
+      "city": 1,
+      "name": "п. Разъезд",
+      "slug": "krd-п-разъезд",
+      "district_type": "suburb",
+      "sort_order": 104
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 175,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.553Z",
+      "updated_at": "2026-06-29T12:02:01.553Z",
+      "city": 1,
+      "name": "пгт Пашковский",
+      "slug": "krd-пгт-пашковский",
+      "district_type": "suburb",
+      "sort_order": 105
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 176,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.554Z",
+      "updated_at": "2026-06-29T12:02:01.554Z",
+      "city": 1,
+      "name": "п. Зеленопольский",
+      "slug": "krd-п-зеленопольский",
+      "district_type": "suburb",
+      "sort_order": 106
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 177,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.556Z",
+      "updated_at": "2026-06-29T12:02:01.556Z",
+      "city": 1,
+      "name": "п. Знаменский",
+      "slug": "krd-п-знаменский",
+      "district_type": "suburb",
+      "sort_order": 107
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 178,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.557Z",
+      "updated_at": "2026-06-29T12:02:01.557Z",
+      "city": 1,
+      "name": "п. Лорис",
+      "slug": "krd-п-лорис",
+      "district_type": "suburb",
+      "sort_order": 108
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 179,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.560Z",
+      "updated_at": "2026-06-29T12:02:01.560Z",
+      "city": 1,
+      "name": "п. Пригородный",
+      "slug": "krd-п-пригородный",
+      "district_type": "suburb",
+      "sort_order": 109
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 180,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.562Z",
+      "updated_at": "2026-06-29T12:02:01.562Z",
+      "city": 1,
+      "name": "х. Ленина",
+      "slug": "krd-х-ленина",
+      "district_type": "suburb",
+      "sort_order": 110
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 181,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.563Z",
+      "updated_at": "2026-06-29T12:02:01.563Z",
+      "city": 1,
+      "name": "п. Берёзовый",
+      "slug": "krd-п-берёзовый",
+      "district_type": "suburb",
+      "sort_order": 111
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 182,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.565Z",
+      "updated_at": "2026-06-29T12:02:01.565Z",
+      "city": 1,
+      "name": "х. Восточный",
+      "slug": "krd-х-восточный",
+      "district_type": "suburb",
+      "sort_order": 112
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 183,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.566Z",
+      "updated_at": "2026-06-29T12:02:01.566Z",
+      "city": 1,
+      "name": "х. Копанской",
+      "slug": "krd-х-копанской",
+      "district_type": "suburb",
+      "sort_order": 113
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 184,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.569Z",
+      "updated_at": "2026-06-29T12:02:01.569Z",
+      "city": 1,
+      "name": "х. Новый",
+      "slug": "krd-х-новый",
+      "district_type": "suburb",
+      "sort_order": 114
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 185,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.573Z",
+      "updated_at": "2026-06-29T12:02:01.573Z",
+      "city": 1,
+      "name": "х. Черников",
+      "slug": "krd-х-черников",
+      "district_type": "suburb",
+      "sort_order": 115
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 186,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.574Z",
+      "updated_at": "2026-06-29T12:02:01.574Z",
+      "city": 1,
+      "name": "п. Колосистый",
+      "slug": "krd-п-колосистый",
+      "district_type": "suburb",
+      "sort_order": 116
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 187,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.577Z",
+      "updated_at": "2026-06-29T12:02:01.577Z",
+      "city": 1,
+      "name": "п. Краснолит",
+      "slug": "krd-п-краснолит",
+      "district_type": "suburb",
+      "sort_order": 117
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 188,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.579Z",
+      "updated_at": "2026-06-29T12:02:01.579Z",
+      "city": 1,
+      "name": "пгт Калинино",
+      "slug": "krd-пгт-калинино",
+      "district_type": "suburb",
+      "sort_order": 118
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 189,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.580Z",
+      "updated_at": "2026-06-29T12:02:01.580Z",
+      "city": 1,
+      "name": "п. Лазурный",
+      "slug": "krd-п-лазурный",
+      "district_type": "suburb",
+      "sort_order": 119
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 190,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.582Z",
+      "updated_at": "2026-06-29T12:02:01.582Z",
+      "city": 1,
+      "name": "п. Дружелюбный",
+      "slug": "krd-п-дружелюбный",
+      "district_type": "suburb",
+      "sort_order": 120
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 191,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.585Z",
+      "updated_at": "2026-06-29T12:02:01.585Z",
+      "city": 1,
+      "name": "п. Индустриальный",
+      "slug": "krd-п-индустриальный",
+      "district_type": "suburb",
+      "sort_order": 121
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 192,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.588Z",
+      "updated_at": "2026-06-29T12:02:01.588Z",
+      "city": 1,
+      "name": "п. Краснодарский",
+      "slug": "krd-п-краснодарский",
+      "district_type": "suburb",
+      "sort_order": 122
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 193,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.589Z",
+      "updated_at": "2026-06-29T12:02:01.590Z",
+      "city": 1,
+      "name": "п. Плодородный",
+      "slug": "krd-п-плодородный",
+      "district_type": "suburb",
+      "sort_order": 123
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 194,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.592Z",
+      "updated_at": "2026-06-29T12:02:01.592Z",
+      "city": 1,
+      "name": "п. Победитель",
+      "slug": "krd-п-победитель",
+      "district_type": "suburb",
+      "sort_order": 124
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 195,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.594Z",
+      "updated_at": "2026-06-29T12:02:01.594Z",
+      "city": 1,
+      "name": "п. Российский",
+      "slug": "krd-п-российский",
+      "district_type": "suburb",
+      "sort_order": 125
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 196,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.595Z",
+      "updated_at": "2026-06-29T12:02:01.595Z",
+      "city": 1,
+      "name": "х. Октябрьский",
+      "slug": "krd-х-октябрьский",
+      "district_type": "suburb",
+      "sort_order": 126
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 197,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.597Z",
+      "updated_at": "2026-06-29T12:02:01.597Z",
+      "city": 1,
+      "name": "ст. Динская",
+      "slug": "krd-ст-динская",
+      "district_type": "suburb",
+      "sort_order": 127
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 198,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.600Z",
+      "updated_at": "2026-06-29T12:02:01.600Z",
+      "city": 1,
+      "name": "ст. Новотитаровская",
+      "slug": "krd-ст-новотитаровская",
+      "district_type": "suburb",
+      "sort_order": 128
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 199,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.603Z",
+      "updated_at": "2026-06-29T12:02:01.603Z",
+      "city": 1,
+      "name": "ст. Васюринская",
+      "slug": "krd-ст-васюринская",
+      "district_type": "suburb",
+      "sort_order": 129
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 200,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.606Z",
+      "updated_at": "2026-06-29T12:02:01.606Z",
+      "city": 1,
+      "name": "ст. Пластуновская",
+      "slug": "krd-ст-пластуновская",
+      "district_type": "suburb",
+      "sort_order": 130
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 201,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.609Z",
+      "updated_at": "2026-06-29T12:02:01.609Z",
+      "city": 1,
+      "name": "ст. Нововеличковская",
+      "slug": "krd-ст-нововеличковская",
+      "district_type": "suburb",
+      "sort_order": 131
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 202,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.611Z",
+      "updated_at": "2026-06-29T12:02:01.611Z",
+      "city": 1,
+      "name": "ст. Старомышастовская",
+      "slug": "krd-ст-старомышастовская",
+      "district_type": "suburb",
+      "sort_order": 132
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 203,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.614Z",
+      "updated_at": "2026-06-29T12:02:01.614Z",
+      "city": 1,
+      "name": "п. Южный",
+      "slug": "krd-п-южный",
+      "district_type": "suburb",
+      "sort_order": 133
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 204,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.615Z",
+      "updated_at": "2026-06-29T12:02:01.615Z",
+      "city": 1,
+      "name": "п. Агроном",
+      "slug": "krd-п-агроном",
+      "district_type": "suburb",
+      "sort_order": 134
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 205,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.618Z",
+      "updated_at": "2026-06-29T12:02:01.618Z",
+      "city": 1,
+      "name": "х. Найдорф",
+      "slug": "krd-х-найдорф",
+      "district_type": "suburb",
+      "sort_order": 135
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 206,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.622Z",
+      "updated_at": "2026-06-29T12:02:01.622Z",
+      "city": 1,
+      "name": "х. Дальний",
+      "slug": "krd-х-дальний",
+      "district_type": "suburb",
+      "sort_order": 136
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 207,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.623Z",
+      "updated_at": "2026-06-29T12:02:01.623Z",
+      "city": 1,
+      "name": "х. Первомайский",
+      "slug": "krd-х-первомайский",
+      "district_type": "suburb",
+      "sort_order": 137
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 208,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.626Z",
+      "updated_at": "2026-06-29T12:02:01.626Z",
+      "city": 1,
+      "name": "х. Украинский",
+      "slug": "krd-х-украинский",
+      "district_type": "suburb",
+      "sort_order": 138
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 209,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.628Z",
+      "updated_at": "2026-06-29T12:02:01.628Z",
+      "city": 1,
+      "name": "х. Янтарный",
+      "slug": "krd-х-янтарный",
+      "district_type": "suburb",
+      "sort_order": 139
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 210,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.631Z",
+      "updated_at": "2026-06-29T12:02:01.631Z",
+      "city": 1,
+      "name": "п. Красносельское",
+      "slug": "krd-п-красносельское",
+      "district_type": "suburb",
+      "sort_order": 140
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 211,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.632Z",
+      "updated_at": "2026-06-29T12:02:01.632Z",
+      "city": 1,
+      "name": "п. Зарождение",
+      "slug": "krd-п-зарождение",
+      "district_type": "suburb",
+      "sort_order": 141
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 212,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.634Z",
+      "updated_at": "2026-06-29T12:02:01.634Z",
+      "city": 1,
+      "name": "ст. Северская",
+      "slug": "krd-ст-северская",
+      "district_type": "suburb",
+      "sort_order": 142
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 213,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.637Z",
+      "updated_at": "2026-06-29T12:02:01.637Z",
+      "city": 1,
+      "name": "ст. Афипская",
+      "slug": "krd-ст-афипская",
+      "district_type": "suburb",
+      "sort_order": 143
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 214,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.638Z",
+      "updated_at": "2026-06-29T12:02:01.638Z",
+      "city": 1,
+      "name": "ст. Ильская",
+      "slug": "krd-ст-ильская",
+      "district_type": "suburb",
+      "sort_order": 144
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 215,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.641Z",
+      "updated_at": "2026-06-29T12:02:01.641Z",
+      "city": 1,
+      "name": "ст. Черноморская",
+      "slug": "krd-ст-черноморская",
+      "district_type": "suburb",
+      "sort_order": 145
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 216,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.643Z",
+      "updated_at": "2026-06-29T12:02:01.643Z",
+      "city": 1,
+      "name": "п. Афипский",
+      "slug": "krd-п-афипский",
+      "district_type": "suburb",
+      "sort_order": 146
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 217,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.648Z",
+      "updated_at": "2026-06-29T12:02:01.648Z",
+      "city": 1,
+      "name": "п. Ильский",
+      "slug": "krd-п-ильский",
+      "district_type": "suburb",
+      "sort_order": 147
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 218,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.651Z",
+      "updated_at": "2026-06-29T12:02:01.651Z",
+      "city": 1,
+      "name": "п. Черноморский",
+      "slug": "krd-п-черноморский",
+      "district_type": "suburb",
+      "sort_order": 148
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 219,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.654Z",
+      "updated_at": "2026-06-29T12:02:01.654Z",
+      "city": 1,
+      "name": "ст. Григорьевская",
+      "slug": "krd-ст-григорьевская",
+      "district_type": "suburb",
+      "sort_order": 149
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 220,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.655Z",
+      "updated_at": "2026-06-29T12:02:01.655Z",
+      "city": 1,
+      "name": "ст. Михайловская",
+      "slug": "krd-ст-михайловская",
+      "district_type": "suburb",
+      "sort_order": 150
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 221,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.658Z",
+      "updated_at": "2026-06-29T12:02:01.658Z",
+      "city": 1,
+      "name": "ст. Азовская",
+      "slug": "krd-ст-азовская",
+      "district_type": "suburb",
+      "sort_order": 151
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 222,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.660Z",
+      "updated_at": "2026-06-29T12:02:01.660Z",
+      "city": 1,
+      "name": "п. Титоровка",
+      "slug": "krd-п-титоровка",
+      "district_type": "suburb",
+      "sort_order": 152
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 223,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.663Z",
+      "updated_at": "2026-06-29T12:02:01.663Z",
+      "city": 1,
+      "name": "х. Красный",
+      "slug": "krd-х-красный",
+      "district_type": "suburb",
+      "sort_order": 153
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 224,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.664Z",
+      "updated_at": "2026-06-29T12:02:01.664Z",
+      "city": 1,
+      "name": "х. Навагинка",
+      "slug": "krd-х-навагинка",
+      "district_type": "suburb",
+      "sort_order": 154
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 225,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.667Z",
+      "updated_at": "2026-06-29T12:02:01.667Z",
+      "city": 1,
+      "name": "п. Яблоновский",
+      "slug": "krd-п-яблоновский",
+      "district_type": "suburb",
+      "sort_order": 155
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 226,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.669Z",
+      "updated_at": "2026-06-29T12:02:01.669Z",
+      "city": 1,
+      "name": "п. Тлюстенхабль",
+      "slug": "krd-п-тлюстенхабль",
+      "district_type": "suburb",
+      "sort_order": 156
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 227,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.672Z",
+      "updated_at": "2026-06-29T12:02:01.672Z",
+      "city": 1,
+      "name": "аул Тахтамукай",
+      "slug": "krd-аул-тахтамукай",
+      "district_type": "suburb",
+      "sort_order": 157
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 228,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.674Z",
+      "updated_at": "2026-06-29T12:02:01.674Z",
+      "city": 1,
+      "name": "аул Новый",
+      "slug": "krd-аул-новый",
+      "district_type": "suburb",
+      "sort_order": 158
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 229,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.677Z",
+      "updated_at": "2026-06-29T12:02:01.677Z",
+      "city": 1,
+      "name": "аул Гатлукай",
+      "slug": "krd-аул-гатлукай",
+      "district_type": "suburb",
+      "sort_order": 159
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 230,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.678Z",
+      "updated_at": "2026-06-29T12:02:01.678Z",
+      "city": 1,
+      "name": "аул Псекупс",
+      "slug": "krd-аул-псекупс",
+      "district_type": "suburb",
+      "sort_order": 160
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 231,
+    "fields": {
+      "created_at": "2026-06-29T12:02:01.681Z",
+      "updated_at": "2026-06-29T12:02:01.681Z",
+      "city": 1,
+      "name": "п. Энем",
+      "slug": "krd-п-энем",
+      "district_type": "suburb",
+      "sort_order": 161
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 232,
+    "fields": {
+      "created_at": "2026-06-29T12:08:01.948Z",
+      "updated_at": "2026-06-29T12:08:01.948Z",
+      "city": 1,
+      "name": "п. Северный",
+      "slug": "krd-п-северный",
+      "district_type": "suburb",
+      "sort_order": 162
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 233,
+    "fields": {
+      "created_at": "2026-06-29T12:08:01.959Z",
+      "updated_at": "2026-06-29T12:08:01.959Z",
+      "city": 1,
+      "name": "Немецкая деревня",
+      "slug": "krd-немецкая-деревня",
+      "district_type": "suburb",
+      "sort_order": 163
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 234,
+    "fields": {
+      "created_at": "2026-06-29T12:08:01.961Z",
+      "updated_at": "2026-06-29T12:08:01.961Z",
+      "city": 1,
+      "name": "п. Новая Адыгея",
+      "slug": "krd-п-новая-адыгея",
+      "district_type": "suburb",
+      "sort_order": 164
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 235,
+    "fields": {
+      "created_at": "2026-06-29T12:08:01.964Z",
+      "updated_at": "2026-06-29T12:08:01.964Z",
+      "city": 1,
+      "name": "ст. Марьянская",
+      "slug": "krd-ст-марьянская",
+      "district_type": "suburb",
+      "sort_order": 165
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 236,
+    "fields": {
+      "created_at": "2026-06-29T12:08:01.967Z",
+      "updated_at": "2026-06-29T12:08:01.967Z",
+      "city": 1,
+      "name": "п. Учхоз Кубань",
+      "slug": "krd-п-учхоз-кубань",
+      "district_type": "suburb",
+      "sort_order": 166
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 237,
+    "fields": {
+      "created_at": "2026-06-29T12:08:01.972Z",
+      "updated_at": "2026-06-29T12:08:01.972Z",
+      "city": 1,
+      "name": "аул Козет",
+      "slug": "krd-аул-козет",
+      "district_type": "suburb",
+      "sort_order": 167
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 238,
+    "fields": {
+      "created_at": "2026-06-29T12:08:01.973Z",
+      "updated_at": "2026-06-29T12:08:01.973Z",
+      "city": 1,
+      "name": "аул Новая Адыгея",
+      "slug": "krd-аул-новая-адыгея",
+      "district_type": "suburb",
+      "sort_order": 168
+    }
+  },
+  {
+    "model": "locations.district",
+    "pk": 239,
+    "fields": {
+      "created_at": "2026-06-29T12:08:01.976Z",
+      "updated_at": "2026-06-29T12:08:01.976Z",
+      "city": 1,
+      "name": "п. Зональный",
+      "slug": "krd-п-зональный",
+      "district_type": "suburb",
+      "sort_order": 169
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 516,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.728Z",
+      "updated_at": "2026-06-28T10:02:24.728Z",
+      "city": 1,
+      "district": 117,
+      "name": "ЦМР (Центральный микрорайон)",
+      "slug": "krd-микрорайон-цмр-центральный-микрорайон",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 517,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.738Z",
+      "updated_at": "2026-06-28T10:02:24.738Z",
+      "city": 1,
+      "district": 117,
+      "name": "ФМР (Фестивальный микрорайон)",
+      "slug": "krd-микрорайон-фмр-фестивальный-микрорайон",
+      "sort_order": 2
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 518,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.739Z",
+      "updated_at": "2026-06-28T10:02:24.739Z",
+      "city": 1,
+      "district": 117,
+      "name": "ЮМР (Юбилейный микрорайон)",
+      "slug": "krd-микрорайон-юмр-юбилейный-микрорайон",
+      "sort_order": 3
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 519,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.742Z",
+      "updated_at": "2026-06-28T10:02:24.742Z",
+      "city": 1,
+      "district": 117,
+      "name": "ЧМР (Черёмушки)",
+      "slug": "krd-микрорайон-чмр-черёмушки",
+      "sort_order": 4
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 520,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.745Z",
+      "updated_at": "2026-06-28T10:02:24.745Z",
+      "city": 1,
+      "district": 117,
+      "name": "ГМР (Гидростроителей)",
+      "slug": "krd-микрорайон-гмр-гидростроителей",
+      "sort_order": 5
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 521,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.747Z",
+      "updated_at": "2026-06-28T10:02:24.747Z",
+      "city": 1,
+      "district": 117,
+      "name": "КМР (Комсомольский микрорайон)",
+      "slug": "krd-микрорайон-кмр-комсомольский-микрорайон",
+      "sort_order": 6
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 522,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.750Z",
+      "updated_at": "2026-06-28T10:02:24.750Z",
+      "city": 1,
+      "district": 117,
+      "name": "ПМР (Пашковский микрорайон)",
+      "slug": "krd-микрорайон-пмр-пашковский-микрорайон",
+      "sort_order": 7
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 523,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.751Z",
+      "updated_at": "2026-06-28T10:02:24.751Z",
+      "city": 1,
+      "district": 117,
+      "name": "СМР (Славянский микрорайон)",
+      "slug": "krd-микрорайон-смр-славянский-микрорайон",
+      "sort_order": 8
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 524,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.756Z",
+      "updated_at": "2026-06-28T10:02:24.756Z",
+      "city": 1,
+      "district": 117,
+      "name": "ЗИП",
+      "slug": "krd-микрорайон-зип",
+      "sort_order": 9
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 525,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.759Z",
+      "updated_at": "2026-06-28T10:02:24.759Z",
+      "city": 1,
+      "district": 117,
+      "name": "ХБК (Хлопчато-бумажный комбинат)",
+      "slug": "krd-микрорайон-хбк-хлопчато-бумажный-комбинат",
+      "sort_order": 10
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 526,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.760Z",
+      "updated_at": "2026-06-28T10:02:24.760Z",
+      "city": 1,
+      "district": 117,
+      "name": "СХИ (Сельхозинститут)",
+      "slug": "krd-микрорайон-схи-сельхозинститут",
+      "sort_order": 11
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 527,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.763Z",
+      "updated_at": "2026-06-28T10:02:24.763Z",
+      "city": 1,
+      "district": 117,
+      "name": "Энка",
+      "slug": "krd-микрорайон-энка",
+      "sort_order": 12
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 528,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.766Z",
+      "updated_at": "2026-06-28T10:02:24.766Z",
+      "city": 1,
+      "district": 117,
+      "name": "Дубинка",
+      "slug": "krd-микрорайон-дубинка",
+      "sort_order": 13
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 529,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.769Z",
+      "updated_at": "2026-06-28T10:02:24.769Z",
+      "city": 1,
+      "district": 117,
+      "name": "Покровка",
+      "slug": "krd-микрорайон-покровка",
+      "sort_order": 14
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 530,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.771Z",
+      "updated_at": "2026-06-28T10:02:24.771Z",
+      "city": 1,
+      "district": 117,
+      "name": "Калинино",
+      "slug": "krd-микрорайон-калинино",
+      "sort_order": 15
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 531,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.774Z",
+      "updated_at": "2026-06-28T10:02:24.774Z",
+      "city": 1,
+      "district": 117,
+      "name": "Музыкальный",
+      "slug": "krd-микрорайон-музыкальный",
+      "sort_order": 16
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 532,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.776Z",
+      "updated_at": "2026-06-28T10:02:24.776Z",
+      "city": 1,
+      "district": 117,
+      "name": "Витаминкомбинат",
+      "slug": "krd-микрорайон-витаминкомбинат",
+      "sort_order": 17
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 533,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.779Z",
+      "updated_at": "2026-06-28T10:02:24.779Z",
+      "city": 1,
+      "district": 117,
+      "name": "Авиагородок",
+      "slug": "krd-микрорайон-авиагородок",
+      "sort_order": 18
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 534,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.782Z",
+      "updated_at": "2026-06-28T10:02:24.782Z",
+      "city": 1,
+      "district": 117,
+      "name": "9-й километр",
+      "slug": "krd-микрорайон-9-й-километр",
+      "sort_order": 19
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 535,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.784Z",
+      "updated_at": "2026-06-28T10:02:24.784Z",
+      "city": 1,
+      "district": 117,
+      "name": "Новознаменский",
+      "slug": "krd-микрорайон-новознаменский",
+      "sort_order": 20
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 536,
+    "fields": {
+      "created_at": "2026-06-28T10:02:24.786Z",
+      "updated_at": "2026-06-28T10:02:24.786Z",
+      "city": 1,
+      "district": 117,
+      "name": "Российский",
+      "slug": "krd-микрорайон-российский",
+      "sort_order": 21
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 640,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.740Z",
+      "updated_at": "2026-06-28T10:28:52.740Z",
+      "city": 2,
+      "district": 148,
+      "name": "Центр",
+      "slug": "gel-геленджик-центр",
+      "sort_order": 1
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 641,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.757Z",
+      "updated_at": "2026-06-28T10:28:52.757Z",
+      "city": 2,
+      "district": 148,
+      "name": "Толстый мыс",
+      "slug": "gel-геленджик-толстый-мыс",
+      "sort_order": 2
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 642,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.759Z",
+      "updated_at": "2026-06-28T10:28:52.759Z",
+      "city": 2,
+      "district": 148,
+      "name": "Тонкий мыс",
+      "slug": "gel-геленджик-тонкий-мыс",
+      "sort_order": 3
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 643,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.762Z",
+      "updated_at": "2026-06-28T10:28:52.762Z",
+      "city": 2,
+      "district": 148,
+      "name": "Северный",
+      "slug": "gel-геленджик-северный",
+      "sort_order": 4
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 644,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.765Z",
+      "updated_at": "2026-06-28T10:28:52.765Z",
+      "city": 2,
+      "district": 148,
+      "name": "Южный",
+      "slug": "gel-геленджик-южный",
+      "sort_order": 5
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 645,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.766Z",
+      "updated_at": "2026-06-28T10:28:52.766Z",
+      "city": 2,
+      "district": 148,
+      "name": "Парус",
+      "slug": "gel-геленджик-парус",
+      "sort_order": 6
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 646,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.769Z",
+      "updated_at": "2026-06-28T10:28:52.769Z",
+      "city": 2,
+      "district": 148,
+      "name": "Магилат",
+      "slug": "gel-геленджик-магилат",
+      "sort_order": 7
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 647,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.771Z",
+      "updated_at": "2026-06-28T10:28:52.771Z",
+      "city": 2,
+      "district": 148,
+      "name": "Нахаловка",
+      "slug": "gel-геленджик-нахаловка",
+      "sort_order": 8
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 648,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.774Z",
+      "updated_at": "2026-06-28T10:28:52.774Z",
+      "city": 2,
+      "district": 148,
+      "name": "Западный",
+      "slug": "gel-геленджик-западный",
+      "sort_order": 9
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 649,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.777Z",
+      "updated_at": "2026-06-28T10:28:52.777Z",
+      "city": 2,
+      "district": 148,
+      "name": "Черёмушки",
+      "slug": "gel-геленджик-черёмушки",
+      "sort_order": 10
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 650,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.780Z",
+      "updated_at": "2026-06-28T10:28:52.780Z",
+      "city": 2,
+      "district": 148,
+      "name": "Сосновая роща",
+      "slug": "gel-геленджик-сосновая-роща",
+      "sort_order": 11
+    }
+  },
+  {
+    "model": "locations.neighborhood",
+    "pk": 651,
+    "fields": {
+      "created_at": "2026-06-28T10:28:52.783Z",
+      "updated_at": "2026-06-28T10:28:52.783Z",
+      "city": 2,
+      "district": 148,
+      "name": "Пятый микрорайон",
+      "slug": "gel-геленджик-пятый-микрорайон",
+      "sort_order": 12
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 1,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.026Z",
+      "updated_at": "2026-06-29T12:13:36.026Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Горизонт",
+      "slug": "горизонт",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 2,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.034Z",
+      "updated_at": "2026-06-29T12:13:36.034Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Ривьера",
+      "slug": "ривьера",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 3,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.038Z",
+      "updated_at": "2026-06-29T12:13:36.038Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Альбатрос",
+      "slug": "альбатрос",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 4,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.040Z",
+      "updated_at": "2026-06-29T12:13:36.040Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Гоголь",
+      "slug": "гоголь",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 5,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.043Z",
+      "updated_at": "2026-06-29T12:13:36.043Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Акватория",
+      "slug": "акватория",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 6,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.044Z",
+      "updated_at": "2026-06-29T12:13:36.044Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Подкова",
+      "slug": "подкова",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 7,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.047Z",
+      "updated_at": "2026-06-29T12:13:36.047Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Кубанская марка",
+      "slug": "кубанская-марка",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 8,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.050Z",
+      "updated_at": "2026-06-29T12:13:36.050Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Столичный квартал",
+      "slug": "столичный-квартал",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 9,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.052Z",
+      "updated_at": "2026-06-29T12:13:36.052Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Атмосфера",
+      "slug": "атмосфера",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 10,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.055Z",
+      "updated_at": "2026-06-29T12:13:36.055Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Изумрудный город",
+      "slug": "изумрудный-город",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 11,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.058Z",
+      "updated_at": "2026-06-29T12:13:36.058Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Прованс",
+      "slug": "прованс",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 12,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.060Z",
+      "updated_at": "2026-06-29T12:13:36.060Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Южная звезда",
+      "slug": "южная-звезда",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 13,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.062Z",
+      "updated_at": "2026-06-29T12:13:36.062Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Кировский",
+      "slug": "кировский",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 14,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.064Z",
+      "updated_at": "2026-06-29T12:13:36.064Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Европейский",
+      "slug": "европейский",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 15,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.066Z",
+      "updated_at": "2026-06-29T12:13:36.066Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Лазурный",
+      "slug": "лазурный",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 16,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.068Z",
+      "updated_at": "2026-06-29T12:13:36.068Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Феллини",
+      "slug": "феллини",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 17,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.070Z",
+      "updated_at": "2026-06-29T12:13:36.070Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Черноморский",
+      "slug": "черноморский",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 18,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.072Z",
+      "updated_at": "2026-06-29T12:13:36.072Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Панорама",
+      "slug": "панорама",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 19,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.074Z",
+      "updated_at": "2026-06-29T12:13:36.074Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Лазурит",
+      "slug": "лазурит",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 20,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.077Z",
+      "updated_at": "2026-06-29T12:13:36.077Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Алые Паруса",
+      "slug": "алые-паруса",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 21,
+    "fields": {
+      "created_at": "2026-06-29T12:13:36.079Z",
+      "updated_at": "2026-06-29T12:13:36.079Z",
+      "city": 2,
+      "district": 148,
+      "neighborhood": null,
+      "name": "Дом у моря",
+      "slug": "дом-у-моря",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 22,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.262Z",
+      "updated_at": "2026-06-29T12:21:11.262Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Москва",
+      "slug": "москва",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 23,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.265Z",
+      "updated_at": "2026-06-29T12:21:11.265Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Самолёт",
+      "slug": "самолёт",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 24,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.268Z",
+      "updated_at": "2026-06-29T12:21:11.268Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Аврора",
+      "slug": "аврора",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 25,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.270Z",
+      "updated_at": "2026-06-29T12:21:11.270Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Литературный",
+      "slug": "литературный",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 26,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.272Z",
+      "updated_at": "2026-06-29T12:21:11.272Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Свобода",
+      "slug": "свобода",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 27,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.273Z",
+      "updated_at": "2026-06-29T12:21:11.273Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Дыхание",
+      "slug": "дыхание",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 28,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.275Z",
+      "updated_at": "2026-06-29T12:21:11.275Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Любимово",
+      "slug": "любимово",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 29,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.278Z",
+      "updated_at": "2026-06-29T12:21:11.278Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Спортивный парк",
+      "slug": "спортивный-парк",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 30,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.279Z",
+      "updated_at": "2026-06-29T12:21:11.279Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Облака",
+      "slug": "облака",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 31,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.283Z",
+      "updated_at": "2026-06-29T12:21:11.283Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Грани",
+      "slug": "грани",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 32,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.284Z",
+      "updated_at": "2026-06-29T12:21:11.284Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Стрижи",
+      "slug": "стрижи",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 33,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.287Z",
+      "updated_at": "2026-06-29T12:21:11.287Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Сегмент",
+      "slug": "сегмент",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 34,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.289Z",
+      "updated_at": "2026-06-29T12:21:11.289Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Достоевский",
+      "slug": "достоевский",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 35,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.290Z",
+      "updated_at": "2026-06-29T12:21:11.290Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Тихий Дон",
+      "slug": "тихий-дон",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 36,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.293Z",
+      "updated_at": "2026-06-29T12:21:11.293Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Кислород",
+      "slug": "кислород",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 37,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.295Z",
+      "updated_at": "2026-06-29T12:21:11.295Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Родные просторы",
+      "slug": "родные-просторы",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 38,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.296Z",
+      "updated_at": "2026-06-29T12:21:11.296Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Самолёт-Аврора",
+      "slug": "самолёт-аврора",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 39,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.298Z",
+      "updated_at": "2026-06-29T12:21:11.298Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Европа-Сити",
+      "slug": "европа-сити",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 40,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.301Z",
+      "updated_at": "2026-06-29T12:21:11.301Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Цветы",
+      "slug": "цветы",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 41,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.302Z",
+      "updated_at": "2026-06-29T12:21:11.302Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Парк Победы",
+      "slug": "парк-победы",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 42,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.304Z",
+      "updated_at": "2026-06-29T12:21:11.304Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Александровский",
+      "slug": "александровский",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 43,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.308Z",
+      "updated_at": "2026-06-29T12:21:11.308Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Восток",
+      "slug": "восток",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 44,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.310Z",
+      "updated_at": "2026-06-29T12:21:11.310Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Большой",
+      "slug": "большой",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 45,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.312Z",
+      "updated_at": "2026-06-29T12:21:11.312Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Айвазовский",
+      "slug": "айвазовский",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 46,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.315Z",
+      "updated_at": "2026-06-29T12:21:11.315Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Времена года",
+      "slug": "времена-года",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 47,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.316Z",
+      "updated_at": "2026-06-29T12:21:11.316Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Притяжение",
+      "slug": "притяжение",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 48,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.319Z",
+      "updated_at": "2026-06-29T12:21:11.319Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Гулливер",
+      "slug": "гулливер",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 49,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.321Z",
+      "updated_at": "2026-06-29T12:21:11.321Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Новелла",
+      "slug": "новелла",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 50,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.324Z",
+      "updated_at": "2026-06-29T12:21:11.324Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Квартал Европейский",
+      "slug": "квартал-европейский",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.residentialcomplex",
+    "pk": 51,
+    "fields": {
+      "created_at": "2026-06-29T12:21:11.325Z",
+      "updated_at": "2026-06-29T12:21:11.325Z",
+      "city": 1,
+      "district": null,
+      "neighborhood": null,
+      "name": "Прогресс",
+      "slug": "прогресс",
+      "address_text": "",
+      "latitude": null,
+      "longitude": null,
+      "description": ""
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 1,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.442Z",
+      "updated_at": "2026-07-18T23:34:45.442Z",
+      "district": 117,
+      "neighborhood": null,
+      "title": "Краснодар: районы города и как выбрать место для жизни",
+      "slug": "krasnodar-obzor",
+      "excerpt": "Общий взгляд на Краснодар для тех, кто выбирает, где купить квартиру: чем живёт город, как устроены его микрорайоны и на что смотреть при выборе места.",
+      "intro": "Краснодар растёт быстро — и это чувствуется во всём: от новых кварталов на окраинах до плотного трафика в час пик. Город притягивает людей со всего юга и из более холодных регионов, и у каждого приезжающего свой Краснодар. Кто-то ищет тихую улицу под частный дом, кто-то — квартиру в шаговой доступности от работы в центре, кто-то берёт новостройку на вырост.\n\nИсторический центр компактный и пеший: старые кварталы вдоль улицы Красной, купеческие особняки, скверы. Здесь дорого и тесно с парковкой, зато всё под рукой. Дальше от центра начинается «поколенческая» застройка — микрорайоны 70-80-х годов вроде Фестивального или Юбилейного, где уже сложилась своя среда: школы, поликлиники, деревья в человеческий рост, обжитые дворы.\n\nОтдельная история — новые районы, выросшие за последние полтора десятка лет. Музыкальный, Немецкая деревня, кварталы вдоль Ростовского шоссе. Там много свежего жилья и часто выгоднее цена за метр, но инфраструктура местами всё ещё догоняет застройку — это нормально для быстрорастущего города, просто держите в голове.\n\nЧто стоит понимать про Краснодар до покупки:\n\n— Город очень зависит от автомобиля. Общественный транспорт есть, но пробки серьёзные, и близость к работе или к нужной трассе экономит вам часы в неделю.\n— Летом жарко и душно. Сторона света, наличие кондиционера и зелень во дворе — не мелочи, а реальный комфорт с мая по сентябрь.\n— «Хорошего района вообще» здесь нет — есть район под конкретную задачу. Семье с детьми важны школы и дворы, инвестору — ликвидность и новостройки, тому, кто работает в центре, — минуты до офиса.\n\nДальше в этом разделе — отдельные гиды по конкретным микрорайонам Краснодара: ЦМР, ФМР, ЮМР, Гидрострой, Комсомольский и другие. Если вы ещё только присматриваетесь к городу, начните с них — так проще понять, где именно вам будет комфортно, и уже потом смотреть конкретные объекты.",
+      "housing": "",
+      "infrastructure": "",
+      "audience": "",
+      "caveats": "",
+      "conclusion": "",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:34:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 2,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.453Z",
+      "updated_at": "2026-07-18T23:34:45.453Z",
+      "district": null,
+      "neighborhood": 516,
+      "title": "ЦМР — Центральный микрорайон Краснодара: жизнь в сердце города",
+      "slug": "cmr-centralnyy-mikrorayon-krasnodar",
+      "excerpt": "Центральный микрорайон Краснодара: историческая застройка, пешая доступность и деловая жизнь. Кому подойдёт квартира в самом центре и на что обратить внимание.",
+      "intro": "Центр Краснодара — это про «всё в пешей доступности». Улица Красная с её выходными пешеходными часами, скверы, театры, кофейни, администрация, набережная Кубани неподалёку. Если вам важно жить там, где кипит городская жизнь и не нужен автомобиль для повседневных дел, ЦМР — очевидный кандидат.",
+      "housing": "Застройка здесь смешанная и в этом её характер. Дореволюционные особняки соседствуют со сталинками, брежневскими домами и точечными новостройками, которые аккуратно вписывают в старую ткань города. Из-за этого квартиры очень разные: от компактных «под ремонт» в старом фонде до просторных лотов в новых клубных домах. Купить квартиру в центре Краснодара можно в очень широком диапазоне — многое зависит от дома и состояния.",
+      "infrastructure": "",
+      "audience": "Кто здесь обычно покупает: те, кто работает в центре и ценит минуты до офиса; люди, которым нравится городская среда и пешие прогулки; покупатели, которые смотрят на центральную недвижимость как на ликвидный актив — центр редко теряет спрос.",
+      "caveats": "О чём честно стоит помнить:\n\n— Парковка. Это, пожалуй, главная бытовая сложность центра. Свой машиноместо или паркинг в доме здесь ценятся особенно.\n— Старый фонд требует внимания. Красивый исторический дом может скрывать изношенные коммуникации — состояние конкретного здания проверяйте отдельно.\n— Тишина относительна. Центр живёт активно; если вам нужен покой, выбирайте двор внутри квартала, а не окна на оживлённую улицу.",
+      "conclusion": "Жизнь в ЦМР — это осознанный выбор в пользу городского ритма и удобства перемещений пешком. За это платят более высокой ценой и компромиссом по парковке, но взамен получают ту самую «жизнь в центре», ради которой в Краснодар часто и переезжают.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:33:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 3,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.457Z",
+      "updated_at": "2026-07-18T23:34:45.457Z",
+      "district": null,
+      "neighborhood": 517,
+      "title": "ФМР — Фестивальный микрорайон Краснодара: обжитой район для семьи",
+      "slug": "fmr-festivalnyy-mikrorayon-krasnodar",
+      "excerpt": "Фестивальный микрорайон (ФМР) Краснодара — один из самых обжитых жилых районов с зеленью и развитой инфраструктурой. Чем он привлекает семьи и покупателей.",
+      "intro": "Фестивальный — из тех районов, которые люди выбирают и потом остаются в них надолго. Застраивался он в основном во второй половине советского периода, и с тех пор успел как следует обжиться: дворы заросли высокими деревьями, инфраструктура сложилась, а сам ФМР давно воспринимается как самостоятельная, самодостаточная часть города.",
+      "housing": "Жильё здесь в основном — панельные и кирпичные дома тех лет, с понятными планировками. В последние годы к ним добавились точечные новостройки, так что выбор есть и на вторичном рынке, и среди нового жилья. Купить квартиру в ФМР часто выходит выгоднее, чем в самом центре, при этом до центра отсюда недалеко.",
+      "infrastructure": "",
+      "audience": "Почему район любят семьи: всё нужное рядом — школы, детские сады, поликлиники, магазины, зелёные дворы, где детям есть где гулять. Это не парадный, а именно жилой, «для жизни» район, и в этом его сила.",
+      "caveats": "Практические заметки для покупателя:\n\n— Возраст домов. Основной фонд не новый, поэтому смотрите на состояние конкретного дома, коммуникаций и подъезда, а не только на квартиру.\n— Транспорт. Район плотно застроен и хорошо связан с городом, но в часы пик на выездах бывает загруженно — как почти везде в Краснодаре.\n— Зелень и дворы — большой плюс ФМР, особенно если сравнивать с новыми районами, где деревьям ещё расти и расти.",
+      "conclusion": "Если вы ищете спокойное, устоявшееся место с готовой инфраструктурой и разумной ценой — Фестивальный стоит посмотреть одним из первых.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:32:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 4,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.461Z",
+      "updated_at": "2026-07-18T23:34:45.461Z",
+      "district": null,
+      "neighborhood": 518,
+      "title": "ЮМР — Юбилейный микрорайон Краснодара: район у реки с набережной",
+      "slug": "yumr-yubileynyy-mikrorayon-krasnodar",
+      "excerpt": "Юбилейный микрорайон (ЮМР) Краснодара у реки Кубань: набережная, прогулочные зоны и жильё разных лет. Чем живёт район и кому он подходит.",
+      "intro": "Главная особенность Юбилейного — река. Микрорайон вытянут вдоль Кубани, и близость воды с набережной и прогулочными зонами задаёт ему характер: сюда приходят гулять, бегать, кататься на велосипеде. Для города с жарким летом выход к воде и открытые пространства — заметное преимущество.",
+      "housing": "ЮМР застраивался как крупный жилой массив, и жильё здесь разное по возрасту: есть дома советского периода, есть более поздние. Планировки, состояние и цена сильно зависят от конкретного дома, так что район стоит смотреть предметно. При этом он давно обжит, с привычным набором магазинов, школ и всего необходимого поблизости.",
+      "infrastructure": "",
+      "audience": "Кому подходит: тем, кто ценит прогулочные пространства и воду рядом с домом; активным людям и семьям, которым важно, куда выйти вечером и в выходные. «Жизнь в ЮМР» во многом крутится вокруг набережной — и это именно то, за чем сюда едут.",
+      "caveats": "На что обратить внимание:\n\n— Расположение относительно реки. Виды и близость к набережной — плюс, но конкретный двор и вид из окон проверяйте на месте.\n— Разброс по домам. Раз фонд разновозрастный, «средней температуры по району» тут нет — оценивайте каждый дом отдельно.\n— Транспортная доступность. Как и по всему Краснодару, в часы пик закладывайте время на дорогу.",
+      "conclusion": "Юбилейный — хороший вариант, если вам важно жить у воды и иметь под боком место для прогулок, не уезжая при этом далеко от города.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:31:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 5,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.464Z",
+      "updated_at": "2026-07-18T23:34:45.464Z",
+      "district": null,
+      "neighborhood": 520,
+      "title": "ГМР — Гидростроителей в Краснодаре: большой жилой район на левом берегу",
+      "slug": "gmr-gidrostroiteley-krasnodar",
+      "excerpt": "Микрорайон Гидростроителей (ГМР) Краснодара: крупный самодостаточный жилой массив со своей инфраструктурой. Особенности района для покупателя.",
+      "intro": "Гидростроителей, или просто Гидрострой, — большой жилой район, который многие воспринимают как «город в городе». Он достаточно самодостаточен: своя торговля, школы, поликлиники, рынки — за повседневным сюда не нужно ехать в центр. Для семьи, которой важно, чтобы всё необходимое было рядом, это ощутимый плюс.",
+      "housing": "Основу застройки составляют дома советского периода, к которым со временем добавлялось новое жильё. Из-за этого на местном рынке уживаются и доступная вторичка, и более современные варианты. Купить квартиру в ГМР нередко можно выгоднее по цене за метр, чем в более центральных районах, — этим он и привлекателен для тех, кто считает бюджет.",
+      "infrastructure": "",
+      "audience": "Характер у района рабочий, обстоятельный, без парадного лоска — это спокойное место для жизни, а не витрина. Сюда часто смотрят те, кому важнее практичность и цена, чем престиж адреса.",
+      "caveats": "Что учитывать:\n\n— Удалённость от центра. Гидрострой стоит на левом берегу, и до центра ехать заметно; оцените, насколько это критично для вашей работы и образа жизни.\n— Транспорт и мосты. Связь с остальным городом идёт через ограниченное число направлений, поэтому в часы пик закладывайте время.\n— Состояние фонда. Основной массив не новый — как всегда, смотрите на конкретный дом и коммуникации.",
+      "conclusion": "Если приоритет — просторный, обжитой район с собственной инфраструктурой и разумной ценой, а удалённость от центра вас не пугает, Гидростроителей заслуживает внимания.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:30:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 6,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.467Z",
+      "updated_at": "2026-07-18T23:34:45.467Z",
+      "district": null,
+      "neighborhood": 521,
+      "title": "КМР — Комсомольский микрорайон Краснодара: компактный и обжитой",
+      "slug": "kmr-komsomolskiy-mikrorayon-krasnodar",
+      "excerpt": "Комсомольский микрорайон (КМР) Краснодара — компактный жилой район советской застройки с устоявшейся средой. Чем он удобен для жизни.",
+      "intro": "Комсомольский — компактный, плотно застроенный микрорайон, который давно живёт своей размеренной жизнью. Он не самый большой в городе, и в этом есть удобство: всё внутри пешей доступности, инфраструктура сложилась, соседи знают друг друга, а среда предсказуемая.",
+      "housing": "Застройка типична для советских микрорайонов — панельные и кирпичные дома с привычными планировками, дворы, школы и детские сады в шаговой доступности. Рынок здесь преимущественно вторичный, и это скорее плюс для тех, кто хочет въехать в готовый, обжитой район, а не ждать, пока вокруг достроят и озеленят.",
+      "infrastructure": "",
+      "audience": "Кому подойдёт: тем, кто ищет спокойное место без сюрпризов, с понятной ценой и всем необходимым под рукой. Комсомольский нередко выбирают, когда хочется «просто нормально жить» без переплаты за престиж.",
+      "caveats": "Что стоит проверить:\n\n— Возраст и состояние дома — основной фонд не новый.\n— Парковку во дворе — в плотных советских микрорайонах с этим бывает тесно.\n— Конкретный двор — даже в небольшом районе дворы отличаются по тишине и зелени.",
+      "conclusion": "КМР — тот случай, когда компактность и обжитость важнее масштаба. Хороший вариант для спокойной городской жизни по адекватной цене.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:29:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 7,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.472Z",
+      "updated_at": "2026-07-18T23:34:45.472Z",
+      "district": null,
+      "neighborhood": 522,
+      "title": "Пашковский микрорайон (ПМР) Краснодара: район со своим укладом",
+      "slug": "pmr-pashkovskiy-mikrorayon-krasnodar",
+      "excerpt": "Пашковский микрорайон (ПМР) Краснодара — большая часть города со своим характером и частным сектором. Что важно знать покупателю о Пашковке.",
+      "intro": "Пашковка — район с собственной историей и укладом, который заметно отличается от типовых микрорайонов. Здесь много частного сектора вперемешку с многоквартирной застройкой, и это придаёт месту особый, немного пригородный характер: тише, просторнее, ближе к земле.",
+      "housing": "Из-за такой смешанной застройки выбор жилья широкий: от квартир в многоэтажках до домов и участков в частном секторе. Тем, кто рассматривает не только квартиру, но и дом поближе к городу, стоит присмотреться именно к Пашковке. Цены при этом часто мягче центральных.",
+      "infrastructure": "",
+      "audience": "",
+      "caveats": "Район большой, и внутри него условия ощутимо разнятся — где-то ближе к оживлённым улицам, где-то совсем тихие частные кварталы. Поэтому Пашковку правильнее выбирать не «в целом», а по конкретной части и конкретному объекту.\n\nО чём помнить покупателю:\n\n— Удалённость. От центра Пашковский расположен на отдалении — оцените ежедневную дорогу.\n— Разнородность застройки. Многоквартирные дома и частный сектор живут по-разному; определитесь, что именно вам ближе.\n— Инфраструктура по частям района отличается — проверяйте, что рядом с конкретным адресом.",
+      "conclusion": "Если вам нравится более спокойный, «приземлённый» уклад и хочется больше пространства за меньшие деньги, Пашковский микрорайон — один из вариантов, где это реально найти.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:28:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 8,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.476Z",
+      "updated_at": "2026-07-18T23:34:45.476Z",
+      "district": null,
+      "neighborhood": 523,
+      "title": "СМР — Славянский микрорайон Краснодара: спокойный жилой массив",
+      "slug": "smr-slavyanskiy-mikrorayon-krasnodar",
+      "excerpt": "Славянский микрорайон (СМР) Краснодара — жилой район с понятной средой и доступным жильём. Кому он подойдёт и на что смотреть.",
+      "intro": "Славянский микрорайон — спокойное жилое место без громкой репутации, и для многих покупателей это как раз достоинство. Здесь живут, а не показывают адрес: обычная городская среда, магазины и школы поблизости, привычный ритм.",
+      "housing": "Жильё в СМР в основном относится к массовой застройке, что делает его одним из более доступных по цене вариантов в городе. Для тех, кто покупает первое жильё или считает каждый метр бюджета, это важный аргумент — купить квартиру в Славянском микрорайоне обычно можно мягче, чем в раскрученных центральных районах.",
+      "infrastructure": "",
+      "audience": "Кому подходит: практичным покупателям, молодым семьям, тем, кто хочет въехать в понятный жилой район без переплаты за престиж и не гонится за парадностью.",
+      "caveats": "Что проверить перед покупкой:\n\n— Состояние дома и коммуникаций — как в любом массиве вторички.\n— Что именно рядом с конкретным адресом — инфраструктура по району распределена неравномерно.\n— Дорогу до работы — расположение относительно центра и трасс оцените под свой маршрут.",
+      "conclusion": "СМР — разумный выбор, когда важнее спокойная жизнь и адекватная цена, чем статус района.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:27:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 9,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.480Z",
+      "updated_at": "2026-07-18T23:34:45.480Z",
+      "district": null,
+      "neighborhood": 524,
+      "title": "ЗИП в Краснодаре: район с промышленным прошлым и удобным расположением",
+      "slug": "zip-mikrorayon-krasnodar",
+      "excerpt": "Микрорайон ЗИП в Краснодаре — сложившийся жилой район рядом с центром с историей вокруг завода. Особенности района для покупателя жилья.",
+      "intro": "Название ЗИП район получил от расположенного здесь предприятия, и это довольно типичная для Краснодара история — жилой массив, выросший рядом с заводом. Сегодня ЗИП — сложившийся жилой район, который ценят прежде всего за удачное расположение: до центра отсюда близко, а цена при этом обычно приятнее центральной.",
+      "housing": "Застройка здесь преимущественно советская, обжитая, со своей инфраструктурой. Есть и более новые дома. Рынок в основном вторичный, с понятными планировками и предсказуемым состоянием — то, что нужно покупателю, который хочет ясности.",
+      "infrastructure": "",
+      "audience": "Главный козырь района — баланс между близостью к центру и разумной ценой. Не переплачивая за центральный адрес, вы остаётесь в удобной досягаемости от него. Это делает ЗИП интересным и для жизни, и с точки зрения ликвидности.",
+      "caveats": "Что учитывать:\n\n— Соседство с промзоной. Часть района исторически связана с предприятием — при выборе конкретного адреса оцените окружение на месте.\n— Возраст фонда. Основная застройка не новая, смотрите состояние дома.\n— Разброс по улицам — как всегда, конкретное место важнее общего впечатления о районе.",
+      "conclusion": "Если ищете жильё близко к центру, но без центральной наценки, ЗИП — один из тех районов, где такой компромисс реально найти.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:26:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 10,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.484Z",
+      "updated_at": "2026-07-18T23:34:45.484Z",
+      "district": null,
+      "neighborhood": 525,
+      "title": "ХБК в Краснодаре: обжитой район с доступным жильём",
+      "slug": "hbk-mikrorayon-krasnodar",
+      "excerpt": "Микрорайон ХБК в Краснодаре — жилой район, выросший вокруг комбината, с устоявшейся средой и доступными ценами. Чем он интересен покупателю.",
+      "intro": "ХБК — ещё один краснодарский район, чьё название и происхождение связаны с производством: он вырос вокруг хлопчато-бумажного комбината. Как и другие такие массивы, сегодня это в первую очередь обычный жилой район со сложившейся средой и своим кругом жителей.",
+      "housing": "Жильё здесь по большей части из массовой застройки прошлых десятилетий, что держит цены в доступном диапазоне. Для покупателя с ограниченным бюджетом ХБК — вариант, где реально найти квартиру мягче по цене, оставаясь при этом в черте города с работающей инфраструктурой.",
+      "infrastructure": "Район давно обжит: магазины, школы, детские сады, транспорт — всё привычное рядом. Это не место «на показ», а спокойный жилой уголок для повседневной жизни.",
+      "audience": "",
+      "caveats": "Практические моменты:\n\n— Возраст домов — основной фонд немолодой, проверяйте состояние.\n— Окружение конкретного адреса — район неоднородный, оцените именно вашу улицу и двор.\n— Дорогу до нужных вам точек города — расположение под свой маршрут.",
+      "conclusion": "Для тех, кто ищет доступное жильё в обжитом районе и не гонится за престижным адресом, ХБК — практичный и понятный выбор.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:25:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 11,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.488Z",
+      "updated_at": "2026-07-18T23:34:45.488Z",
+      "district": null,
+      "neighborhood": 526,
+      "title": "СХИ (Сельхозинститут) в Краснодаре: зелёный район рядом с вузом",
+      "slug": "shi-selhozinstitut-krasnodar",
+      "excerpt": "Микрорайон СХИ в Краснодаре сложился вокруг аграрного университета: зелень, студенческая атмосфера и удобное расположение. Особенности района.",
+      "intro": "СХИ — район с особым настроением, сложившийся вокруг аграрного университета. Присутствие большого вуза задаёт атмосферу: здесь заметно больше зелени, чем в среднем по городу, есть студенческая жизнь и определённая молодость среды. Многим это нравится — район ощущается живым и при этом не суетливым.",
+      "housing": "Застройка смешанная: дома советского периода соседствуют с более новыми. Из-за близости университета часть жилья исторически рассматривалась под аренду студентам и преподавателям, так что рынок здесь активный — купить квартиру в районе СХИ имеет смысл и для жизни, и тем, кто думает про сдачу.",
+      "infrastructure": "Зелень — заметная черта района. Обширные озеленённые территории, связанные с университетом, делают СХИ одним из более «дышащих» мест в городе, что в краснодарскую жару ценно.",
+      "audience": "",
+      "caveats": "На что обратить внимание:\n\n— Сезонность спроса. Если рассматриваете сдачу, учитывайте, что спрос со стороны студентов имеет свой ритм.\n— Возраст конкретного дома — фонд разновозрастный.\n— Транспорт и дорога до центра — оцените под свои задачи.",
+      "conclusion": "СХИ подойдёт тем, кто ценит зелёную, чуть более неспешную среду с университетским характером, а также покупателям, присматривающимся к жилью под аренду.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:24:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 12,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.492Z",
+      "updated_at": "2026-07-18T23:34:45.492Z",
+      "district": null,
+      "neighborhood": 527,
+      "title": "Энка в Краснодаре: район активной застройки на западе города",
+      "slug": "enka-mikrorayon-krasnodar",
+      "excerpt": "Микрорайон Энка в Краснодаре — район с большим объёмом относительно нового жилья. Чем он привлекает покупателей новостроек и что учитывать.",
+      "intro": "Энка — район на западе Краснодара, который за последние годы серьёзно преобразился за счёт активной застройки. Здесь заметно больше нового и относительно нового жилья, чем в старых советских массивах, поэтому сюда часто смотрят покупатели, которым важна свежая квартира с современной планировкой.",
+      "housing": "Такой характер застройки означает и более широкий выбор среди новостроек, и обычно более выгодную цену за метр по сравнению с центром. Для тех, кто берёт первое жильё или ищет новую квартиру без центральной наценки, Энка — один из логичных адресов для поиска.",
+      "infrastructure": "При этом, как это часто бывает в активно растущих районах, инфраструктура местами догоняет темпы застройки. Что-то уже удобно, что-то ещё формируется — это рабочий момент, который просто стоит проверить применительно к конкретному дому.",
+      "audience": "",
+      "caveats": "Что учитывать покупателю:\n\n— Инфраструктура вокруг конкретного адреса — уточняйте, что уже работает, а что в планах (школы, сады, дороги).\n— Застройщик и дом — при покупке в новостройке оценивайте надёжность и репутацию.\n— Транспорт — расположение на западе города оцените под свой ежедневный маршрут.",
+      "conclusion": "Если приоритет — новое жильё по разумной цене и вы готовы к тому, что район ещё дозревает, Энка вполне заслуживает места в вашем списке.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:23:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 13,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.496Z",
+      "updated_at": "2026-07-18T23:34:45.496Z",
+      "district": null,
+      "neighborhood": 528,
+      "title": "Дубинка в Краснодаре: старый район у центра с частным сектором",
+      "slug": "dubinka-mikrorayon-krasnodar",
+      "excerpt": "Микрорайон Дубинка в Краснодаре — исторический район рядом с центром со смешанной застройкой. Что о нём важно знать при покупке жилья.",
+      "intro": "Дубинка — один из старых, исторически сложившихся районов Краснодара, расположенный близко к центру. Застройка здесь смешанная: частный сектор соседствует с многоквартирными домами, и у района из-за этого свой, немного камерный характер — не парадный, но по-своему уютный и «настоящий».",
+      "housing": "Главное преимущество Дубинки — расположение. Близость к центру при обычно более мягких, чем в самом центре, ценах делает район интересным для тех, кто хочет быть рядом с сердцем города, не переплачивая за центральный адрес. Смешанная застройка при этом даёт выбор: и квартиры, и варианты в частном секторе.\n\nРайон старый, и это двойственно. С одной стороны — сложившаяся среда и удачное место. С другой — часть фонда изношена, и к состоянию конкретного дома или дома под снос/реконструкцию нужно относиться внимательно.",
+      "infrastructure": "",
+      "audience": "",
+      "caveats": "О чём помнить:\n\n— Состояние объекта. В старом районе разброс по домам большой — тщательно проверяйте конкретный.\n— Частный сектор vs квартиры — решите, что вам ближе, они живут по-разному.\n— Перспективы застройки. Близкие к центру старые районы со временем нередко обновляются — это стоит держать в уме и как риск, и как возможность.",
+      "conclusion": "Дубинка подойдёт тем, кто ценит близость к центру и готов вникать в состояние конкретного объекта ради удачного расположения по разумной цене.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:22:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 14,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.500Z",
+      "updated_at": "2026-07-18T23:34:45.500Z",
+      "district": null,
+      "neighborhood": 531,
+      "title": "Музыкальный микрорайон в Краснодаре: район новостроек для молодых семей",
+      "slug": "muzykalnyy-mikrorayon-krasnodar",
+      "excerpt": "Музыкальный микрорайон в Краснодаре — район массовой современной застройки, популярный у молодых семей. Плюсы и что учитывать при покупке.",
+      "intro": "Музыкальный — один из самых узнаваемых районов новой Краснодарской застройки. Он вырос быстро и во многом стал символом того, как город прирастает новыми кварталами: много многоэтажного жилья, современные планировки, доступная по городским меркам цена за метр. Именно поэтому сюда так часто едут молодые семьи и покупатели первого жилья.",
+      "housing": "Плюсы для покупателя понятны: свежий фонд, большой выбор среди новостроек и вторички последних лет, и бюджет, который обычно мягче центрального. Купить квартиру в Музыкальном — распространённый сценарий для тех, кто хочет новое жильё, не выходя за разумные деньги.",
+      "infrastructure": "У массовой быстрой застройки есть и обратная сторона, о которой честно стоит сказать. Плотность высокая, и инфраструктура — школы, сады, дороги, парковки — в таких районах традиционно испытывает нагрузку и не всегда поспевает за числом жильцов. Это не «минус навсегда», а то, что нужно проверять здесь и сейчас под конкретный дом.",
+      "audience": "",
+      "caveats": "Что оценить перед покупкой:\n\n— Реальную загрузку инфраструктуры рядом с домом: места в садах и школах, транспорт, парковку.\n— Застройщика и дом — при таком объёме застройки качество разнится.\n— Час пик. Плотный район даёт заметный трафик на выездах — заложите это в оценку дороги.",
+      "conclusion": "Музыкальный — сильный вариант, если вам нужно современное доступное жильё и вы трезво смотрите на нагрузку на инфраструктуру плотного района. Для многих молодых семей этот баланс оказывается именно тем, что нужно.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:21:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 15,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.505Z",
+      "updated_at": "2026-07-18T23:34:45.505Z",
+      "district": 148,
+      "neighborhood": null,
+      "title": "Геленджик: курортный город и его районы — обзор для покупателя",
+      "slug": "gelendzhik-obzor",
+      "excerpt": "Геленджик как место для жизни и второго дома у моря: чем живёт курорт, как устроены его районы и посёлки и на что смотреть при покупке.",
+      "intro": "Геленджик — это прежде всего бухта. Почти закрытая, подковообразная, с длинной набережной, которую местные и гости считают одной из главных в стране. Вокруг этой бухты и разворачивается город: центр с курортной жизнью, жилые районы на склонах, два мыса, обрамляющих залив, и цепочка посёлков вдоль побережья за пределами города.\n\nПокупка недвижимости в Геленджике почти всегда связана с морем — но мотивы у людей разные. Кто-то берёт квартиру или дом для постоянной жизни у воды, кто-то — второе, сезонное жильё для отдыха, кто-то рассматривает объект под сдачу в курортный сезон. От того, какой сценарий ваш, зависит и выбор района, и то, на что смотреть.\n\nКак в общих чертах устроен город:\n\n— Центр и набережная — самая курортная и оживлённая часть, всё под рукой, но летом людно и активно.\n— Мысы, Толстый и Тонкий, обрамляют бухту и у каждого свой характер — от них во многом зависят виды и атмосфера.\n— Жилые районы (Северный, Южный, Пятый микрорайон и другие) — более «городская», повседневная сторона Геленджика.\n— Посёлки вокруг (Кабардинка, Дивноморское, Архипо-Осиповка и дальше) — для тех, кто хочет к морю, но тише и ближе к природе.\n\nЧто важно понимать про курортную недвижимость до покупки:\n\n— Сезонность. Летом город оживает и наполняется гостями, зимой живёт размеренно. Продумайте, в какие месяцы будете пользоваться жильём и насколько важна круглогодичная инфраструктура рядом.\n— Близость моря — понятие растяжимое. Проверяйте реальную пешую доступность до воды, а не формулировки объявления.\n— Прибрежный климат. Влажность и близость моря влияют на состояние жилья — обращайте внимание на качество отделки и вентиляцию.\n\nДальше в разделе — отдельные гиды по районам Геленджика и по окрестным посёлкам. Начните с них, чтобы понять, какой сценарий у моря вам ближе, и уже потом переходите к конкретным объектам.",
+      "housing": "",
+      "infrastructure": "",
+      "audience": "",
+      "caveats": "",
+      "conclusion": "",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:20:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 16,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.510Z",
+      "updated_at": "2026-07-18T23:34:45.510Z",
+      "district": null,
+      "neighborhood": 640,
+      "title": "Центр Геленджика: жизнь у набережной в сердце курорта",
+      "slug": "gelendzhik-centr",
+      "excerpt": "Центр Геленджика — самая курортная часть города у набережной, где всё в пешей доступности. Кому подойдёт жильё в центре и что учитывать.",
+      "intro": "Центр Геленджика — это набережная и всё, что вокруг неё. Здесь сосредоточена курортная жизнь: прогулочная линия у моря, кафе, магазины, вечернее оживление. Если вы хотите жить или отдыхать там, где до моря пара минут пешком и всё нужное рядом, центр — самый очевидный выбор.",
+      "housing": "Жильё в центральной части ценится именно за расположение. Близость к набережной и морю делает такие квартиры желанными и для собственного отдыха, и для сдачи в сезон — спрос на аренду у самой воды традиционно высокий. Купить квартиру в центре Геленджика — решение, где вы платите в первую очередь за location, за те самые «минуты до моря».",
+      "infrastructure": "",
+      "audience": "",
+      "caveats": "За удобство приходится чем-то жертвовать, и об этом честно:\n\n— Летом здесь людно и шумно. Разгар сезона превращает центр в оживлённое курортное место — кому-то это в радость, кому-то мешает.\n— Парковка в сезон — отдельная сложность, как в любом курортном центре.\n— Цена. Самая курортная часть города — и одна из самых дорогих; вы платите за близость к набережной.",
+      "conclusion": "Кому подходит центр: тем, для кого главное — быть у моря и в гуще курортной жизни; покупателям, рассматривающим сезонную сдачу; тем, кто готов к летнему оживлению ради круглогодичного удобства «всё рядом». Если же вы едете за тишиной, стоит посмотреть районы подальше от набережной или окрестные посёлки.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:19:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 17,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.514Z",
+      "updated_at": "2026-07-18T23:34:45.514Z",
+      "district": null,
+      "neighborhood": 641,
+      "title": "Толстый мыс в Геленджике: район с видами на бухту",
+      "slug": "gelendzhik-tolstyy-mys",
+      "excerpt": "Толстый мыс — один из мысов, обрамляющих бухту Геленджика, район с видовым потенциалом. Чем он привлекателен и на что смотреть при покупке.",
+      "intro": "Толстый мыс — южная «рука» геленджикской бухты, и уже из этого следует его главная ценность: рельеф и виды. Возвышенное положение над заливом даёт потенциал для панорам на море и бухту, а это то, ради чего многие и покупают жильё в Геленджике.",
+      "housing": "Район сочетает жилую застройку с курортным характером. Здесь встречаются и дома для постоянной жизни, и жильё, ориентированное на отдых и виды. Из-за рельефа и близости к воде объекты сильно различаются: видовая квартира на склоне и дом в глубине района — это совсем разные истории и по атмосфере, и по цене.",
+      "infrastructure": "",
+      "audience": "Кому интересен Толстый мыс: тем, кто ищет видовое жильё; покупателям, которым важно сочетание близости к морю и чуть большей приватности, чем в шумном центре; тем, кто рассматривает объект как место силы с панорамой, а не только квадратные метры.",
+      "caveats": "Что важно проверить:\n\n— Реальные виды. «Вид на море» в объявлении и вид из конкретного окна — не всегда одно и то же; смотрите на месте.\n— Рельеф. Склоны — это и красивые панорамы, и вопросы подъезда, парковки, пеших подъёмов; оцените под свой образ жизни.\n— Удалённость от набережной и инфраструктуры — с мыса до центра нужно спланировать логистику.",
+      "conclusion": "Толстый мыс — хороший выбор, если вы охотитесь именно за видами и приватностью у моря и готовы учитывать особенности жизни на рельефе.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:18:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 18,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.518Z",
+      "updated_at": "2026-07-18T23:34:45.518Z",
+      "district": null,
+      "neighborhood": 642,
+      "title": "Тонкий мыс в Геленджике: район у выхода из бухты",
+      "slug": "gelendzhik-tonkiy-mys",
+      "excerpt": "Тонкий мыс — вторая оконечность бухты Геленджика, район со своим характером ближе к открытому морю. Особенности для покупателя жилья.",
+      "intro": "Тонкий мыс — северная оконечность бухты, вытянутая в сторону открытого моря. По характеру он отличается от Толстого мыса и от центра: здесь своё сочетание жилой застройки и курортной функции, и своя атмосфера — ближе к «краю» бухты, к простору.",
+      "housing": "Как и на другом мысу, многое здесь определяется расположением конкретного объекта относительно воды и рельефа. Есть жильё ориентированное на отдых и виды, есть для постоянной жизни. Для покупателя это значит, что Тонкий мыс стоит рассматривать предметно, по конкретному адресу, а не по общему представлению.",
+      "infrastructure": "",
+      "audience": "Кому подойдёт: тем, кто хочет быть у моря, но не в самом эпицентре курортной толчеи центра; покупателям, которым нравится более открытая, «морская» сторона Геленджика; тем, кто ищет свой баланс между близостью к воде и спокойствием.",
+      "caveats": "На что обратить внимание:\n\n— Инфраструктура. Ближе к оконечности мыса набор повседневных удобств может быть скромнее, чем в центре, — проверьте, что рядом.\n— Реальная удалённость от нужных точек — до центра и набережной спланируйте маршрут.\n— Состояние и тип жилья — оно здесь разнородное, оценивайте объект отдельно.",
+      "conclusion": "Тонкий мыс — вариант для тех, кому важнее морской простор и чуть больше спокойствия, чем максимальная курортная движуха центральной набережной.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:17:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 19,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.522Z",
+      "updated_at": "2026-07-18T23:34:45.522Z",
+      "district": null,
+      "neighborhood": 651,
+      "title": "Пятый микрорайон Геленджика: жилая, «городская» сторона курорта",
+      "slug": "gelendzhik-pyatyy-mikrorayon",
+      "excerpt": "Пятый микрорайон Геленджика — жилой район с более городским укладом и повседневной инфраструктурой. Кому он подойдёт для постоянной жизни.",
+      "intro": "Пятый микрорайон — это Геленджик с той стороны, которую не видят отдыхающие. Не набережная и не пляж, а обычная жилая, «городская» часть курорта, где люди живут круглый год: дома, магазины, школы, повседневный ритм. Для тех, кто переезжает в Геленджик насовсем, а не ради сезона, именно такие районы часто оказываются практичнее приморского центра.",
+      "housing": "Здесь больше жилой застройки многоквартирного типа и меньше курортной наценки «за близость к морю». Купить квартиру в Пятом микрорайоне обычно выходит рациональнее по бюджету, чем у набережной, — а до моря из любой точки компактного Геленджика в любом случае не так далеко, как в большом городе.",
+      "infrastructure": "",
+      "audience": "Кому подходит: тем, кто выбирает Геленджик для постоянной жизни; семьям, которым важнее школы, сады и повседневное удобство, чем вид на бухту; покупателям, для которых важен разумный бюджет и круглогодичная инфраструктура.",
+      "caveats": "Что учитывать:\n\n— Это не «морской» район в открыточном смысле — сюда едут за нормальной жизнью, а не за видом из окна.\n— Инфраструктура повседневная — проверьте, что именно рядом с конкретным адресом.\n— Сезон. Даже в жилых районах курортного города летом становится многолюднее — имейте в виду.",
+      "conclusion": "Если Геленджик для вас — место жить, а не только отдыхать, Пятый микрорайон и подобные ему жилые районы стоит посмотреть в первую очередь: они дают более устойчивый, круглогодичный уклад по более спокойной цене.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:16:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 20,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.526Z",
+      "updated_at": "2026-07-18T23:34:45.526Z",
+      "district": 149,
+      "neighborhood": null,
+      "title": "Кабардинка: посёлок в уютной бухте под Геленджиком",
+      "slug": "kabardinka-gelendzhik",
+      "excerpt": "Кабардинка — курортный посёлок между Новороссийском и Геленджиком в закрытой бухте. Чем он привлекает тех, кто ищет жильё у моря вне города.",
+      "intro": "Кабардинка лежит в уютной бухте между Новороссийском и Геленджиком, и её главное обаяние — в спокойствии. Это курортный посёлок, но по ритму он заметно тише самого Геленджика: сюда едут за морем без большого городского шума. Закрытое положение бухты защищает от ветров и добавляет ощущение камерности.",
+      "housing": "При этом Кабардинка — не глухая деревня, а обжитой курортный посёлок со своей набережной, курортной инфраструктурой и сложившейся жизнью. Это удачный баланс для тех, кто хочет быть у моря, иметь под рукой всё необходимое для отдыха, но не жить в гуще большого курорта. Недвижимость здесь берут и под сезонный отдых, и под постоянную жизнь, и с прицелом на сдачу летом.",
+      "infrastructure": "",
+      "audience": "Кому подойдёт Кабардинка: тем, кто ищет более тихую альтернативу центру Геленджика; покупателям второго дома у моря; тем, кому важна близость и к Геленджику, и к Новороссийску одновременно.",
+      "caveats": "О чём помнить при покупке у моря в посёлке:\n\n— Сезонность. Летом посёлок оживает, зимой затихает — продумайте, как будете пользоваться жильём вне сезона и что работает круглый год.\n— Прибрежный климат. Влажность влияет на жильё — смотрите на состояние отделки и вентиляцию.\n— Содержание. Второй дом требует внимания круглый год; заранее решите, кто присмотрит за ним в межсезонье.",
+      "conclusion": "Кабардинка — один из самых приятных вариантов «у моря, но спокойно» на этом участке побережья: курортная жизнь есть, а суеты большого города — нет.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:15:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 21,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.529Z",
+      "updated_at": "2026-07-18T23:34:45.529Z",
+      "district": 150,
+      "neighborhood": null,
+      "title": "Дивноморское под Геленджиком: сосны, море и семейный отдых",
+      "slug": "divnomorskoe-gelendzhik",
+      "excerpt": "Дивноморское — популярный посёлок южнее Геленджика, известный сосновыми лесами у моря и спокойным характером. Чем он привлекает покупателей.",
+      "intro": "Дивноморское — один из самых любимых посёлков на побережье южнее Геленджика, и любят его во многом за сосны. Реликтовые сосновые леса подходят здесь почти к самому морю, и это сочетание хвойного воздуха и побережья создаёт особую, оздоровительную атмосферу. Место с давней курортной репутацией и спокойным, семейным характером.",
+      "housing": "Посёлок относительно близок к Геленджику, так что городская инфраструктура остаётся в досягаемости, а сам он при этом заметно тише и «природнее». Для покупателя это привлекательный баланс: чистый воздух, море, сосны — и не полная оторванность от города. Недвижимость в Дивноморском рассматривают под сезонный отдых, постоянную жизнь и сдачу.",
+      "infrastructure": "",
+      "audience": "Кому подойдёт: семьям, ценящим спокойный отдых и природу; тем, кому важен воздух и хвойные леса рядом с морем; покупателям, ищущим более размеренную альтернативу городскому курорту.",
+      "caveats": "Что учитывать:\n\n— Сезонность и межсезонье — как и везде на побережье, продумайте круглогодичную сторону.\n— Реальную близость к морю и к соснам от конкретного объекта — проверяйте на месте.\n— Инфраструктуру вне сезона — что работает зимой.",
+      "conclusion": "Если вам близка идея «сосны у моря» и спокойный семейный ритм, Дивноморское — один из первых посёлков, которые стоит посмотреть под Геленджиком.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:14:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 22,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.533Z",
+      "updated_at": "2026-07-18T23:34:45.533Z",
+      "district": 151,
+      "neighborhood": null,
+      "title": "Архипо-Осиповка: самостоятельный курорт на краю Геленджикского округа",
+      "slug": "arhipo-osipovka-gelendzhik",
+      "excerpt": "Архипо-Осиповка — крупный курортный посёлок с широкой пляжной зоной и собственной курортной жизнью. Для тех, кто ищет автономный курорт у моря.",
+      "intro": "Архипо-Осиповка стоит особняком среди окрестностей Геленджика — и в прямом, и в переносном смысле. Это довольно удалённый от города посёлок, но при этом крупный и самодостаточный: со своей широкой пляжной зоной, развитой курортной инфраструктурой и полноценной летней жизнью. По сути, это самостоятельный курорт, а не пригород Геленджика.",
+      "housing": "Именно автономность и делает Архипо-Осиповку привлекательной для определённого покупателя. Здесь не нужно ездить в город за курортными удобствами — всё своё. Долина реки, широкий пляж, обжитая курортная среда. Недвижимость берут под сезонный отдых, сдачу в высокий сезон и постоянную жизнь у моря вдали от городской суеты.",
+      "infrastructure": "",
+      "audience": "Кому подойдёт: тем, кто хочет «свой» самодостаточный курорт, а не близость к Геленджику; покупателям, ориентированным на летнюю сдачу в раскрученном курортном месте; тем, кого не смущает удалённость от города ради простора и автономности.",
+      "caveats": "О чём честно стоит подумать:\n\n— Расстояние до Геленджика заметное — оцените, насколько для вас важна близость к городу и как организована дорога.\n— Ярко выраженная сезонность. Летом — полноценный курорт, зимой — заметно тише; продумайте межсезонье.\n— Инфраструктура вне сезона — уточните, что работает круглый год.",
+      "conclusion": "Архипо-Осиповка — выбор для тех, кому нужен полноценный курорт со своим характером и кто сознательно предпочитает автономность близости к городу.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:13:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 23,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.536Z",
+      "updated_at": "2026-07-18T23:34:45.536Z",
+      "district": 154,
+      "neighborhood": null,
+      "title": "Джанхот под Геленджиком: тихий посёлок среди сосен и скал",
+      "slug": "dzhankhot-gelendzhik",
+      "excerpt": "Джанхот — небольшой живописный посёлок южнее Геленджика с сосновыми склонами и уединённой атмосферой. Для ценителей тишины у моря.",
+      "intro": "Джанхот — маленький и живописный посёлок недалеко от Дивноморского, спрятанный среди сосновых склонов у моря. Он куда камернее крупных курортов побережья, и в этом вся суть: сюда едут за тишиной, природой и уединением, а не за курортной движухой. Пицундская сосна, склоны, небольшая бухта — атмосфера здесь особая, почти заповедная.",
+      "housing": "Для покупателя Джанхот — это история про природу и покой, а не про инфраструктуру и масштаб. Посёлок небольшой, поэтому и выбор объектов ограниченнее, и повседневных удобств меньше, чем в городе или на крупных курортах. Зато то, чего здесь в избытке — тишина и красота места — не купишь в оживлённом центре.",
+      "infrastructure": "",
+      "audience": "Кому подойдёт: тем, кто осознанно ищет уединение у моря; покупателям дачи или второго дома для спокойного отдыха на природе; ценителям сосновых лесов и негромкого побережья.",
+      "caveats": "Что важно учитывать:\n\n— Небольшой размер и удалённость означают более скромную повседневную инфраструктуру — оцените, готовы ли вы к этому.\n— Межсезонье в маленьком посёлке особенно тихое — продумайте, как будете пользоваться жильём зимой.\n— Дорога до города и крупных посёлков — спланируйте логистику заранее.",
+      "conclusion": "Джанхот — для тех, кто ставит тишину, сосны и уединение выше близости к курортной инфраструктуре. Если это про вас, посёлок стоит посмотреть.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:12:45.429Z"
+    }
+  },
+  {
+    "model": "locations.districtguide",
+    "pk": 24,
+    "fields": {
+      "created_at": "2026-07-18T23:34:45.540Z",
+      "updated_at": "2026-07-18T23:34:45.540Z",
+      "district": 152,
+      "neighborhood": null,
+      "title": "Криница под Геленджиком: спокойный посёлок у моря",
+      "slug": "krinitsa-gelendzhik",
+      "excerpt": "Криница — небольшой приморский посёлок южнее Геленджика со спокойным укладом. Для тех, кто ищет тихое место у моря вдали от крупных курортов.",
+      "intro": "Криница — небольшой посёлок на побережье южнее Геленджика, из тех мест, что живут спокойной, негромкой жизнью. Это не раскрученный курорт, а тихий приморский уголок, и едут сюда именно за этим: за морем без толп, за размеренностью, за ощущением, что ты немного в стороне от суеты.",
+      "housing": "Как и другие небольшие посёлки этого участка побережья, Криница предлагает покупателю прежде всего природу и покой, а не масштаб инфраструктуры. Выбор недвижимости здесь скромнее, чем в городе или на крупных курортах, а повседневных удобств меньше — это честная плата за тишину и уединённость.",
+      "infrastructure": "",
+      "audience": "Кому подойдёт: тем, кто ищет тихое место для отдыха или неспешной жизни у моря; покупателям второго дома, для которых важнее природа, чем курортная инфраструктура.",
+      "caveats": "О чём помнить:\n\n— Скромная инфраструктура и небольшой размер — оцените, комфортно ли вам это.\n— Сезонность и межсезонье — как и везде на побережье, продумайте, как будете пользоваться жильём вне лета.\n— Логистику до города — спланируйте дорогу до Геленджика и крупных посёлков.",
+      "conclusion": "Криница — вариант для ценителей тишины у моря, готовых обменять курортную инфраструктуру на спокойствие и близость к природе.",
+      "cover_image": "",
+      "status": "published",
+      "published_at": "2026-07-18T23:11:45.429Z"
+    }
+  }
+]

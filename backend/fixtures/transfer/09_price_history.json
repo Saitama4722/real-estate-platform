@@ -1,0 +1,29 @@
+[
+  {
+    "model": "properties.pricehistory",
+    "pk": 1,
+    "fields": {
+      "property": 18,
+      "price": "1100000.00",
+      "changed_at": "2026-06-29T21:44:44.478Z"
+    }
+  },
+  {
+    "model": "properties.pricehistory",
+    "pk": 28,
+    "fields": {
+      "property": 18,
+      "price": "4500000.00",
+      "changed_at": "2026-07-04T01:44:35.603Z"
+    }
+  },
+  {
+    "model": "properties.pricehistory",
+    "pk": 30,
+    "fields": {
+      "property": 18,
+      "price": "5000000.00",
+      "changed_at": "2026-07-04T01:56:06.917Z"
+    }
+  }
+]

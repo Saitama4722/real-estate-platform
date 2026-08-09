@@ -1,0 +1,53 @@
+[
+  {
+    "model": "properties.propertyphoto",
+    "pk": 2,
+    "fields": {
+      "created_at": "2026-06-29T21:44:44.862Z",
+      "updated_at": "2026-08-03T01:05:25.646Z",
+      "property": 18,
+      "original_file": "properties/photos/Скриншот-20260630-004259.jpg",
+      "image_large": "properties/photos/large/photo_2_large.jpg",
+      "image_medium": "properties/photos/medium/photo_2_medium.jpg",
+      "image_thumb": "properties/photos/thumb/photo_2_thumb.jpg",
+      "sort_order": 0,
+      "is_main": true,
+      "mime_type": "image/jpeg",
+      "file_size": 53461
+    }
+  },
+  {
+    "model": "properties.propertyphoto",
+    "pk": 3,
+    "fields": {
+      "created_at": "2026-06-29T21:44:45.501Z",
+      "updated_at": "2026-07-02T12:40:17.926Z",
+      "property": 18,
+      "original_file": "properties/photos/Скриншот-20260630-004249.jpg",
+      "image_large": "properties/photos/large/photo_3_large.jpg",
+      "image_medium": "properties/photos/medium/photo_3_medium.jpg",
+      "image_thumb": "properties/photos/thumb/photo_3_thumb.jpg",
+      "sort_order": 1,
+      "is_main": false,
+      "mime_type": "image/jpeg",
+      "file_size": 56005
+    }
+  },
+  {
+    "model": "properties.propertyphoto",
+    "pk": 4,
+    "fields": {
+      "created_at": "2026-06-29T21:44:45.654Z",
+      "updated_at": "2026-07-02T12:40:18.062Z",
+      "property": 18,
+      "original_file": "properties/photos/Скриншот-20260629-235134_WJB3QJP.jpg",
+      "image_large": "properties/photos/large/photo_4_large.jpg",
+      "image_medium": "properties/photos/medium/photo_4_medium.jpg",
+      "image_thumb": "properties/photos/thumb/photo_4_thumb.jpg",
+      "sort_order": 2,
+      "is_main": false,
+      "mime_type": "image/jpeg",
+      "file_size": 169900
+    }
+  }
+]
