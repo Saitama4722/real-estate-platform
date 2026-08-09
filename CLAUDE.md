@@ -2404,6 +2404,171 @@ Index of what changed this session; details live in the linked sections above.
   read somewhere does **not** mean it's editable — verify the write path
   (serializers + views) before assuming a "missing" UI is just a frontend gap.
 
+## ⭐ Cloudflare R2 media storage (2026-08-09)
+
+`MEDIA_STORAGE_BACKEND=r2` is now live locally, all 16 media objects are in the
+bucket, and every media URL in every API response comes from one helper.
+
+### Two management commands — NEITHER existed before this date
+
+There was **no** R2 tooling of any kind: the only management commands were
+`create_initial_admin`, the `seed_*` family and `generate_article_covers`
+`[measured]`. In particular **`check_r2` has never existed** — if a prompt or a
+note refers to it, that name is folklore.
+
+- **`python manage.py check_media_storage`** — proves the credentials work
+  **without uploading anything**: `HeadBucket` + `ListObjectsV2` only. Prints the
+  resolved config with the secret masked, validates it before touching the
+  network, and maps failures to causes (403 → wrong key or a token not scoped to
+  the bucket; 404 → wrong bucket name or account endpoint). Runs fine while
+  `MEDIA_STORAGE_BACKEND=local`, so credentials can be checked before switching.
+- **`python manage.py migrate_media_to_r2`** — **dry run by default**; uploads
+  only with `--execute`. Discovers every `FileField`/`ImageField` on every
+  installed model, so a new model with an upload field is covered without editing
+  it. Object keys are the exact DB values, so **no rows change** and the switch
+  is just an env var afterwards. Useful flags: `--limit N`, `--model app.Model`,
+  `--overwrite`, `--skip-remote-check`.
+  - It deliberately does **not** build its storage through
+    `default_storages_entry()`, because that function requires
+    `AWS_S3_CUSTOM_DOMAIN` (needed to SERVE files, not to upload them) and would
+    otherwise block the migration on an unrelated variable.
+
+### ⚠ 16 unreferenced files sit in MEDIA_ROOT and are deliberately NOT uploaded
+
+The dry run reports them separately: **16 referenced files (5.0 MB) uploaded, and
+16 more files on disk that no DB row points at** `[measured]`. Those are orphans
+(see the deletion section below for where orphans come from) and uploading them
+would mean paying to store files nothing can ever render. If a count ever has to
+be reconciled, that is the gap — it is intentional, not a bug.
+
+### ONE helper builds every media URL — `common/media_urls.py`
+
+**The real divergence was NOT "public serializer vs CRM serializer vs mobile
+sizes"** (there is no separate mobile-size code path at all — `image_large` /
+`image_medium` / `image_thumb` are just fields on the same serializer). Measured,
+it was **two** patterns across ten sites:
+
+| Pattern | Sites | Under r2 | Under local |
+| --- | --- | --- | --- |
+| `request.build_absolute_uri(f.url)` | 7 custom methods + DRF's own `ImageField` on the 4 CRM photo fields | R2 URL | `http://<backend-host>/media/…` — **leaks the private Django host** |
+| bare `f.url` | 3 avatar sites | R2 URL | `/media/…` |
+
+Under r2 the two agree **by accident**: `build_absolute_uri` is a no-op on a URL
+that already has a scheme and host `[measured]`. That is why the split stayed
+invisible until the local path was examined.
+
+- **`media_url(file_field)` returns `FieldFile.url` verbatim**, and
+  `MediaURLField` does the same for model fields. Nothing inspects
+  `MEDIA_STORAGE_BACKEND` — the storage already encodes it, and duplicating that
+  decision is exactly what produced the split.
+- **⚠ NEVER wrap it in `request.build_absolute_uri()`.** Under r2 harmless, under
+  local it re-introduces the host leak.
+- Verified `[measured]`: 13 media-emitting fields across 10 serializers, probed
+  under **both** backends with a request in context — absolute R2 under `r2`,
+  relative `/media/…` under `local`, **0 backend-host leaks in both**. Article
+  covers, guide covers and sale-request photos are **code-verified only** — no
+  rows in the DB carry those files.
+- **Consequence to know:** `propertyStructuredData.ts` filters JSON-LD images to
+  absolute URLs, so under **local** the `image` array is now empty. No real loss
+  — the previous value was a backend-host URL no crawler could fetch — and under
+  r2 it is correct.
+
+### The "localhost URL despite r2 being active" symptom was the NEXT.JS CACHE
+
+**It was not the `/media/` proxy in next.config.ts.** That rule was measured and
+is not the cause; it was not changed, and it should **stay unconditional**:
+
+- it is **required** under `local` (a relative `/media/…` only resolves because
+  Next proxies it to Django) and it is the rollback path;
+- making it conditional means giving the frontend its own copy of the backend's
+  storage setting — a second source of truth that can drift, which is the same
+  class of mistake as the seven `build_absolute_uri` sites;
+- under r2 nothing emits a relative `/media/…` any more, so the only callers left
+  are stale caches and old bookmarks, for which a 404 is the honest answer.
+
+**The actual cause:** Next's on-disk data cache (`.next/cache/fetch-cache`) was
+replaying a payload fetched before the switch. The relative `/media/…` in that
+payload is turned into `http://localhost:3001/media/…` **by the browser**,
+resolving it against the document origin — no application code concatenates
+anything. `[measured]`: 171 cache entries, 160 written before the switch, one
+still carrying `/media/properties/photos/medium/photo_2_medium.jpg` from the
+previous day; the file survives a Django restart, which is why restarting the
+backend never helped. **The port is the tell — Django never emits `:3001`.**
+Fetch any affected page 2–3 times to burn it (same rule already recorded for
+fixture cleanup and post-migration payloads).
+
+Also worth knowing: once `MEDIA_URL` contains `://`,
+`django.conf.urls.static.static()` returns an empty list, so **Django stops
+serving `/media/` entirely** — stale relative URLs 404 rather than silently
+working `[measured]`.
+
+### ⛔ DELETING A ROW DOES NOT DELETE THE OBJECT — measured against the real bucket
+
+**There is no `post_delete` signal, no `django-cleanup`, and no `delete()`
+override anywhere** `[measured]`. `perform_destroy` calls plain
+`instance.delete()`, and Django has not deleted files on model delete since 1.3.
+Verified live against the production-destined bucket, baseline 16 objects:
+
+| Action | Result in the bucket |
+| --- | --- |
+| Upload a photo (CRM path: `save()` + derivative task) | 16 → **20** objects (original + 3 derivatives) |
+| Delete the photo row (`instance.delete()`, what `perform_destroy` calls) | row gone, **4 of 4 objects still present — ORPHANED** |
+| Replace a user avatar | **old avatar still present** |
+
+**This is a real cost/PII issue for production, not a theoretical one:** every
+deleted listing photo and every replaced avatar leaves bytes in R2 forever, and a
+deleted photo stays publicly fetchable at its URL because the bucket is public.
+It is also where the 16 unreferenced local files came from. **Nothing has been
+built to fix this yet** — the options are a `post_delete` receiver per model,
+`django-cleanup`, or a periodic reaper that diffs bucket keys against DB values
+(`migrate_media_to_r2` already computes exactly that diff).
+
+- **A failed remote delete cannot break the database delete** `[measured]` — the
+  delete path never touches storage, so there is nothing to fail.
+- **⚠ But the ONE path that does delete remotely is unguarded.**
+  `_clear_derivative_image_fields()` (models.py, called from `save()` when the
+  original file changes, and from `properties/tasks.py`) calls
+  `field.delete(save=False)` and **propagates the exception** — a simulated R2
+  failure raised `OSError` straight out to the caller `[measured]`. On local disk
+  a delete practically never fails; against R2 it is a network call. A transient
+  failure there would 500 a photo re-upload.
+- **This also corrects the old incident note.** The 2026-08-03 loss of #18's
+  derivatives is recorded under "A test fixture must NEVER reference a real
+  object's file paths" as having happened when the fixture was **deleted**. That
+  cannot be right — delete removes no files. The mechanism was
+  `_clear_derivative_image_fields()` running on **save**, which deletes exactly
+  `image_large`/`image_medium`/`image_thumb` and leaves `original_file` — which is
+  precisely what #18 lost `[inferred, from the two measured facts above]`. The
+  fixture rule itself stands unchanged and matters just as much.
+
+### ⚠ LOCAL DEV WITH `MEDIA_STORAGE_BACKEND=r2` WRITES TO THE PRODUCTION BUCKET
+
+There is one bucket and one set of credentials. A photo uploaded while poking at
+the CRM locally lands in the same place production will read from, under the same
+key namespace, and — because deletion does not clean up (above) — **removing the
+row afterwards does not remove the object.** Test uploads must be cleaned out of
+the bucket explicitly, by key.
+
+- The safe protocol, used for the deletion test above: snapshot the bucket key
+  set BEFORE, give every fixture its OWN bytes at a fixture-only name, assert no
+  fixture key collides with a baseline key, and at the end delete only
+  `current − baseline`. Result `[measured]`: 26 objects at peak → back to
+  **exactly 16, set-equal to the baseline**, DB counts restored
+  (Property 1, PropertyPhoto 3, User 3), #18 untouched (5 000 000, 3 photos,
+  3 history rows).
+- If a separate `centreal-media-dev` bucket is ever created, that removes this
+  hazard entirely and is a two-variable change.
+
+### Custom domain later is an env-var change only
+
+`AWS_S3_CUSTOM_DOMAIN` (bare host, **no** `https://` prefix) is read from the
+environment at settings load and is what `file.url` and `MEDIA_URL` are built
+from. Pointing the bucket at a real domain is that variable plus a restart — **no
+migration and no DB change**, because rows store relative keys `[inferred from
+the settings code path; not exercised with a real custom domain]`. Caveat: pages
+and Next fetch-cache entries already rendered keep the old host until their
+revalidate window expires.
+
 ## Local dev / tooling
 
 - **Don't run one-off Django scripts via `manage.py shell < script.py`.** On this
