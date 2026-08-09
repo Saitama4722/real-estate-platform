@@ -18,12 +18,57 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-dev-key-change-in-production",
+# True when running on Railway. Several signals, because the guard below is a
+# security control and must not be disarmed by one variable changing name.
+IS_DEPLOYED = any(
+    os.environ.get(name, "").strip()
+    for name in ("RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "RAILWAY_SERVICE_ID")
 )
 
+# --- SECRET_KEY --------------------------------------------------------------
+# ⚠ THERE IS DELIBERATELY NO HARDCODED FALLBACK. This file is public, so any
+# literal committed here is a published signing key: whoever has it can forge
+# session cookies, password-reset tokens and anything else Django signs. A
+# fallback that "only applies in development" becomes the production key the
+# moment the variable name is misspelled — which is exactly how the previous
+# value went live.
+#
+# Deployed  -> the variable is REQUIRED; boot fails loudly without it.
+# Local     -> a random key is generated per process. Set DJANGO_SECRET_KEY in
+#              backend/.env if you want admin sessions to survive a restart.
+_secret_key = os.environ.get("DJANGO_SECRET_KEY", "").strip()
+if not _secret_key:
+    if IS_DEPLOYED:
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY is not set. Note the DJANGO_ prefix — a bare "
+            "SECRET_KEY variable is read by nothing. Generate one with:\n"
+            "  python -c \"from django.core.management.utils import "
+            'get_random_secret_key as k; print(k())"'
+        )
+    from django.utils.crypto import get_random_string
+
+    _secret_key = get_random_string(
+        50, "abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)"
+    )
+SECRET_KEY = _secret_key
+
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
+
+# --- Refuse to boot with debug on in a deployed environment ------------------
+# ⚠ DEBUG defaults to True when its variable is missing, and the variable this
+# code reads is `DJANGO_DEBUG`, WITH the prefix. Setting a bare `DEBUG` in the
+# hosting dashboard reads as if it worked, changes nothing, and leaves
+# production serving tracebacks with settings and environment values in them.
+if IS_DEPLOYED and DEBUG:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "DEBUG is True in a deployed environment. Set DJANGO_DEBUG=False — note "
+        "the DJANGO_ prefix; a bare DEBUG variable is read by nothing, so "
+        "deleting DJANGO_DEBUG turns debug back ON rather than off."
+    )
 
 
 def _csv_env_list(value):
