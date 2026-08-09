@@ -2569,6 +2569,120 @@ the settings code path; not exercised with a real custom domain]`. Caveat: pages
 and Next fetch-cache entries already rendered keep the old host until their
 revalidate window expires.
 
+## ⭐ Railway deployment: TWO services from ONE repo, and the names lie (2026-08-10)
+
+Railway is live now. The project holds **three** services: Postgres, plus two
+built from the **same** GitHub repo (`Saitama4722/real-estate-platform`) on the
+**same** branch (`design-system-audit`), differing only by root directory.
+
+| Railway service | Actually is | Root dir | Public domain |
+| --- | --- | --- | --- |
+| **`real-estate-platform`** | the **BACKEND** (Django) | `backend/` | `real-estate-platform-production-7ade.up.railway.app` |
+| **`loyal-miracle`** | the **FRONTEND** (Next.js) | `frontend/` | `loyal-miracle-production-cb88.up.railway.app` |
+
+- **⚠ `loyal-miracle` IS THE FRONTEND. It is not a stale fork. DO NOT DELETE IT.**
+  The name is Railway-generated and reads like an unrelated app; it was one
+  instruction away from being deleted on exactly that assumption.
+  - **How it was identified `[measured]`:** its deploy log contained
+    `[fetchPublicArticlesList] HTTP 500 …` — a bespoke log string that exists
+    only in `frontend/src/lib/publicArticles.ts` in this repo. That proves the
+    REPO but **not the branch** (the same line is on `main` too), so confirm the
+    branch from Settings → Source, never from a log line.
+- The service NAME matching the repo name is what makes this confusing: the
+  service called `real-estate-platform` is only the backend third of it.
+
+### ⚠ The `DJANGO_` prefix trap — cost a live insecure deploy
+
+`settings.py` reads **`DJANGO_SECRET_KEY`** and **`DJANGO_DEBUG`**. A bare
+`SECRET_KEY` or `DEBUG` in the Railway dashboard is **read by nothing**, and
+both settings default to their INSECURE value when unset — `DEBUG` to `True`,
+and `SECRET_KEY` formerly to a literal committed in this public repo. Deleting
+`DJANGO_DEBUG` therefore turns debug **on**.
+
+- **The hardcoded SECRET_KEY fallback is GONE.** Deployed environments must
+  supply `DJANGO_SECRET_KEY` or the process refuses to start; locally a random
+  key is generated per process. `backend/.env` now carries a local key so admin
+  sessions survive restarts.
+- A boot guard raises `ImproperlyConfigured` when deployed with `DEBUG` true or
+  no key. Deployment is detected from `RAILWAY_ENVIRONMENT` /
+  `RAILWAY_PROJECT_ID` / `RAILWAY_SERVICE_ID` — several signals, so renaming one
+  cannot disarm it.
+- **`collectstatic` imports settings**, so both `backend/Dockerfile` and
+  `backend/nixpacks.toml` pass a throwaway `DJANGO_SECRET_KEY` for that build
+  step only. Without it the image build can fail on a variable it never uses.
+- **Only DEBUG and SECRET_KEY carry the prefix.** `DJANGO_ALLOWED_HOSTS` does
+  too, but `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS` have **no** prefix.
+- Read by nothing, safe to delete: `DEBUG`, `SECRET_KEY`, `ALLOWED_HOSTS`,
+  `MEDIA_ROOT`, `MEDIA_URL`, `MEDIA_STORAGE`, `NEXT_PUBLIC_YANDEX_SUGGEST_API_KEY`,
+  and `POSTGRES_*` once `DATABASE_URL` is set.
+
+### ⚠ A HARDCODED PORT HAS CAUSED TWO SEPARATE OUTAGES
+
+Both presented as a total outage — Railway's edge returning
+`x-railway-fallback: true` with HTTP 502 on **every** path, which means no
+container is listening on the port the proxy targets. A Django 404 would come
+from Django; a platform 502 with that header means nothing answered.
+
+1. **Backend:** `PORT` was absent from the service variables, so
+   `--bind 0.0.0.0:${PORT:-8000}` fell back to 8000 while the proxy targeted
+   8080. The code was correct and the fix was a **variable**, not a commit.
+   (The variable may have been deleted during a cleanup because a note here
+   listed `PORT` under "Railway-provided — never set by hand", which reads as
+   "should not be present".)
+2. **Frontend:** `frontend/Dockerfile` existed only on this branch — the
+   **docker-compose dev image**, running `npm run dev -- -H 0.0.0.0 -p 3000`
+   with `NODE_ENV=development`. Its mere presence flipped Railway from its
+   Next.js builder to the Docker builder. `package.json` was never involved:
+   its scripts are byte-identical on both branches `[measured]`. Renamed to
+   **`Dockerfile.dev`**, with `docker-compose.yml` pointing at it explicitly.
+   **Do not rename it back.**
+
+- **RULE: prefer a start command containing NO port literal.** `next start`
+  reads `$PORT` itself; a templated `${PORT:-3000}` still leaves a number in the
+  tree waiting to go stale. Removing the number is what makes it drift-proof.
+- If a Dockerfile is renamed away, **check Settings → Build**: Railway may have
+  latched the Docker builder, and will then fail with "Dockerfile not found"
+  rather than falling back.
+
+### `BACKEND_URL`, not `BACKEND_INTERNAL_URL`
+
+Server-side data fetching uses **`BACKEND_URL`** and appends `/api`
+(`getPublicApiBaseUrl()` in `lib/publicProperty.ts`). `BACKEND_INTERNAL_URL` is
+read **only** by `next.config.ts` for proxy rewrites.
+
+- **⚠ `http://real-estate-platform:8000` is a docker-compose URL, not a Railway
+  one.** `docker-compose.yml` sets `BACKEND_URL: http://backend:8000` and
+  declares a network **alias literally named `real-estate-platform`**. Someone
+  carried that shape into Railway, where it worked **by coincidence** — the
+  Railway service happens to have the same name, and gunicorn happened to be
+  mis-bound to 8000. Fixing the port breaks it.
+- **Private networking needs an explicit port** — it is container-to-container
+  DNS with no port translation; the public edge is what maps 443 → target port.
+  Evidence `[measured]`: `:8000` was honoured literally and connected only while
+  gunicorn was on 8000. Drift-proof form:
+  `http://${{real-estate-platform.RAILWAY_PRIVATE_DOMAIN}}:${{real-estate-platform.PORT}}`.
+- **`NEXT_PUBLIC_API_URL` must be the PUBLIC backend URL** — the browser cannot
+  resolve a private hostname.
+- **`NEXT_PUBLIC_SITE_URL` is the FRONTEND's own public domain**, and it is read
+  at **build** time: the build dies at `/sitemap.xml` prerender without it
+  `[measured]`, and changing it later needs a rebuild, not a restart.
+
+### Verified in production `[measured]` 2026-08-10
+
+- **`DEBUG` is off.** An unknown path returns a 179-byte plain "Not Found" with
+  zero debug-page markers; Django's debug 404 is a large page naming the URLconf.
+- **The API answers**: `GET /api/properties/` → HTTP 200. It returns `[]` — the
+  production database has no rows yet, which is expected until the transfer
+  fixtures are loaded.
+- **Latency**, 10 requests 3s apart from a Russian client to the `ams1` edge:
+  first **1.19s**, steady state **0.46–0.57s**, mean **0.58s**. The first request
+  cost roughly +0.6s over steady state.
+  **⚠ This is NOT a true cold start** — the service had just been deployed and
+  exercised, and a sleeping database cannot be forced from outside. A genuinely
+  sleeping Postgres would show multiple seconds or an `OperationalError`, since
+  Django does not retry a failed connect. Re-measure after a real idle period
+  before concluding anything about the sleep setting.
+
 ## Local dev / tooling
 
 - **Don't run one-off Django scripts via `manage.py shell < script.py`.** On this
