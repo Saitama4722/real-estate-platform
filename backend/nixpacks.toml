@@ -1,6 +1,10 @@
 # Railway / Nixpacks: gather static files into STATIC_ROOT for WhiteNoise when not using Docker.
 [phases.build]
-cmds = ["python manage.py collectstatic --noinput"]
+# The throwaway key mirrors the Dockerfile: collectstatic imports settings, which
+# refuse to start in a deployed environment without DJANGO_SECRET_KEY, and build
+# time is not guaranteed to have the service variables. Scoped to this command;
+# never the runtime key.
+cmds = ["DJANGO_SECRET_KEY=build-step-only-never-used-at-runtime python manage.py collectstatic --noinput"]
 
 [start]
 # Bind to Railway-injected $PORT (falls back to 8000 for local dev).
