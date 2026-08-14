@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon, Icons } from "@/components/ui/icon";
 import { CatalogSelect, type CatalogSelectOption } from "@/components/catalog/CatalogSelect";
 import {
@@ -36,6 +36,20 @@ interface CatalogFilterPanelProps {
   onPatch: (patch: Partial<CatalogFilterState>) => void;
   onRemoveChip: (chip: CatalogChip) => void;
   onResetAll: () => void;
+  /**
+   * Overrides what «Показать объявления» does. Receives the still-uncommitted
+   * draft patch (null when nothing is pending) INSTEAD of it being applied via
+   * onPatch, so a caller that navigates can fold the drafts into the very URL
+   * it pushes. Committing first and navigating after would read state that has
+   * not re-rendered yet and silently drop the last edit — the same
+   * two-calls-in-one-tick hazard the sheet's merged patch avoids.
+   *
+   * Omitted on /catalog, where the default (commit + scroll to results) is
+   * correct because the results are already on the page.
+   */
+  onSubmit?: (pending: Partial<CatalogFilterState> | null) => void;
+  /** Secondary controls rendered left of «Показать объявления». */
+  extraActions?: ReactNode;
 }
 
 /** Draft keys: text inputs commit on blur/Enter/submit, never per keystroke. */
@@ -89,6 +103,8 @@ export function CatalogFilterPanel({
   onPatch,
   onRemoveChip,
   onResetAll,
+  onSubmit,
+  extraActions,
 }: CatalogFilterPanelProps) {
   const f = state.filters;
   const [drafts, setDrafts] = useState<PanelDrafts>(() => draftsFrom(f));
@@ -156,6 +172,10 @@ export function CatalogFilterPanel({
   };
 
   const submit = () => {
+    if (onSubmit) {
+      onSubmit(pendingDraftPatch());
+      return;
+    }
     commitDrafts();
     const results = document.getElementById("catalog-results");
     if (results) {
@@ -412,6 +432,7 @@ export function CatalogFilterPanel({
             className={cn("text-gray-400 transition-transform", moreOpen && "rotate-180")}
           />
         </button>
+        {extraActions}
         <button
           type="button"
           onClick={submit}

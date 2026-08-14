@@ -1,13 +1,16 @@
 import type { LucideIcon } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { HeroHeadlines } from "@/components/home/HeroHeadlines";
-import { SearchBar } from "@/components/home/SearchBar";
+import { HomeHeroSearch } from "@/components/home/HomeHeroSearch";
 import { Icons } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import type { HomepageTextMap } from "@/lib/homepageTextBlocks";
+import type { CatalogLocationData } from "@/lib/publicLocations";
 
 interface HeroSectionProps {
   homepageText: Pick<HomepageTextMap, "hero_title" | "hero_subtitle">;
+  /** Server-fetched location dictionaries for the search panel. */
+  locationData: CatalogLocationData;
 }
 
 type Depth = "back" | "mid" | "front";
@@ -99,14 +102,14 @@ function HeroField() {
   );
 }
 
-export function HeroSection({ homepageText }: HeroSectionProps) {
+export function HeroSection({ homepageText, locationData }: HeroSectionProps) {
   return (
     <>
       {/*
        * `.ctr-hero` carries the navy gradient plus the two radial highlights. It
        * deliberately has NO overflow clipping and NO isolation of its own — see
        * the note on `.ctr-hero` in globals.css for why either would re-break the
-       * SearchBar's District dropdown. The clipping that IS needed lives on the
+       * search panel's District combobox. The clipping that IS needed lives on the
        * decorative `.ctr-hero__field` layer, which also stops the wide
        * right-hand icons from widening the document.
        *
@@ -143,7 +146,7 @@ export function HeroSection({ homepageText }: HeroSectionProps) {
        */}
       <div className="relative z-[1] -mt-23 md:-mt-[118px]">
         <Container>
-          <SearchBar variant="hero" />
+          <HomeHeroSearch locationData={locationData} />
         </Container>
       </div>
     </>

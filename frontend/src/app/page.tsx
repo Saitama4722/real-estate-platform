@@ -10,6 +10,7 @@ import { HomeInquiryCard } from "@/components/home/HomeInquiryCard";
 import { fetchPublicArticlesList, listArticlesSorted } from "@/lib/publicArticles";
 import { fetchPublicPropertiesList } from "@/lib/publicPropertyList";
 import { fetchHomepageTextBlockMap } from "@/lib/homepageTextBlocks";
+import { fetchCatalogLocationData } from "@/lib/publicLocations";
 
 const categories: HomeCategory[] = [
   {
@@ -49,10 +50,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [catalogItems, articlesRaw, hp] = await Promise.all([
+  const [catalogItems, articlesRaw, hp, locationData] = await Promise.all([
     fetchPublicPropertiesList(),
     fetchPublicArticlesList(),
     fetchHomepageTextBlockMap(),
+    // Same server-side dictionaries the catalog uses, so the hero's Город and
+    // Район controls are populated in the SSR HTML instead of after a
+    // browser round-trip through the /api rewrite.
+    fetchCatalogLocationData(),
   ]);
 
   const articles = listArticlesSorted(articlesRaw)
@@ -63,6 +68,7 @@ export default async function HomePage() {
     <>
       <HeroSection
         homepageText={{ hero_title: hp.hero_title, hero_subtitle: hp.hero_subtitle }}
+        locationData={locationData}
       />
       <HomeCatalogExplorer
         properties={catalogItems}

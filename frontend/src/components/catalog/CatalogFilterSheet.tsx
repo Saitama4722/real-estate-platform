@@ -29,6 +29,14 @@ interface CatalogFilterSheetProps {
   onPatch: (patch: Partial<CatalogFilterState>) => void;
   onResetAll: () => void;
   onClose: () => void;
+  /**
+   * Overrides «Показать объявления». Receives the SAME merged patch the
+   * default path would have applied, so a navigating caller folds it into the
+   * pushed URL instead of committing and then reading not-yet-rerendered
+   * state. Same contract as the desktop panel's `onSubmit`; the sheet still
+   * closes afterwards.
+   */
+  onSubmit?: (pending: Partial<CatalogFilterState>) => void;
 }
 
 const FOCUSABLE =
@@ -54,6 +62,7 @@ export function CatalogFilterSheet({
   onPatch,
   onResetAll,
   onClose,
+  onSubmit,
 }: CatalogFilterSheetProps) {
   const f = state.filters;
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -608,7 +617,11 @@ export function CatalogFilterSheet({
               const patch: Partial<CatalogFilterState> = pendingAreaPatch();
               if (priceMin !== f.priceMin) patch.priceMin = priceMin;
               if (priceMax !== f.priceMax) patch.priceMax = priceMax;
-              if (Object.keys(patch).length > 0) onPatch(patch);
+              if (onSubmit) {
+                onSubmit(patch);
+              } else if (Object.keys(patch).length > 0) {
+                onPatch(patch);
+              }
               onClose();
             }}
             className="h-12 w-full rounded-xl bg-brand text-[15px] font-semibold text-white transition-colors hover:bg-brand-hover focus-ring-brand"
