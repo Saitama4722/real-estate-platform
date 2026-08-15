@@ -7,6 +7,7 @@ import { FavoritesProvider } from "@/lib/favorites";
 import { CompareProvider } from "@/lib/compare";
 import { CompareBar } from "@/components/compare/CompareBar";
 import { RevealController } from "@/components/layout/RevealController";
+import { NavigationProgress } from "@/components/layout/NavigationProgress";
 import { SiteChrome } from "@/components/layout/SiteChrome";
 
 /**
@@ -41,6 +42,10 @@ export default function RootLayout({
             {/* Renders nothing; arms the section reveal and the compact header.
                 Must stay mounted for both — see RevealController. */}
             <RevealController />
+            {/* Fills the silent gap between a nav click and the RSC payload
+                arriving. Renders an overlay only while a pathname change is in
+                flight — see NavigationProgress. */}
+            <NavigationProgress />
             {/* Auth routes are full-bleed split screens with their own
                 branding, so the site chrome is withheld there. Header/Footer
                 are still SERVER-rendered and passed through as slots. */}
