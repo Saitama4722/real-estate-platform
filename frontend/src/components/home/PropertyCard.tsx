@@ -8,6 +8,14 @@ import { CompareToggleButton } from "@/components/compare/CompareToggleButton";
 import { Icon, Icons } from "@/components/ui/icon";
 import type { LucideIcon } from "lucide-react";
 import type { ComparePropertyType } from "@/lib/compare";
+import {
+  formatArea,
+  formatAreaNumber,
+  propertyTypeLabel,
+  PROPERTY_TYPE_ICON,
+  type AreaField,
+  type PropertyTypeValue,
+} from "@/lib/propertyArea";
 
 interface PropertyCardProps {
   slug?: string;
@@ -56,29 +64,36 @@ interface PropertyCardProps {
   /** Property type — required alongside compareId for the same-type constraint. */
   compareType?: ComparePropertyType;
   /* ---- Structured specs: drive the iconed spec line ---------------------- */
+  /**
+   * Property type — drives the leading «Квартира / Дом / Участок / Коммерция»
+   * item of the spec line. Separate from `compareType`, which exists for the
+   * comparison constraint; keeping them apart stops a display concern from
+   * riding on a feature flag.
+   */
+  propertyType?: PropertyTypeValue;
   /** Room count (apartments). */
   rooms?: number;
-  /** Area in m² — total area for flats/commercial, plot area (сот.) for land. */
+  /** The headline area value. Its UNIT comes from `areaField`, never a default. */
   area?: number;
+  /**
+   * ⚠ WHICH FIELD `area` CAME FROM. Without it the card cannot know whether the
+   * number is м² or сотки — which is exactly how a plot of 8 соток rendered as
+   * «8 м²». Absent ⇒ the area is not rendered at all rather than guessed.
+   */
+  areaField?: AreaField;
+  /** A house's plot size in соток, shown in addition to its own area. */
+  landArea?: number;
   /** Floor the unit is on. Rendered only together with totalFloors. */
   floor?: number;
   /** Floors in the building. Rendered only together with floor. */
   totalFloors?: number;
 }
 
-/**
- * "45.00" → "45", "45.5" → "45,5". The API sends decimals as strings that the
- * mappers coerce with Number(), so trailing ".00" is common; a Russian decimal
- * comma is used for the rare fractional value.
- */
-function formatSpecNumber(value: number): string {
-  if (Number.isInteger(value)) return String(value);
-  return String(Number(value.toFixed(2))).replace(".", ",");
-}
-
 interface SpecItem {
   icon: LucideIcon;
   text: string;
+  /** The type item — same row, one step darker so it reads as the heading fact. */
+  lead?: boolean;
 }
 
 /**
@@ -88,20 +103,54 @@ interface SpecItem {
  * to a single area item without a per-type branch.
  */
 function buildSpecs({
+  propertyType,
   rooms,
   area,
+  areaField,
+  landArea,
   floor,
   totalFloors,
 }: Pick<
   PropertyCardProps,
-  "rooms" | "area" | "floor" | "totalFloors"
+  "propertyType" | "rooms" | "area" | "areaField" | "landArea" | "floor" | "totalFloors"
 >): SpecItem[] {
   const specs: SpecItem[] = [];
+
+  /*
+   * ⭐ THE TYPE LEADS THE ROW.
+   *
+   * Placement rationale: the four photo corners are spoken for — top-left is
+   * «Цена снижена»/«Новый объект», top-right is the heart + compare pair,
+   * bottom-left is the market badge — so a fifth overlay would have to fight
+   * one of them, and would sit on the grey placeholder on photoless cards.
+   * The spec row is in the card BODY, so it CANNOT collide with any badge no
+   * matter how many a card carries, it is always visible, and it completes the
+   * row's job: the row already says how big and which floor, it just never said
+   * WHAT. Reading order stays price → specs → address.
+   */
+  const typeText = propertyTypeLabel(propertyType);
+  if (typeText && propertyType) {
+    specs.push({
+      icon: Icons[PROPERTY_TYPE_ICON[propertyType] as keyof typeof Icons] as LucideIcon,
+      text: typeText,
+      lead: true,
+    });
+  }
+
   if (rooms != null) {
     specs.push({ icon: Icons.Rooms, text: `${rooms}-комн.` });
   }
-  if (area != null && Number.isFinite(area) && area > 0) {
-    specs.push({ icon: Icons.Area, text: `${formatSpecNumber(area)} м²` });
+  // ⚠ No areaField ⇒ no unit ⇒ nothing rendered. Never fall back to м².
+  if (area != null && Number.isFinite(area) && area > 0 && areaField) {
+    specs.push({ icon: Icons.Area, text: formatArea(area, areaField) });
+  }
+  // A house has two areas in two units; the plot is named so they cannot be
+  // mistaken for one another.
+  if (landArea != null && Number.isFinite(landArea) && landArea > 0) {
+    specs.push({
+      icon: Icons.Land,
+      text: `участок ${formatAreaNumber(landArea)} сот.`,
+    });
   }
   if (floor != null && totalFloors != null) {
     specs.push({ icon: Icons.Floor, text: `${floor}/${totalFloors} эт.` });
@@ -125,13 +174,24 @@ function PropertyCardComponent({
   marketLabel,
   compareId,
   compareType,
+  propertyType,
   rooms,
   area,
+  areaField,
+  landArea,
   floor,
   totalFloors,
 }: PropertyCardProps) {
   const targetHref = href ?? (slug ? `/catalog/${slug}` : "/catalog");
-  const specs = buildSpecs({ rooms, area, floor, totalFloors });
+  const specs = buildSpecs({
+    propertyType,
+    rooms,
+    area,
+    areaField,
+    landArea,
+    floor,
+    totalFloors,
+  });
   /* Unique per card — the overlay anchor borrows the hidden <h3> as its
      accessible name via aria-labelledby, so the id cannot be a constant. */
   const titleId = useId();
@@ -287,13 +347,18 @@ function PropertyCardComponent({
         {specs.length > 0 ? (
           <ul className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] font-medium text-gray-700">
             {specs.map((spec) => (
-              <li key={spec.text} className="inline-flex items-center gap-1.5">
+              <li
+                key={spec.text}
+                className={`inline-flex items-center gap-1.5${
+                  spec.lead ? " text-fg" : ""
+                }`}
+              >
                 {/* neutral-400, a step lighter than the text — the kit dims spec
                     glyphs so the values read first. */}
                 <Icon
                   icon={spec.icon}
                   size={16}
-                  className="shrink-0 text-gray-400"
+                  className={`shrink-0 ${spec.lead ? "text-brand" : "text-gray-400"}`}
                 />
                 {spec.text}
               </li>

@@ -1,5 +1,6 @@
 import { Container } from "@/components/layout/container";
 import { PropertyCard } from "@/components/home/PropertyCard";
+import type { AreaField } from "@/lib/propertyArea";
 import { HomepageInlineText } from "@/components/home/HomepageInlineText";
 import { SectionHeader } from "@/components/home/SectionHeader";
 
@@ -28,6 +29,9 @@ interface PropertyItem {
   propertyType?: "apartment" | "house" | "land" | "commercial";
   rooms?: number;
   area?: number;
+  /** ⚠ The unit of `area` derives from this — see lib/propertyArea.ts. */
+  areaField?: AreaField;
+  landArea?: number;
   floor?: number;
   totalFloors?: number;
 }
@@ -65,6 +69,9 @@ export function PropertiesSection({ properties, sectionTitle }: PropertiesSectio
               characteristics={property.characteristics}
               rooms={property.rooms}
               area={property.area}
+              areaField={property.areaField}
+              landArea={property.landArea}
+              propertyType={property.propertyType}
               floor={property.floor}
               totalFloors={property.totalFloors}
               location={property.location}

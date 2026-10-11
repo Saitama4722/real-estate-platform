@@ -1,5 +1,10 @@
 import { CatalogPropertyItem } from "@/components/catalog/types";
 import { PropertySection } from "@/components/property/PropertySection";
+import {
+  formatArea,
+  PRIMARY_AREA_FIELD,
+  type PropertyTypeValue,
+} from "@/lib/propertyArea";
 
 interface PropertyCharacteristicsProps {
   property: CatalogPropertyItem;
@@ -21,10 +26,13 @@ export function PropertyCharacteristics({ property }: PropertyCharacteristicsPro
   }
 
   if (property.area) {
-    const areaLabel = property.propertyType === "land" ? "Площадь участка" : "Площадь";
-    const areaValue = property.propertyType === "land" 
-      ? `${property.area} соток` 
-      : `${property.area} м²`;
+    const areaLabel =
+      property.propertyType === "land" ? "Площадь участка" : "Площадь";
+    // Unit from the FIELD, through the shared table.
+    const areaValue = formatArea(
+      property.area,
+      PRIMARY_AREA_FIELD[(property.propertyType ?? "apartment") as PropertyTypeValue],
+    );
     mainCharacteristics.push({
       label: areaLabel,
       value: areaValue,

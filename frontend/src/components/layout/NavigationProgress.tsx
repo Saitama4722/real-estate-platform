@@ -3,6 +3,11 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+import {
+  getPageLoadingCount,
+  subscribePageLoading,
+} from "@/components/layout/pageLoadingSignal";
+
 /**
  * Top-of-page progress bar for client-side route changes.
  *
@@ -25,8 +30,19 @@ import { useEffect, useRef } from "react";
  * the start is a capture-phase click on an internal `<a>`, plus `popstate` for
  * the back/forward buttons.
  *
- * ── End signal: `usePathname()` ──────────────────────────────────────────────
- * A pathname change means the new route committed.
+ * ── End signal: route commit AND the destination reporting content ready ────
+ * A pathname change means the new route COMMITTED. For a server-rendered route
+ * that is also when its content exists: with no `loading.tsx` in the app, App
+ * Router does not commit until the RSC payload has arrived `[measured]`.
+ *
+ * ⚠ COMMIT IS NOT "LOADED" FOR A PAGE THAT FETCHES AFTER IT MOUNTS, and using
+ * it as the sole end signal is the bug this file used to have. `[measured]` on
+ * /favorites with its per-slug API call delayed 4000ms: committed at 297ms,
+ * indicator gone by 776ms, content at 4524ms — 3748ms of a contentless page
+ * with no indicator. So commit only ARMS the finish; the run actually ends when
+ * no component is holding `pageLoadingSignal` open. Pages that load after mount
+ * call `usePageLoading(theirRealLoadingFlag)`; every other page holds nothing
+ * and finishes at commit exactly as before.
  *
  * ⚠ DELIBERATELY NOT `useSearchParams()`. Reading it here would opt the whole
  * tree out of static rendering, and the homepage IS statically prerendered
@@ -77,6 +93,10 @@ type Run = {
   progress: number;
   startedAt: number;
   raf: number;
+  /** Route has committed; the run is now waiting on content readiness. */
+  committed: boolean;
+  /** rAF coalescing the readiness check; see scheduleFinishCheck. */
+  checkRaf: number;
   showTimer: ReturnType<typeof setTimeout> | null;
   hintTimer: ReturnType<typeof setTimeout> | null;
   safetyTimer: ReturnType<typeof setTimeout> | null;
@@ -94,6 +114,9 @@ export function NavigationProgress() {
   /** Set by the listener effect; called by the route effect below. Declared up
    *  here so the two effects can meet without either depending on the other. */
   const finishRef = useRef<(() => void) | null>(null);
+  /** Called on pathname change: marks the route committed and schedules the
+   *  readiness check. Replaces the old "commit === done" assumption. */
+  const armFinishRef = useRef<(() => void) | null>(null);
 
   /** Last pathname this component saw COMMIT.
    *
@@ -112,6 +135,8 @@ export function NavigationProgress() {
     progress: 0,
     startedAt: 0,
     raf: 0,
+    committed: false,
+    checkRaf: 0,
     showTimer: null,
     hintTimer: null,
     safetyTimer: null,
@@ -130,6 +155,8 @@ export function NavigationProgress() {
       r.showTimer = r.hintTimer = r.safetyTimer = null;
       if (r.raf) cancelAnimationFrame(r.raf);
       r.raf = 0;
+      if (r.checkRaf) cancelAnimationFrame(r.checkRaf);
+      r.checkRaf = 0;
     };
 
     const hideHint = () => {
@@ -144,6 +171,7 @@ export function NavigationProgress() {
       r.active = false;
       r.shown = false;
       r.progress = 0;
+      r.committed = false;
       hideHint();
       if (barRef.current) barRef.current.style.opacity = "0";
       if (fillRef.current) fillRef.current.style.width = "0%";
@@ -169,6 +197,7 @@ export function NavigationProgress() {
       r.active = true;
       r.shown = false;
       r.progress = 0;
+      r.committed = false;
       r.startedAt = performance.now();
       if (fillRef.current) fillRef.current.style.width = "0%";
 
@@ -194,6 +223,7 @@ export function NavigationProgress() {
       // never showed → the route beat the threshold; leave no trace at all
       if (!r.shown) {
         r.active = false;
+        r.committed = false;
         r.progress = 0;
         return;
       }
@@ -220,10 +250,50 @@ export function NavigationProgress() {
         }, LINGER_MS);
         r.active = false;
         r.shown = false;
+        r.committed = false;
         r.progress = 0;
       };
       r.raf = requestAnimationFrame(step);
     };
+
+    /* The route has committed; the run may only end once nothing is still
+       loading. Evaluated on BOTH triggers (commit, holder-count change) so
+       whichever happens last is the one that ends the run. */
+    /* ⚠ ALWAYS EVALUATE ON THE NEXT FRAME, NEVER SYNCHRONOUSLY.
+       A holder can release and immediately re-acquire inside one commit — React
+       does exactly that in development, where StrictMode runs every effect
+       setup → cleanup → setup. `[measured]`: holders went 1 → 0 → 1 within the
+       SAME millisecond, and a synchronous check that landed in the gap finished
+       the run while the page was still loading. That transient zero is not
+       "loaded"; deferring one frame lets the re-acquire land first, and a
+       genuine release still resolves on the very next frame.
+
+       This is a coalescing frame, NOT a minimum duration — it never extends a
+       run that is already done, it only refuses to act on a half-applied state. */
+    const scheduleFinishCheck = () => {
+      if (r.checkRaf) cancelAnimationFrame(r.checkRaf);
+      r.checkRaf = requestAnimationFrame(() => {
+        r.checkRaf = 0;
+        if (!r.active || !r.committed) return;
+        if (getPageLoadingCount() > 0) return;
+        finish();
+      });
+    };
+    /* ⚠ One frame, and it is NOT a duration — it is "after this commit's
+       effects have run". NavigationProgress sits ABOVE <main> in the tree, so
+       its pathname effect fires BEFORE the destination page's own effects;
+       asking for the holder count right then would always read 0 and finish
+       early, which is the bug we are fixing. Deferring the first evaluation by
+       one frame lets the page register. Do not turn this into a delay. */
+    const armFinish = () => {
+      r.committed = true;
+      scheduleFinishCheck();
+    };
+    armFinishRef.current = armFinish;
+
+    const unsubscribe = subscribePageLoading((count) => {
+      if (count === 0) scheduleFinishCheck();
+    });
 
     finishRef.current = finish;
 
@@ -275,6 +345,7 @@ export function NavigationProgress() {
       document.removeEventListener("click", onClick, true);
       window.removeEventListener("popstate", onPopState);
       window.removeEventListener("pagehide", onPageHide);
+      unsubscribe();
       clearTimers();
       if (r.fadeTimer) clearTimeout(r.fadeTimer);
     };
@@ -285,7 +356,8 @@ export function NavigationProgress() {
      never again — the exact bug CLAUDE.md records for RevealController. */
   useEffect(() => {
     lastPathRef.current = pathname;
-    finishRef.current?.();
+    // Commit ARMS the finish; `pageLoadingSignal` decides when it actually ends.
+    armFinishRef.current?.();
   }, [pathname]);
 
   return (

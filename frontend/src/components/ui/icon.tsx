@@ -4,6 +4,8 @@ import {
   ArrowRight,
   ArrowUpDown,
   BedDouble,
+  Bell,
+  BellOff,
   Building,
   Building2,
   Calendar,
@@ -23,8 +25,10 @@ import {
   Info,
   KeyRound,
   LandPlot,
+  LayoutDashboard,
   Link2,
   List,
+  LogOut,
   LoaderCircle,
   Lock,
   Mail,
@@ -46,8 +50,10 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Store,
+  Tag,
   Trees,
   User,
+  Users,
   WashingMachine,
   Wifi,
   X,
@@ -127,6 +133,11 @@ export const Icons = {
   ArrowLeft,
   Inbox,
   Article: Newspaper,
+  /** Звук уведомлений о новых заявках включён — переключатель в кабинете. */
+  Bell,
+  /** …и выключен. Всегда парой с Bell: беззвучный режим обязан быть ВИДЕН,
+      иначе «звука нет» неотличимо от «заявок нет». */
+  BellOff,
 
   // Articles (index + detail)
   Clock,
@@ -175,6 +186,19 @@ export const Icons = {
   /** Submit spinner. NEVER the only loading signal: reduced motion cancels
       every animation, so the control's label must change too. */
   Loader: LoaderCircle,
+
+  // Cabinet sidebar navigation
+  /** «Панель» — the cabinet's overview route. */
+  Dashboard: LayoutDashboard,
+  /** «Заявки на продажу» — an owner offering a property, not an inquiry.
+      Deliberately NOT `Inbox`, which already means «Заявки»: the two rows sit
+      next to each other and must not share a glyph. */
+  SaleRequest: Tag,
+  /** «Собственники» — a group, against the single-person `User` («Профиль»).
+      Same reasoning as above: adjacent rows, distinguishable silhouettes. */
+  Owners: Users,
+  /** «Выйти» — the cabinet sign-out control. */
+  Logout: LogOut,
 } as const;
 
 export type IconName = keyof typeof Icons;

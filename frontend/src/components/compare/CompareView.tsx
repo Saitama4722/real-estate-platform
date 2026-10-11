@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { PriceDropBadge } from "@/components/property/PriceDropBadge";
@@ -12,6 +14,11 @@ import {
   mapPublicDetailToCatalogItem,
 } from "@/lib/publicProperty";
 import { useCompare } from "@/lib/compare";
+import {
+  AREA_FIELD_UNIT,
+  PRIMARY_AREA_FIELD,
+  type PropertyTypeValue,
+} from "@/lib/propertyArea";
 
 /**
  * Client-only "Сравнение" page. Mirrors FavoritesView's fetch pattern:
@@ -44,7 +51,7 @@ function pricePerSqm(p: CatalogPropertyItem): number | null {
 }
 
 const AREA_UNIT = (p: CatalogPropertyItem) =>
-  p.propertyType === "land" ? "соток" : "м²";
+  AREA_FIELD_UNIT[PRIMARY_AREA_FIELD[(p.propertyType ?? "apartment") as PropertyTypeValue]];
 
 /** Row definitions, in display order. Rows with no data in ANY column are hidden. */
 const ROWS: CompareRow[] = [
@@ -101,6 +108,10 @@ export function CompareView() {
   const { slugs, ready, removeCompare } = useCompare();
   const [items, setItems] = useState<CatalogPropertyItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /* Same shape as /favorites: commits immediately, fetches after mount. Hold the
+     navigation indicator open for the real loading flag. See pageLoadingSignal. */
+  usePageLoading(!ready || loading);
   const cacheRef = useRef<Map<string, CatalogPropertyItem | null>>(new Map());
 
   useEffect(() => {

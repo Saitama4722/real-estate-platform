@@ -101,15 +101,30 @@ class CrmEmployeeActivityLogListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsCrmStaffManager]
     serializer_class = EmployeeActivityLogSerializer
 
+    #: Верхняя граница PostgreSQL `integer`. Значение больше неё проходит
+    #: `isdigit()`, но роняет запрос DataError'ом ещё до сериализации, поэтому
+    #: отсекаем его здесь, а не в базе.
+    MAX_PG_INT = 2_147_483_647
+
     def get_queryset(self):
         qs = EmployeeActivityLog.objects.select_related("user").order_by("-created_at")
+
+        # Фильтры приходят из строки запроса, то есть от кого угодно. Любое
+        # некорректное значение ИГНОРИРУЕТСЯ и отдаёт нефильтрованный список —
+        # никогда 500.
         action_type = self.request.query_params.get("action_type")
         valid_actions = {c.value for c in EmployeeActivityLog.ActionType}
         if action_type in valid_actions:
             qs = qs.filter(action_type=action_type)
+
         user_id = self.request.query_params.get("user")
-        if user_id is not None and str(user_id).isdigit():
-            qs = qs.filter(user_id=int(user_id))
+        if user_id:
+            try:
+                user_pk = int(user_id)
+            except (TypeError, ValueError):
+                user_pk = None
+            if user_pk is not None and 0 < user_pk <= self.MAX_PG_INT:
+                qs = qs.filter(user_id=user_pk)
         return qs
 
 

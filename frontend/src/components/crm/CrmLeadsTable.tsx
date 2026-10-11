@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
 
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
+
 interface CrmLeadRow {
   id: number;
   client_name: string;
@@ -23,6 +25,11 @@ function normalizeList(data: unknown): CrmLeadRow[] {
 
 export function CrmLeadsTable() {
   const [rows, setRows] = useState<CrmLeadRow[] | null>(null);
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts. `rows === null` is the loading state here. */
+  usePageLoading(rows === null);
   const [unauthenticated, setUnauthenticated] = useState(false);
   const [error, setError] = useState("");
 

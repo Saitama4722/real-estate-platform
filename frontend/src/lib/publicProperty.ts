@@ -1,6 +1,7 @@
 import type { CatalogCitySlug, CatalogPropertyItem } from "@/components/catalog/types";
 import { formatPropertyPrice } from "@/lib/propertySeo";
 import { formatOldPrice, marketLabelFor } from "@/lib/propertyBadges";
+import type { AreaField } from "@/lib/propertyArea";
 
 /** Narrow an arbitrary city slug to the two known landing-city slugs. */
 function asCitySlug(slug: string | undefined): CatalogCitySlug | undefined {
@@ -137,6 +138,33 @@ function characteristicsLine(p: PublicPropertyDetail): string {
   return parts.join(" • ");
 }
 
+/** Headline area + the field it came from, and a house's plot size. */
+function detailArea(p: {
+  apartment_details: { area_total: string } | null;
+  house_details: { house_area: string; land_area: string } | null;
+  land_plot_details: { land_area: string } | null;
+  commercial_details: { area_total: string } | null;
+}): { area?: number; areaField?: AreaField; landArea?: number } {
+  if (p.apartment_details) {
+    return { area: Number(p.apartment_details.area_total), areaField: "area_total" };
+  }
+  if (p.land_plot_details) {
+    return { area: Number(p.land_plot_details.land_area), areaField: "land_area" };
+  }
+  if (p.commercial_details) {
+    return { area: Number(p.commercial_details.area_total), areaField: "area_total" };
+  }
+  if (p.house_details) {
+    const land = Number(p.house_details.land_area);
+    return {
+      area: Number(p.house_details.house_area),
+      areaField: "house_area",
+      landArea: Number.isFinite(land) && land > 0 ? land : undefined,
+    };
+  }
+  return {};
+}
+
 export function mapPublicDetailToCatalogItem(
   p: PublicPropertyDetail,
   slug: string,
@@ -192,15 +220,11 @@ export function mapPublicDetailToCatalogItem(
     videoUrl,
     propertyType: p.property_type,
     rooms: p.apartment_details?.rooms,
-    area: p.apartment_details
-      ? Number(p.apartment_details.area_total)
-      : p.land_plot_details
-        ? Number(p.land_plot_details.land_area)
-        : p.commercial_details
-          ? Number(p.commercial_details.area_total)
-          : p.house_details
-            ? Number(p.house_details.house_area)
-            : undefined,
+    // ⚠ Same rule as the LIST mapper: the field travels with the value, so the
+    // unit is never guessed. Omitting it here made /favorites — which fetches
+    // each property through THIS mapper — drop the area entirely, because the
+    // card refuses to render a number whose unit it does not know.
+    ...detailArea(p),
     floor: p.apartment_details?.floor ?? p.commercial_details?.floor ?? undefined,
     totalFloors:
       p.apartment_details?.floors_total ??

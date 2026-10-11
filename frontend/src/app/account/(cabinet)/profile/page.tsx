@@ -14,6 +14,8 @@ import {
 import { ChangeOwnEmailCard } from "@/components/account/ChangeOwnEmailCard";
 import { UploadProgressBar, useUploadProgress } from "@/components/ui/upload-progress";
 
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
+
 /** Синхронно с бэкендом (users.serializers.SHORT_BIO_MAX). */
 const SHORT_BIO_MAX = 1500;
 
@@ -22,6 +24,11 @@ export default function AccountProfilePage() {
   const setEmployeeUser = useSetEmployeeUser();
   const upload = useUploadProgress();
   const [loading, setLoading] = useState(true);
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts.  */
+  usePageLoading(loading);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);

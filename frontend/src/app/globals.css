@@ -1311,6 +1311,38 @@
   resize: none;
 }
 
+/* --- Field with an icon parked inside it -----------------------------------
+   ⚠ A Tailwind `pl-*` utility CANNOT do this. `.ctr-control` is UNLAYERED and
+   sets `padding: 0 14px`; utilities live in Tailwind's `utilities` layer, which
+   loses to unlayered CSS. That is why the map-pin overlapped the first
+   character despite `pl-9` being on the input — the declared padding was still
+   14px. Same reason `.ctr-control--area` exists rather than a `p-*` utility.
+
+   The padding is DERIVED, not a magic number:
+       icon inset + icon size + the field's own text gutter
+   and the component positions/sizes the icon from the SAME two variables, so
+   the two can never drift apart. Because this is real padding (not a margin or
+   a transform), the text stays clear of the icon even when a long address
+   scrolls horizontally inside the field: an input clips its text to the content
+   box, which starts after the padding. */
+:root {
+  --field-gutter: 14px;      /* == .ctr-control's own horizontal padding */
+  --field-icon-inset: 12px;  /* distance from the field edge to the icon */
+  --field-icon-size: 16px;   /* the lucide icon box (size-4) */
+}
+
+.ctr-control--icon-left {
+  padding-left: calc(
+    var(--field-icon-inset) + var(--field-icon-size) + var(--field-gutter)
+  );
+}
+
+.ctr-control--icon-right {
+  padding-right: calc(
+    var(--field-icon-inset) + var(--field-icon-size) + var(--field-gutter)
+  );
+}
+
 /* Character counter parked inside the textarea's bottom-right gutter. */
 .ctr-counter {
   position: absolute;

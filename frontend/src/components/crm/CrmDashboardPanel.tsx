@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { authBearerHeaders, clearCrmTokens, getCrmAccessToken, performEmployeeLogout } from "@/lib/crmAuth";
 import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
+
 interface MeUser {
   id: number;
   email: string;
@@ -16,6 +18,11 @@ interface MeUser {
 
 export function CrmDashboardPanel() {
   const [user, setUser] = useState<MeUser | null | undefined>(undefined);
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts. `undefined` means «not fetched yet» here; `null` means «no user». */
+  usePageLoading(user === undefined);
   const [error, setError] = useState("");
 
   useEffect(() => {

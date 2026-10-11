@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
+
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
 import {
   CRM_PROPERTY_TYPE_LABELS,
   CRM_PROPERTY_TYPE_VALUES,
@@ -78,6 +80,11 @@ function typeLabelRu(code: string): string {
 
 export function CrmPropertyTable() {
   const [rows, setRows] = useState<CrmPropertyRow[] | null>(null);
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts. `rows === null` is the loading state here. */
+  usePageLoading(rows === null);
   const [unauthenticated, setUnauthenticated] = useState(false);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<Tab>("active");

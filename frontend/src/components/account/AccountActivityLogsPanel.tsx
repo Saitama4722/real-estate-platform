@@ -8,9 +8,13 @@ import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
 import { isCabinetAdminRole } from "@/lib/employeeUser";
 import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
 
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
+
 type ActivityRow = {
   id: number;
-  user: number;
+  /** NULL для неудачного входа по несуществующему адресу — такую попытку
+   *  некому приписать; введённый адрес приходит в user_email. */
+  user: number | null;
   user_email: string;
   user_display_name: string;
   action_type: string;
@@ -49,6 +53,11 @@ export function AccountActivityLogsPanel() {
   const [error, setError] = useState("");
   const [actionFilter, setActionFilter] = useState<string>("");
   const [userFilter, setUserFilter] = useState<string>("");
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts.  */
+  usePageLoading(loading);
 
   const load = useCallback(async () => {
     if (!allowed) return;

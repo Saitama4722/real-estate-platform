@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchWithCrmAuthRetry } from "@/lib/crmAuth";
+import { isSuperadminRole } from "@/lib/employeeUser";
+import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
 
 /**
  * Superadmin-only security band on the cabinet dashboard.
@@ -49,21 +51,38 @@ function pluralAccounts(n: number): string {
 }
 
 export function SecuritySummaryBand() {
+  const user = useEmployeeUser();
+  /**
+   * ⛔ THE REQUEST IS NOT MADE AT ALL FOR A NON-SUPERADMIN.
+   *
+   * `/api/auth/security-summary/` is `[IsCrmUser, IsSuperAdmin]`, so it 403s
+   * anyone else. This used to fetch unconditionally and drop the 403 with
+   * `if (!res.ok) return;` — silent in JS, but the BROWSER still logged two
+   * console errors on every realtor's visit to /account, which buries real
+   * errors in noise. The gate below is `isSuperadminRole`, the exact mirror of
+   * that permission class, so the two cannot drift.
+   *
+   * ⚠ Do NOT relax this to `isCabinetAdminRole`: it admits `admin`, whom the
+   * endpoint still refuses.
+   */
+  const mayLoad = isSuperadminRole(user.role);
   const [data, setData] = useState<Summary | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
 
   const load = useCallback(async () => {
+    if (!mayLoad) return;
     try {
       const res = await fetchWithCrmAuthRetry("/api/auth/security-summary/", {
         credentials: "same-origin",
       });
-      // 403 simply means "not the superadmin" — stay silent, never error.
+      // A genuine failure (network, 5xx) leaves the band unrendered rather than
+      // breaking the dashboard. A 403 can no longer reach here.
       if (!res.ok) return;
       setData((await res.json()) as Summary);
     } catch {
       /* a dashboard extra must never break the dashboard */
     }
-  }, []);
+  }, [mayLoad]);
 
   useEffect(() => {
     void load();
@@ -82,6 +101,8 @@ export function SecuritySummaryBand() {
     }
   };
 
+  // Renders nothing for a non-superadmin — no band, no placeholder, no request.
+  if (!mayLoad) return null;
   if (!data) return null;
   const quiet =
     data.failed_attempts === 0 &&

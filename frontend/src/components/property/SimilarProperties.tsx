@@ -54,6 +54,9 @@ export async function SimilarProperties({ current }: SimilarPropertiesProps) {
             characteristics={property.characteristics}
             rooms={property.rooms}
             area={property.area}
+              areaField={property.areaField}
+              landArea={property.landArea}
+              propertyType={property.propertyType}
             floor={property.floor}
             totalFloors={property.totalFloors}
             location={property.location}

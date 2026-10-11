@@ -24,7 +24,7 @@ import { isPropertyImageUrl } from "@/lib/propertyMedia";
  * overlay keeps the blast radius at this file.
  *
  * ⚠ z-[1000] in the ARBITRARY-VALUE BRACKET FORM. Leaflet paints its map panes
- * at z-index 400–600 and the property page renders a 2GIS map, so the overlay
+ * at z-index 400–600 and the property page renders a Leaflet map, so the overlay
  * has to clear those. Do NOT let an editor "canonicalize" this to z-1000 — see
  * the Tailwind z-index note in CLAUDE.md.
  */

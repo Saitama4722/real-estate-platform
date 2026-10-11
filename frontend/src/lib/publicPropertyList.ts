@@ -2,6 +2,7 @@ import type { CatalogCitySlug, CatalogPropertyItem } from "@/components/catalog/
 import { formatGroupedNumber, formatPriceRub } from "@/lib/formatPrice";
 import { getPublicApiBaseUrl } from "@/lib/publicProperty";
 import { formatOldPrice, marketLabelFor } from "@/lib/propertyBadges";
+import type { AreaField } from "@/lib/propertyArea";
 
 const CURRENCY_LABEL: Record<string, string> = {
   rub: "₽",
@@ -98,6 +99,42 @@ function listingCharacteristics(row: PublicPropertyListItemRaw): string {
   return parts.join(" • ");
 }
 
+/** The headline area plus the field it came from, and a house's plot size. */
+function areaFromDetails(row: PublicPropertyListItemRaw): {
+  area?: number;
+  areaField?: AreaField;
+  landArea?: number;
+} {
+  if (row.apartment_details) {
+    return {
+      area: Number(row.apartment_details.area_total),
+      areaField: "area_total",
+    };
+  }
+  if (row.land_plot_details) {
+    return {
+      area: Number(row.land_plot_details.land_area),
+      areaField: "land_area",
+    };
+  }
+  if (row.commercial_details) {
+    return {
+      area: Number(row.commercial_details.area_total),
+      areaField: "area_total",
+    };
+  }
+  if (row.house_details) {
+    const land = Number(row.house_details.land_area);
+    return {
+      area: Number(row.house_details.house_area),
+      areaField: "house_area",
+      // A house has BOTH, in different units — the card shows the plot too.
+      landArea: Number.isFinite(land) && land > 0 ? land : undefined,
+    };
+  }
+  return {};
+}
+
 export function mapPublicListItemToCatalogItem(row: PublicPropertyListItemRaw): CatalogPropertyItem {
   const pathSlug = (row.slug?.trim() || String(row.id)).trim();
   const lat = row.public_latitude != null ? Number(row.public_latitude) : 0;
@@ -124,15 +161,10 @@ export function mapPublicListItemToCatalogItem(row: PublicPropertyListItemRaw): 
     publishedAt: row.published_at ?? undefined,
     propertyType: row.property_type,
     rooms: row.apartment_details?.rooms,
-    area: row.apartment_details
-      ? Number(row.apartment_details.area_total)
-      : row.land_plot_details
-        ? Number(row.land_plot_details.land_area)
-        : row.commercial_details
-          ? Number(row.commercial_details.area_total)
-          : row.house_details
-            ? Number(row.house_details.house_area)
-            : undefined,
+    // ⚠ THE FIELD TRAVELS WITH THE VALUE. Four differently-united fields used
+    // to collapse into one bare number here, and the card then appended a
+    // hardcoded « м² » — which is how 8 соток became «8 м²».
+    ...areaFromDetails(row),
     floor: row.apartment_details?.floor ?? row.commercial_details?.floor ?? undefined,
     totalFloors:
       row.apartment_details?.floors_total ??

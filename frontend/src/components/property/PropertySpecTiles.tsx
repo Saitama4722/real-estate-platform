@@ -1,6 +1,11 @@
 import { Building2, DoorOpen, MapPinned, Scan } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import type { CatalogPropertyItem } from "@/components/catalog/types";
+import {
+  formatArea,
+  PRIMARY_AREA_FIELD,
+  type PropertyTypeValue,
+} from "@/lib/propertyArea";
 
 /**
  * Summary strip under the gallery: the handful of numbers a buyer scans first.
@@ -33,7 +38,12 @@ export function PropertySpecTiles({
   if (property.area) {
     tiles.push({
       icon: Scan,
-      value: isLand ? `${property.area} сот.` : `${property.area} м²`,
+      // Unit from the FIELD this type's area comes from, via the one table —
+      // not a local `isLand ? … : "м²"`, which is the shape that drifts.
+      value: formatArea(
+        property.area,
+        PRIMARY_AREA_FIELD[(property.propertyType ?? "apartment") as PropertyTypeValue],
+      ),
       label: isLand ? "площадь участка" : "общая площадь",
     });
   }

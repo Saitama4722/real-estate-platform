@@ -12,10 +12,18 @@ import { employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
 import { parseEmployeeUser, type EmployeeUser } from "@/lib/employeeUser";
 import { EmployeeUserProvider } from "@/components/account/EmployeeAuthContext";
 
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
+
 export function RequireEmployeeAuth({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [state, setState] = useState<"checking" | "ok" | "redirect" | "session_error">("checking");
   const [user, setUser] = useState<EmployeeUser | null>(null);
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts. This is the FIRST of two stages for every cabinet route: the auth
+     check renders skeletons before any page data is even requested. */
+  usePageLoading(state === "checking");
 
   useEffect(() => {
     let cancelled = false;
@@ -77,13 +85,58 @@ export function RequireEmployeeAuth({ children }: { children: React.ReactNode })
   }, [router]);
 
   if (state === "checking") {
+    /**
+     * ⚠ ЗАГЛУШКА ПОВТОРЯЕТ ГЕОМЕТРИЮ КАБИНЕТА, А НЕ НАМЕКАЕТ НА НЕЁ.
+     *
+     * Это не украшение: пока состояние `checking`, страница ЗАНИМАЕТ место, и
+     * если места меньше, чем у настоящего содержимого, при подстановке всё
+     * ниже прыгает. Прежняя заглушка резервировала колонку 208px и высоту
+     * 176px против фактических 280px и 634px — и загрузка «Панели» давала
+     * сдвиг макета CLS 0.617 на 375px и 0.061 на 1440px `[measured]`.
+     *
+     * ⚠ Высота НЕ ЗАДАНА ЧИСЛОМ. Строки набраны теми же классами, что и
+     * настоящие (`h-11`, те же отступы и та же рамка), поэтому колонка-скелет
+     * высчитывает свою высоту сама и не разъедется с меню, если у пункта
+     * поменяется высота. Магическое число здесь протухло бы первым.
+     */
     return (
-      <div className="mt-6 flex flex-col gap-8 md:flex-row md:gap-10">
-        <div className="h-44 w-full shrink-0 animate-pulse rounded-xl bg-slate-200 md:w-52" aria-hidden />
-        <div className="min-w-0 flex-1 space-y-4">
-          <div className="h-9 max-w-xs animate-pulse rounded-lg bg-slate-200" aria-hidden />
-          <div className="h-4 max-w-lg animate-pulse rounded bg-slate-200" aria-hidden />
-          <div className="h-4 max-w-md animate-pulse rounded bg-slate-200" aria-hidden />
+      <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+        <div className="md:w-[280px] md:shrink-0">
+          <div
+            className="flex flex-col rounded-2xl border border-border bg-surface-raised px-4 pb-5 pt-6 shadow-xs"
+            aria-hidden
+          >
+            <div className="ctr-skel mx-2 h-4 w-32 rounded" />
+            <div className="mt-4 flex flex-col gap-2.5 px-2 pb-3.5 pt-3">
+              <div className="flex items-center gap-3">
+                <div className="ctr-skel h-11 w-11 shrink-0 rounded-full" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <div className="ctr-skel h-4 w-4/5 rounded" />
+                  <div className="ctr-skel h-3 w-2/5 rounded" />
+                </div>
+              </div>
+              <div className="ctr-skel h-4 w-full rounded" />
+            </div>
+            <div className="mt-3 flex flex-col gap-0.5">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="ctr-skel h-11 rounded-lg" />
+              ))}
+            </div>
+            <div className="mx-1 mt-5 h-px bg-surface-inset" />
+            <div className="ctr-skel mt-4 h-11 rounded-xl" />
+            <div className="min-h-6 flex-1" />
+            <div className="ctr-skel mt-4 h-11 rounded-lg" />
+          </div>
+        </div>
+        <div className="min-w-0 flex-1" aria-hidden>
+          <div className="max-w-[660px]">
+            <div className="border-b border-border pb-6">
+              <div className="ctr-skel h-9 w-48 rounded-lg" />
+              <div className="ctr-skel mt-2.5 h-5 w-72 max-w-full rounded" />
+            </div>
+            <div className="ctr-skel mt-8 h-[266px] rounded-2xl" />
+            <div className="ctr-skel mt-6 h-5 w-80 max-w-full rounded" />
+          </div>
         </div>
       </div>
     );

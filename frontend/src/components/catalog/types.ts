@@ -1,3 +1,5 @@
+import type { AreaField } from "@/lib/propertyArea";
+
 export type CatalogCitySlug = "krasnodar" | "gelendzhik";
 
 export interface CatalogPropertyItem {
@@ -33,6 +35,13 @@ export interface CatalogPropertyItem {
   gallery?: string[];
   videoUrl?: string;
   propertyType?: "apartment" | "house" | "land" | "commercial";
+  /**
+   * WHICH model field `area` came from — so the unit can be derived from it
+   * rather than defaulting to м². See `lib/propertyArea.ts`.
+   */
+  areaField?: AreaField;
+  /** Plot size for a HOUSE, in соток. The house's own area stays in `area`. */
+  landArea?: number;
   rooms?: number;
   area?: number;
   floor?: number;

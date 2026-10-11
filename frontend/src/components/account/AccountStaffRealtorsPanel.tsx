@@ -8,6 +8,8 @@ import { Modal } from "@/components/ui/modal";
 import { fetchWithCrmAuthRetry } from "@/lib/crmAuth";
 import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
 
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
+
 export type RealtorRow = {
   id: number;
   crm_id: string;
@@ -106,6 +108,11 @@ function formatLastLogin(iso: string | null): string {
 export function AccountStaffRealtorsPanel() {
   const [rows, setRows] = useState<RealtorRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts.  */
+  usePageLoading(loading);
   const [error, setError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);

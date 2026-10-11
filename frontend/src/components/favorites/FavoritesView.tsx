@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { PropertyCard } from "@/components/home/PropertyCard";
@@ -26,6 +28,12 @@ export function FavoritesView() {
   const [loading, setLoading] = useState(true);
   // slug -> resolved catalog item (or null when the slug 404s / is unavailable).
   const cacheRef = useRef<Map<string, CatalogPropertyItem | null>>(new Map());
+
+  /* This page COMMITS instantly and only then fetches each slug, so route
+     commit is not "loaded" here. Holding the global navigation indicator open
+     for exactly this flag is what stops it ending mid-load — measured at 3748ms
+     of indicator-free loading before this existed. See pageLoadingSignal. */
+  usePageLoading(!ready || loading);
 
   useEffect(() => {
     if (!ready) return;
@@ -109,6 +117,9 @@ export function FavoritesView() {
               characteristics={property.characteristics}
               rooms={property.rooms}
               area={property.area}
+              areaField={property.areaField}
+              landArea={property.landArea}
+              propertyType={property.propertyType}
               floor={property.floor}
               totalFloors={property.totalFloors}
               location={property.location}

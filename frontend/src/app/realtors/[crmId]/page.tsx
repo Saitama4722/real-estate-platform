@@ -626,6 +626,9 @@ export default async function PublicRealtorPage({
                 characteristics={p.characteristics}
                 rooms={p.rooms}
                 area={p.area}
+                areaField={p.areaField}
+                landArea={p.landArea}
+                propertyType={p.propertyType}
                 floor={p.floor}
                 totalFloors={p.totalFloors}
                 location={p.location}

@@ -25,6 +25,7 @@ import { CatalogStickyBar } from "@/components/catalog/CatalogStickyBar";
 import type { CatalogLocationOption } from "@/components/catalog/CatalogDistrictCombobox";
 import type { CatalogSelectOption } from "@/components/catalog/CatalogSelect";
 import type { CatalogPropertyItem } from "@/components/catalog/types";
+import { isSquareMetreField } from "@/lib/propertyArea";
 import {
   buildCatalogChips,
   buildWidenActions,
@@ -78,6 +79,11 @@ function pluralListings(n: number): string {
 
 /** «12 345 ₽/м²» from the formatted price + numeric area; rounded to 100. */
 function pricePerM2(item: CatalogPropertyItem): string | undefined {
+  // ⚠ ONLY for areas actually measured in м². A land plot's area is in СОТКИ,
+  // so dividing by it and printing «₽/м²» is off by a factor of 100 — the same
+  // hardcoded-unit bug as the card's, one step removed. CompareView already
+  // guarded this; the catalog card did not.
+  if (!isSquareMetreField(item.areaField)) return undefined;
   if (!item.area || item.area <= 0) return undefined;
   const price = parsePropertyListPriceRub(item.price);
   if (!Number.isFinite(price) || price <= 0) return undefined;
@@ -321,6 +327,9 @@ export function CatalogExplorer({
       characteristics={item.characteristics}
       rooms={item.rooms}
       area={item.area}
+      areaField={item.areaField}
+      landArea={item.landArea}
+      propertyType={item.propertyType}
       floor={item.floor}
       totalFloors={item.totalFloors}
       location={item.location}

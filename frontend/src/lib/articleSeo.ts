@@ -16,7 +16,7 @@ export function siteOrigin(): string {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (explicit) return explicit.replace(/\/$/, "");
   if (process.env.NODE_ENV !== "production") {
-    return "http://localhost:3000".replace(/\/$/, "");
+    return "http://localhost:3001".replace(/\/$/, "");
   }
   return "";
 }

@@ -8,6 +8,8 @@ import { OwnerModal, type OwnerData } from "@/components/crm/OwnerModal";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
 import { isCabinetAdminRole } from "@/lib/employeeUser";
 import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
+
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
 import { cn } from "@/lib/utils";
 
 interface OwnerLinkedProperty {
@@ -46,6 +48,11 @@ export function AccountOwnersTable() {
 
   const [rows, setRows] = useState<OwnerRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts.  */
+  usePageLoading(loading);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
