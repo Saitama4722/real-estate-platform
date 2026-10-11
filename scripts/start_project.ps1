@@ -167,6 +167,7 @@ try {
 # Python — ищем venv, иначе системный
 $pythonExe = $null
 $venvPaths = @(
+    (Join-Path $env:LOCALAPPDATA "Centreal\venv\Scripts\python.exe"),  # per-machine venv, see start_local.ps1
     (Join-Path $BackendDir  "venv\.venv\Scripts\python.exe"),
     (Join-Path $BackendDir  "venv\Scripts\python.exe"),
     (Join-Path $BackendDir  ".venv\Scripts\python.exe"),

@@ -94,8 +94,12 @@ $BackendProbeUrl = "$BackendUrl/api/properties/"
 # These ceilings only ever matter when something is wrong, and a process that has
 # actually DIED is now detected directly (see the liveness check below) instead
 # of by waiting out the clock - so being generous here costs nothing real.
+#   * Next.js on a machine whose pCloud cache is COLD (node_modules online-only,
+#     every file fetched on first read at ~0.3-0.5s): bound 3001 ~9 min after
+#     start `[measured]` 2026-10-11 on the laptop. Hitting this budget is
+#     therefore reported as "still starting", not as a failure - see step 7/7.
 $BackendReadyTimeoutSec  = 180
-$FrontendReadyTimeoutSec = 300
+$FrontendReadyTimeoutSec = 600
 
 # --- Console helpers -----------------------------------------------------
 function Write-OK   ($m) { Write-Host "  [OK]   $m" -ForegroundColor Green }
@@ -160,25 +164,131 @@ if ($memuraiSvc) {
 # ============================================================================
 Write-Step "2/7 Backend virtual environment"
 
-$venvCandidates = @(
-    (Join-Path $BackendDir ".venv"),
-    (Join-Path $BackendDir "venv")
-)
-$venvDir = $null
-foreach ($c in $venvCandidates) {
-    if (Test-Path (Join-Path $c "Scripts\Activate.ps1")) { $venvDir = $c; break }
-}
-if (-not $venvDir) {
-    Write-Err "No virtual environment found in backend/ (.venv or venv)."
-    Write-Warn "Create it once with:"
-    Write-Host "      cd backend; python -m venv .venv; .venv\Scripts\Activate.ps1; pip install -r requirements.txt" -ForegroundColor DarkGray
+# ⭐ The venv lives OUTSIDE pCloud, per machine: %LOCALAPPDATA%\Centreal\venv.
+#
+# A venv is not portable. Its pyvenv.cfg hard-codes the ABSOLUTE path of the base
+# interpreter (C:\Users\<user>\AppData\Local\Programs\Python\Python310), and this
+# repo is synced by pCloud between PCs with DIFFERENT user names. A venv inside
+# backend\ therefore worked on one machine and died on the other with
+#     No Python at 'C:\Users\<other user>\...\python.exe'
+# So: one venv per machine under LOCALAPPDATA, located and (re)built from the py
+# launcher - never a hard-coded user path - and repaired automatically here.
+$venvDir    = Join-Path $env:LOCALAPPDATA "Centreal\venv"
+$venvPython = Join-Path $venvDir "Scripts\python.exe"
+$venvHashFile     = Join-Path $venvDir ".requirements.sha256"
+$requirementsFile = Join-Path $BackendDir "requirements.txt"
+
+function Stop-Launcher {
     Write-Host ""
     Read-Host "  Press Enter to exit"
     exit 1
 }
-$venvActivate = Join-Path $venvDir "Scripts\Activate.ps1"
-$venvPython   = Join-Path $venvDir "Scripts\python.exe"
-Write-OK "Using virtual environment: $venvDir"
+
+# "Usable" means the interpreter actually starts - an existing folder whose
+# pyvenv.cfg points at another machine's Python is exactly the broken case.
+function Test-VenvUsable {
+    if (-not (Test-Path -LiteralPath $venvPython)) { return $false }
+    try {
+        & $venvPython -c "import sys" 2>$null | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+# Returns the py-launcher selector ("-3.10", "-3.12", ...) to build the venv with:
+# 3.10 first (what both machines run), else the newest 3.10-3.12 that `py -0p` lists.
+function Get-BasePythonSelector {
+    if (-not (Get-Command py -ErrorAction SilentlyContinue)) { return $null }
+
+    & py -3.10 -c "import sys" 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { return "-3.10" }
+
+    $listing = @(& py -0p 2>$null)
+    $minors = @()
+    foreach ($line in $listing) {
+        # Older launchers print " -3.12-64  <path>", newer ones " -V:3.12 *  <path>".
+        if ($line -match '-(?:V:)?3\.(1[0-2])\b') { $minors += [int]$Matches[1] }
+    }
+    if ($minors.Count -eq 0) { return $null }
+    $best = ($minors | Sort-Object -Descending -Unique | Select-Object -First 1)
+    return "-3.$best"
+}
+
+if (Test-VenvUsable) {
+    Write-OK "Virtual environment OK: $venvDir"
+} else {
+    if (Test-Path -LiteralPath $venvDir) {
+        Write-Warn "Virtual environment at $venvDir is broken (its python.exe does not start)."
+        Write-Info "Deleting it and rebuilding from this machine's Python..."
+        try {
+            Remove-Item -LiteralPath $venvDir -Recurse -Force -ErrorAction Stop
+        } catch {
+            Write-Err "Could not delete the broken venv: $($_.Exception.Message)"
+            Write-Warn "Close any window still using it (Centreal Backend / Celery), or run scripts\stop_local.ps1, then re-run."
+            Stop-Launcher
+        }
+    } else {
+        Write-Info "No virtual environment on this machine yet - creating $venvDir"
+    }
+
+    $pySelector = Get-BasePythonSelector
+    if (-not $pySelector) {
+        Write-Err "No usable Python found. Need Python 3.10 (or 3.11 / 3.12) registered with the py launcher."
+        Write-Warn "Install Python 3.10 from python.org (keep 'py launcher' ticked), then re-run."
+        Write-Host "      Check what is installed with:  py -0p" -ForegroundColor DarkGray
+        Stop-Launcher
+    }
+    if ($pySelector -ne "-3.10") {
+        Write-Warn "Python 3.10 not found via the py launcher - falling back to py $pySelector"
+    }
+
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $venvDir) | Out-Null
+    & py $pySelector -m venv $venvDir
+    if ($LASTEXITCODE -ne 0 -or -not (Test-VenvUsable)) {
+        Write-Err "Creating the virtual environment failed (py $pySelector -m venv `"$venvDir`")."
+        Stop-Launcher
+    }
+    Write-OK "Virtual environment created with py ${pySelector}: $venvDir"
+}
+
+# --- Dependency sync, keyed on the requirements.txt hash ------------------
+# The hash lives INSIDE the venv, so a rebuilt venv always reinstalls and a
+# requirements change on the other machine arrives here via pCloud and triggers
+# an install on next launch.
+$reqHash = (Get-FileHash -LiteralPath $requirementsFile -Algorithm SHA256).Hash
+$installedHash = $null
+if (Test-Path -LiteralPath $venvHashFile) {
+    $installedHash = (Get-Content -LiteralPath $venvHashFile -Raw -ErrorAction SilentlyContinue)
+    if ($installedHash) { $installedHash = $installedHash.Trim() }
+}
+
+if ($installedHash -eq $reqHash) {
+    Write-OK "Python packages up to date (requirements.txt unchanged)"
+} else {
+    Write-Host ""
+    if (-not $installedHash) {
+        Write-Info "First run on this machine: installing Python packages, this may take a few minutes..."
+    } else {
+        Write-Info "backend\requirements.txt changed: updating Python packages..."
+    }
+    & $venvPython -m pip install --upgrade pip
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "pip self-upgrade failed - continuing with the bundled pip."
+    }
+    & $venvPython -m pip install -r $requirementsFile
+    if ($LASTEXITCODE -ne 0) {
+        # No hash is written, so the next launch retries the install.
+        Write-Err "pip install -r backend\requirements.txt FAILED - see the output above."
+        Stop-Launcher
+    }
+    Set-Content -LiteralPath $venvHashFile -Value $reqHash -Encoding ASCII
+    Write-OK "Python packages installed"
+}
+
+# Single-quote-escaped copies for the -Command payloads below.
+$venvPythonQ = $venvPython -replace "'", "''"
+$managePyQ   = (Join-Path $BackendDir "manage.py") -replace "'", "''"
 
 # ============================================================================
 #  3. Port preflight - identify the owner, never blind-kill by port
@@ -483,13 +593,16 @@ function Start-ServiceWindow {
 # --- Backend -------------------------------------------------------------
 # PYTHONUTF8=1 so Cyrillic in Django's output cannot raise UnicodeEncodeError in
 # a legacy-code-page console and take the server down with it.
+# manage.py is passed by ABSOLUTE path on purpose: the venv now lives outside the
+# repo, so the interpreter path no longer names it, and the autoreloader re-execs
+# with the same argv - this keeps the repo path in every runserver command line
+# that Test-BelongsToProject inspects.
 $backendCmd = @(
     "`$host.UI.RawUI.WindowTitle = 'Centreal Backend'"
     "Set-Location -LiteralPath '$BackendDir'"
-    "& '$venvActivate'"
     "`$env:PYTHONUTF8 = '1'"
-    "Write-Host ('  python: ' + (Get-Command python).Source) -ForegroundColor DarkGray"
-    "python manage.py runserver $BackendPort"
+    "Write-Host '  python: $venvPythonQ' -ForegroundColor DarkGray"
+    "& '$venvPythonQ' '$managePyQ' runserver $BackendPort"
     $exitBanner
 ) -join "; "
 
@@ -547,7 +660,7 @@ $workerCmd = @(
     "`$host.UI.RawUI.WindowTitle = 'Centreal Celery'"
     "Set-Location -LiteralPath '$BackendDir'"
     "`$env:PYTHONUTF8 = '1'"
-    "& '$venvPython' -m celery -A config.celery worker -l info -P solo"
+    "& '$venvPythonQ' -m celery -A config.celery worker -l info -P solo"
     $exitBanner
 ) -join "; "
 
@@ -714,6 +827,10 @@ if ($backendReady) {
 
 Write-Step "7/7 Waiting for the frontend (up to ${FrontendReadyTimeoutSec}s)"
 $frontendReady = $false
+# Budget ran out while the process is still ALIVE. On this pCloud drive that is
+# a cold first start, not a failure: the server keeps going and answers later,
+# so the browser is opened anyway. A process that DIED is still a real failure.
+$frontendSlow  = $false
 if (-not $backendReady) {
     # Opening the browser now would only show a site whose every server-side
     # fetch fails with ECONNREFUSED - the confusing symptom this launcher exists
@@ -733,14 +850,16 @@ if (-not $backendReady) {
         Write-Err "The error is in the 'Centreal Frontend' window, which was kept open for it."
         Write-Warn "If it says EADDRINUSE, something claimed port $FrontendPort after the preflight."
     } else {
-        Write-Err "Frontend did not answer within ${FrontendReadyTimeoutSec}s: $($r.Error)"
-        Write-Warn "It may simply still be compiling - check the 'Centreal Frontend' window."
+        $frontendSlow = $true
+        Write-Warn "First start on this machine can be slow (pCloud is downloading files)"
+        Write-Warn "The frontend has not answered after ${FrontendReadyTimeoutSec}s but is still running."
+        Write-Warn "Opening the browser anyway - refresh it in a few minutes if the page is not up yet."
     }
 }
 
 # --- Browser -------------------------------------------------------------
 Write-Host ""
-if ($backendReady -and $frontendReady) {
+if ($backendReady -and ($frontendReady -or $frontendSlow)) {
     Write-Info "Opening the browser at $FrontendUrl ..."
     Start-Process $FrontendUrl | Out-Null
     Write-OK "Browser opened at $FrontendUrl"
@@ -791,6 +910,8 @@ Write-Host ""
 Write-Host "  ============================================" -ForegroundColor DarkGray
 if ($backendReady -and $frontendReady) {
     Write-Host "   Centreal is UP" -ForegroundColor Green
+} elseif ($backendReady -and $frontendSlow) {
+    Write-Host "   Centreal is STARTING - backend up, frontend still loading" -ForegroundColor Yellow
 } else {
     Write-Host "   Centreal did NOT start cleanly" -ForegroundColor Red
 }
@@ -805,5 +926,7 @@ Write-Host "   3000 and 8000 are permanently held by other software on this PC."
 Write-Host "   To stop everything: scripts\stop_local.ps1" -ForegroundColor DarkGray
 Write-Host ""
 
-if ($backendReady -and $frontendReady) { exit 0 }
+# A slow cold start exits 0 too: Start Centreal.bat would otherwise hold its
+# window open with "did not complete cleanly" over a start that is merely slow.
+if ($backendReady -and ($frontendReady -or $frontendSlow)) { exit 0 }
 exit 1
