@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 param(
-    [int]$Port       = 3000,
+    [int]$Port       = 3001,
     [string]$LogFile = "",
     [string]$ApiUrl  = "http://localhost:8000/api"
 )

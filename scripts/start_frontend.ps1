@@ -8,7 +8,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 #  Автоматически:
 #    - проверяет Node.js/npm
 #    - устанавливает зависимости при необходимости
-#    - находит свободный порт (3000–3010)
+#    - находит свободный порт (3001–3010)
 #    - запускает Next.js dev сервер
 #    - открывает браузер
 #    - пишет лог в logs/frontend/
@@ -174,7 +174,7 @@ if (-not (Test-Path $nodeModules)) {
 # ================================================================
 Print-Section "Шаг 4 / Поиск свободного порта"
 
-$port    = 3000
+$port    = 3001
 $maxPort = 3010
 
 while ($port -le $maxPort) {
@@ -185,7 +185,7 @@ while ($port -le $maxPort) {
 }
 
 if ($port -gt $maxPort) {
-    Print-Fail "Нет свободных портов в диапазоне 3000–$maxPort"
+    Print-Fail "Нет свободных портов в диапазоне 3001–$maxPort"
     Log "ОШИБКА: нет свободных портов"
     Write-Host ""
     Read-Host "  Нажмите Enter для выхода"

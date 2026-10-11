@@ -9,7 +9,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 #    - проверяет окружение (Docker, Python, Node.js)
 #    - запускает базу данных через docker compose
 #    - находит свободный порт для backend (8000–8010)
-#    - находит свободный порт для frontend (3000–3010)
+#    - находит свободный порт для frontend (3001–3010)
 #    - запускает Django backend в отдельном окне
 #    - запускает Next.js frontend в отдельном окне
 #    - открывает браузер
@@ -300,9 +300,9 @@ if ($backendPort -eq -1) {
 Print-OK "Backend порт:  $backendPort"
 Log "Backend порт: $backendPort"
 
-$frontendPort = Find-FreePort 3000 3010
+$frontendPort = Find-FreePort 3001 3010
 if ($frontendPort -eq -1) {
-    Print-Fail "Нет свободных портов в диапазоне 3000–3010"
+    Print-Fail "Нет свободных портов в диапазоне 3001–3010"
     Log "ОШИБКА: нет свободных портов для frontend"
     Write-Host ""
     Read-Host "  Нажмите Enter для выхода"

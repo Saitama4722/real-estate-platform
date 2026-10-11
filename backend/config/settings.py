@@ -11,9 +11,15 @@ from celery.schedules import crontab
 from dotenv import load_dotenv
 
 from common.media_storage import default_storages_entry
+from config.db_env import expected_db_name, resolve_database_url
 
 # Load .env for local development. In production (Railway) env vars are injected
 # by the platform and load_dotenv() is a no-op (existing vars are not overridden).
+#
+# ⚠ NOTE THE "not overridden" PART — it is not a footnote, it is the reason the
+# database resolution below reads CENTREAL_DATABASE_URL first. An OS-level
+# variable of the same name as one in backend/.env WINS, silently. Do not add
+# override=True here (config/db_env.py explains what that would break in prod).
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -190,7 +196,18 @@ try:
 except ValueError:
     _conn_max_age = 600
 
-_database_url = os.environ.get("DATABASE_URL", "").strip()
+# ⚠ RESOLUTION ORDER IS CENTREAL_DATABASE_URL → DATABASE_URL → POSTGRES_* parts.
+# The project-specific name is checked FIRST because this machine has a
+# persistent User-level Windows `DATABASE_URL` belonging to another tool, and
+# load_dotenv() never overrides an already-present variable — so backend/.env
+# silently lost and Django connected to the wrong database. See config/db_env.py
+# for the full reasoning, including why load_dotenv(override=True) was rejected.
+_database_url, CENTREAL_DB_URL_SOURCE = resolve_database_url(is_deployed=IS_DEPLOYED)
+
+#: Which database this checkout expects locally; drives the startup guard in
+#: common.apps.CommonConfig.ready().
+CENTREAL_EXPECTED_DB_NAME = expected_db_name()
+
 if _database_url:
     DATABASES = {
         "default": dj_database_url.parse(_database_url, conn_max_age=_conn_max_age),
