@@ -24,11 +24,23 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# True when running on Railway. Several signals, because the guard below is a
+# True when running deployed. Several signals, because the guards below are a
 # security control and must not be disarmed by one variable changing name.
+#
+# ⚠ CENTREAL_DEPLOYED is the signal for the Docker deploy (Beget VPS), which has
+# no RAILWAY_* variables. docker-compose.prod.yml sets it on every Django
+# container. Without it, IS_DEPLOYED is False there: a missing DJANGO_SECRET_KEY
+# silently becomes a RANDOM key PER PROCESS (each gunicorn worker signs JWTs
+# with a different key → random 401s), DEBUG=True does not refuse to boot, and
+# the DB resolution order stays the local-dev one.
 IS_DEPLOYED = any(
     os.environ.get(name, "").strip()
-    for name in ("RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "RAILWAY_SERVICE_ID")
+    for name in (
+        "CENTREAL_DEPLOYED",
+        "RAILWAY_ENVIRONMENT",
+        "RAILWAY_PROJECT_ID",
+        "RAILWAY_SERVICE_ID",
+    )
 )
 
 # --- SECRET_KEY --------------------------------------------------------------
