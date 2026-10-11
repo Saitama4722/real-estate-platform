@@ -1,0 +1,962 @@
+{
+  "_comment": "SERVICE AREA of Centreal, as a UNION OF PER-SETTLEMENT CIRCLES. ⭐ THE Город/Район DROPDOWN DEFINES THE SCOPE: every row that has coordinates gets a circle, and a point is inside the service area iff it is within the radius of ANY circle. Rectangles were REJECTED — see CLAUDE.md: a box containing all 72 Krasnodar rows also swallows Усть-Лабинск, Абинск and Крымск, because the округ is too dispersed for a rectangle. Mirrored by backend/common/city_bounds.py; backend/common/tests.py asserts the two agree and that no dropdown row gains coordinates without gaining a circle. Regenerate, do not hand-edit.",
+  "model": "circle-union",
+  "radiusByTypeKm": {
+    "town": 5.0,
+    "administrative": 4.0,
+    "village": 3.5,
+    "suburb": 3.0,
+    "neighbourhood": 3.0,
+    "quarter": 3.0,
+    "residential": 3.0,
+    "hamlet": 2.5,
+    "locality": 2.5,
+    "isolated_dwelling": 2.0,
+    "allotments": 2.0,
+    "farm": 2.0
+  },
+  "centroidRadiusKm": 4.0,
+  "cities": {
+    "Краснодар": {
+      "lat": 45.0355,
+      "lon": 38.9753,
+      "radiusKm": 16.0,
+      "kind": "city"
+    },
+    "Геленджик": {
+      "lat": 44.5622,
+      "lon": 38.0848,
+      "radiusKm": 10.0,
+      "kind": "city"
+    }
+  },
+  "settlements": {
+    "Авиагородок": {
+      "city": "Краснодар",
+      "lat": 45.076199,
+      "lon": 38.97247,
+      "kind": "neighbourhood",
+      "radiusKm": 3.0,
+      "standalone": false
+    },
+    "Адербиевка": {
+      "city": "Геленджик",
+      "lat": 44.60482,
+      "lon": 38.104103,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Архипо-Осиповка": {
+      "city": "Геленджик",
+      "lat": 44.370318,
+      "lon": 38.533611,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "Береговое": {
+      "city": "Геленджик",
+      "lat": 44.418835,
+      "lon": 38.360098,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Бетта": {
+      "city": "Геленджик",
+      "lat": 44.372802,
+      "lon": 38.395614,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Витаминкомбинат": {
+      "city": "Краснодар",
+      "lat": 45.150234,
+      "lon": 38.997012,
+      "kind": "locality",
+      "radiusKm": 2.5,
+      "standalone": false
+    },
+    "Возрождение": {
+      "city": "Геленджик",
+      "lat": 44.550869,
+      "lon": 38.214794,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Геленджик": {
+      "city": "Геленджик",
+      "lat": 44.560945,
+      "lon": 38.076683,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "Голубая бухта": {
+      "city": "Геленджик",
+      "lat": 44.580122,
+      "lon": 37.986923,
+      "kind": "suburb",
+      "radiusKm": 3.0,
+      "standalone": true
+    },
+    "Джанхот": {
+      "city": "Геленджик",
+      "lat": 44.464607,
+      "lon": 38.156178,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Дивноморское": {
+      "city": "Геленджик",
+      "lat": 44.504033,
+      "lon": 38.132551,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Дубинка": {
+      "city": "Краснодар",
+      "lat": 45.02738,
+      "lon": 38.840676,
+      "kind": "administrative",
+      "radiusKm": 4.0,
+      "standalone": false
+    },
+    "Западный": {
+      "city": "Геленджик",
+      "lat": 44.600308,
+      "lon": 38.028179,
+      "kind": "quarter",
+      "radiusKm": 3.0,
+      "standalone": false
+    },
+    "Кабардинка": {
+      "city": "Геленджик",
+      "lat": 44.651572,
+      "lon": 37.939529,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "Калинино": {
+      "city": "Краснодар",
+      "lat": 45.108682,
+      "lon": 38.938652,
+      "kind": "suburb",
+      "radiusKm": 3.0,
+      "standalone": false
+    },
+    "Криница": {
+      "city": "Геленджик",
+      "lat": 44.390468,
+      "lon": 38.339652,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Магилат": {
+      "city": "Геленджик",
+      "lat": 44.5514,
+      "lon": 38.09774,
+      "kind": "suburb",
+      "radiusKm": 3.0,
+      "standalone": false
+    },
+    "Марьина Роща": {
+      "city": "Геленджик",
+      "lat": 44.618471,
+      "lon": 38.027112,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Михайловский перевал": {
+      "city": "Геленджик",
+      "lat": 44.511723,
+      "lon": 38.320261,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Нахаловка": {
+      "city": "Геленджик",
+      "lat": 44.598162,
+      "lon": 38.048596,
+      "kind": "locality",
+      "radiusKm": 2.5,
+      "standalone": false
+    },
+    "Немецкая деревня": {
+      "city": "Краснодар",
+      "lat": 45.119807,
+      "lon": 38.927158,
+      "kind": "quarter",
+      "radiusKm": 3.0,
+      "standalone": true
+    },
+    "Новознаменский": {
+      "city": "Краснодар",
+      "lat": 45.052185,
+      "lon": 39.118744,
+      "kind": "suburb",
+      "radiusKm": 3.0,
+      "standalone": false
+    },
+    "Парус": {
+      "city": "Геленджик",
+      "lat": 44.547922,
+      "lon": 38.077949,
+      "kind": "suburb",
+      "radiusKm": 3.0,
+      "standalone": false
+    },
+    "Прасковеевка": {
+      "city": "Геленджик",
+      "lat": 44.454246,
+      "lon": 38.212907,
+      "kind": "allotments",
+      "radiusKm": 2.0,
+      "standalone": true
+    },
+    "Пшада": {
+      "city": "Геленджик",
+      "lat": 44.472083,
+      "lon": 38.397112,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Российский": {
+      "city": "Краснодар",
+      "lat": 45.117473,
+      "lon": 39.045271,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": false
+    },
+    "СНТ Сосновое": {
+      "city": "Геленджик",
+      "lat": 44.535693,
+      "lon": 38.098612,
+      "kind": "allotments",
+      "radiusKm": 2.0,
+      "standalone": true
+    },
+    "Северный": {
+      "city": "Геленджик",
+      "lat": 44.602042,
+      "lon": 38.031183,
+      "kind": "quarter",
+      "radiusKm": 3.0,
+      "standalone": false
+    },
+    "Текос": {
+      "city": "Геленджик",
+      "lat": 44.440897,
+      "lon": 38.465368,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Тешебс": {
+      "city": "Геленджик",
+      "lat": 44.371673,
+      "lon": 38.585997,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "Толстый мыс": {
+      "city": "Геленджик",
+      "lat": 44.554076,
+      "lon": 38.054251,
+      "kind": "suburb",
+      "radiusKm": 3.0,
+      "standalone": false
+    },
+    "Тонкий мыс": {
+      "city": "Геленджик",
+      "lat": 44.56476,
+      "lon": 38.026615,
+      "kind": "suburb",
+      "radiusKm": 3.0,
+      "standalone": false
+    },
+    "Энка": {
+      "city": "Краснодар",
+      "lat": 45.100348,
+      "lon": 38.977088,
+      "kind": "suburb",
+      "radiusKm": 3.0,
+      "standalone": false
+    },
+    "Южный": {
+      "city": "Геленджик",
+      "lat": 44.560945,
+      "lon": 38.076683,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": false
+    },
+    "аул Гатлукай": {
+      "city": "Краснодар",
+      "lat": 44.892022,
+      "lon": 39.23662,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "аул Козет": {
+      "city": "Краснодар",
+      "lat": 44.996096,
+      "lon": 38.998804,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "аул Новая Адыгея": {
+      "city": "Краснодар",
+      "lat": 45.024767,
+      "lon": 38.933164,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "аул Новый": {
+      "city": "Краснодар",
+      "lat": 45.006898,
+      "lon": 38.979749,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "аул Псекупс": {
+      "city": "Краснодар",
+      "lat": 44.831163,
+      "lon": 39.211196,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "аул Тахтамукай": {
+      "city": "Краснодар",
+      "lat": 44.921286,
+      "lon": 38.994718,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "п. Агроном": {
+      "city": "Краснодар",
+      "lat": 45.139199,
+      "lon": 39.191763,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Афипский": {
+      "city": "Краснодар",
+      "lat": 44.904044,
+      "lon": 38.842682,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "п. Белозёрный": {
+      "city": "Краснодар",
+      "lat": 45.069405,
+      "lon": 38.720773,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Берёзовый": {
+      "city": "Краснодар",
+      "lat": 45.154958,
+      "lon": 38.963483,
+      "kind": "locality",
+      "radiusKm": 2.5,
+      "standalone": true
+    },
+    "п. Дорожный": {
+      "city": "Краснодар",
+      "lat": 45.117535,
+      "lon": 39.35225,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Дружелюбный": {
+      "city": "Краснодар",
+      "lat": 45.123724,
+      "lon": 39.150132,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Зарождение": {
+      "city": "Краснодар",
+      "lat": 45.158178,
+      "lon": 39.235701,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Зеленопольский": {
+      "city": "Краснодар",
+      "lat": 45.120742,
+      "lon": 39.177781,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Знаменский": {
+      "city": "Краснодар",
+      "lat": 45.053167,
+      "lon": 39.14839,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Зональный": {
+      "city": "Краснодар",
+      "lat": 45.087912,
+      "lon": 39.118603,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Ильский": {
+      "city": "Краснодар",
+      "lat": 44.845854,
+      "lon": 38.560825,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "п. Индустриальный": {
+      "city": "Краснодар",
+      "lat": 45.093737,
+      "lon": 39.108942,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Колосистый": {
+      "city": "Краснодар",
+      "lat": 45.132966,
+      "lon": 38.904663,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Краснодарский": {
+      "city": "Краснодар",
+      "lat": 45.06769,
+      "lon": 39.051119,
+      "kind": "allotments",
+      "radiusKm": 2.0,
+      "standalone": true
+    },
+    "п. Краснолит": {
+      "city": "Краснодар",
+      "lat": 45.152167,
+      "lon": 38.841275,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Красносельское": {
+      "city": "Краснодар",
+      "lat": 45.285773,
+      "lon": 39.157696,
+      "kind": "administrative",
+      "radiusKm": 4.0,
+      "standalone": true
+    },
+    "п. Лазурный": {
+      "city": "Краснодар",
+      "lat": 45.154004,
+      "lon": 39.126304,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Лорис": {
+      "city": "Краснодар",
+      "lat": 45.087912,
+      "lon": 39.118603,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Новая Адыгея": {
+      "city": "Краснодар",
+      "lat": 45.024767,
+      "lon": 38.933164,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Плодородный": {
+      "city": "Краснодар",
+      "lat": 45.06769,
+      "lon": 39.051119,
+      "kind": "allotments",
+      "radiusKm": 2.0,
+      "standalone": true
+    },
+    "п. Победитель": {
+      "city": "Краснодар",
+      "lat": 45.123185,
+      "lon": 39.099448,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Пригородный": {
+      "city": "Краснодар",
+      "lat": 45.074058,
+      "lon": 39.193525,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Разъезд": {
+      "city": "Краснодар",
+      "lat": 45.073551,
+      "lon": 39.257695,
+      "kind": "hamlet",
+      "radiusKm": 2.5,
+      "standalone": true
+    },
+    "п. Российский": {
+      "city": "Краснодар",
+      "lat": 45.117473,
+      "lon": 39.045271,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "п. Северный": {
+      "city": "Краснодар",
+      "lat": 44.825507,
+      "lon": 39.21296,
+      "kind": "hamlet",
+      "radiusKm": 2.5,
+      "standalone": true
+    },
+    "п. Тлюстенхабль": {
+      "city": "Краснодар",
+      "lat": 44.9811,
+      "lon": 39.089185,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "п. Учхоз Кубань": {
+      "city": "Краснодар",
+      "lat": 45.062256,
+      "lon": 38.885539,
+      "kind": "neighbourhood",
+      "radiusKm": 3.0,
+      "standalone": true
+    },
+    "п. Черноморский": {
+      "city": "Краснодар",
+      "lat": 44.849996,
+      "lon": 38.494406,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "п. Энем": {
+      "city": "Краснодар",
+      "lat": 44.923073,
+      "lon": 38.907142,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "п. Южный": {
+      "city": "Краснодар",
+      "lat": 44.986688,
+      "lon": 39.009046,
+      "kind": "neighbourhood",
+      "radiusKm": 3.0,
+      "standalone": true
+    },
+    "п. Яблоновский": {
+      "city": "Краснодар",
+      "lat": 44.986434,
+      "lon": 38.938284,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "пгт Калинино": {
+      "city": "Краснодар",
+      "lat": 45.108682,
+      "lon": 38.938652,
+      "kind": "suburb",
+      "radiusKm": 3.0,
+      "standalone": true
+    },
+    "пгт Пашковский": {
+      "city": "Краснодар",
+      "lat": 45.023866,
+      "lon": 39.094968,
+      "kind": "suburb",
+      "radiusKm": 3.0,
+      "standalone": true
+    },
+    "ст. Азовская": {
+      "city": "Краснодар",
+      "lat": 44.790831,
+      "lon": 38.620682,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "ст. Афипская": {
+      "city": "Краснодар",
+      "lat": 44.904044,
+      "lon": 38.842682,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "ст. Васюринская": {
+      "city": "Краснодар",
+      "lat": 45.114541,
+      "lon": 39.380507,
+      "kind": "hamlet",
+      "radiusKm": 2.5,
+      "standalone": true
+    },
+    "ст. Григорьевская": {
+      "city": "Краснодар",
+      "lat": 44.773793,
+      "lon": 38.837955,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "ст. Динская": {
+      "city": "Краснодар",
+      "lat": 45.216871,
+      "lon": 39.224976,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "ст. Елизаветинская": {
+      "city": "Краснодар",
+      "lat": 45.048057,
+      "lon": 38.792896,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "ст. Ильская": {
+      "city": "Краснодар",
+      "lat": 44.845854,
+      "lon": 38.560825,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "ст. Марьянская": {
+      "city": "Краснодар",
+      "lat": 45.099123,
+      "lon": 38.63679,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "ст. Михайловская": {
+      "city": "Краснодар",
+      "lat": 44.854145,
+      "lon": 39.621854,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "ст. Нововеличковская": {
+      "city": "Краснодар",
+      "lat": 45.274869,
+      "lon": 38.843059,
+      "kind": "village",
+      "radiusKm": 4.0,
+      "source": "centroid of 20 named streets in the settlement",
+      "standalone": true
+    },
+    "ст. Новотитаровская": {
+      "city": "Краснодар",
+      "lat": 45.243247,
+      "lon": 38.975662,
+      "kind": "village",
+      "radiusKm": 4.0,
+      "source": "centroid of 20 named streets in the settlement",
+      "standalone": true
+    },
+    "ст. Пластуновская": {
+      "city": "Краснодар",
+      "lat": 45.29411,
+      "lon": 39.269323,
+      "kind": "village",
+      "radiusKm": 4.0,
+      "source": "centroid of 20 named streets in the settlement",
+      "standalone": true
+    },
+    "ст. Северская": {
+      "city": "Краснодар",
+      "lat": 44.853421,
+      "lon": 38.678125,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "ст. Старокорсунская": {
+      "city": "Краснодар",
+      "lat": 45.050655,
+      "lon": 39.313027,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "ст. Старомышастовская": {
+      "city": "Краснодар",
+      "lat": 45.341947,
+      "lon": 39.072969,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "ст. Черноморская": {
+      "city": "Краснодар",
+      "lat": 44.702022,
+      "lon": 39.362944,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "х. Восточный": {
+      "city": "Краснодар",
+      "lat": 44.856954,
+      "lon": 38.852692,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "х. Дальний": {
+      "city": "Краснодар",
+      "lat": 45.4036,
+      "lon": 38.852913,
+      "kind": "administrative",
+      "radiusKm": 4.0,
+      "standalone": true
+    },
+    "х. Копанской": {
+      "city": "Краснодар",
+      "lat": 45.17056,
+      "lon": 38.803573,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "х. Красный": {
+      "city": "Краснодар",
+      "lat": 44.944727,
+      "lon": 38.569106,
+      "kind": "hamlet",
+      "radiusKm": 2.5,
+      "standalone": true
+    },
+    "х. Ленина": {
+      "city": "Краснодар",
+      "lat": 45.018556,
+      "lon": 39.21034,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "х. Найдорф": {
+      "city": "Краснодар",
+      "lat": 45.329353,
+      "lon": 38.818993,
+      "kind": "administrative",
+      "radiusKm": 4.0,
+      "standalone": true
+    },
+    "х. Новый": {
+      "city": "Краснодар",
+      "lat": 45.006898,
+      "lon": 38.979749,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "х. Октябрьский": {
+      "city": "Краснодар",
+      "lat": 44.921286,
+      "lon": 38.994718,
+      "kind": "town",
+      "radiusKm": 5.0,
+      "standalone": true
+    },
+    "х. Первомайский": {
+      "city": "Краснодар",
+      "lat": 44.934013,
+      "lon": 38.449732,
+      "kind": "hamlet",
+      "radiusKm": 2.5,
+      "standalone": true
+    },
+    "х. Украинский": {
+      "city": "Краснодар",
+      "lat": 45.248157,
+      "lon": 39.346362,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    },
+    "х. Черников": {
+      "city": "Краснодар",
+      "lat": 45.185262,
+      "lon": 38.837565,
+      "kind": "hamlet",
+      "radiusKm": 2.5,
+      "standalone": true
+    },
+    "х. Янтарный": {
+      "city": "Краснодар",
+      "lat": 45.128726,
+      "lon": 39.245526,
+      "kind": "village",
+      "radiusKm": 3.5,
+      "standalone": true
+    }
+  },
+  "settlementsWithoutCircle": {
+    "9-й километр": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "ГМР (Гидростроителей)": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "ЗИП": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "КМР (Комсомольский микрорайон)": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "Микрорайоны Краснодара": {
+      "reason": "container",
+      "note": "служебная строка-контейнер, не населённый пункт"
+    },
+    "Музыкальный": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "ПМР (Пашковский микрорайон)": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "Покровка": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "Пятый микрорайон": {
+      "reason": "microdistrict",
+      "city": "Геленджик",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "СМР (Славянский микрорайон)": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "СХИ (Сельхозинститут)": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "Сосновая роща": {
+      "reason": "microdistrict",
+      "city": "Геленджик",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "ФМР (Фестивальный микрорайон)": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "ХБК (Хлопчато-бумажный комбинат)": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "ЦМР (Центральный микрорайон)": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "Центр": {
+      "reason": "microdistrict",
+      "city": "Геленджик",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "ЧМР (Черёмушки)": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "Черёмушки": {
+      "reason": "microdistrict",
+      "city": "Геленджик",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "ЮМР (Юбилейный микрорайон)": {
+      "reason": "microdistrict",
+      "city": "Краснодар",
+      "note": "микрорайон внутри города — покрыт кругом города"
+    },
+    "п. Титоровка": {
+      "reason": "unmapped",
+      "city": "Краснодар",
+      "note": "нет в OpenStreetMap; адрес вводится вручную, метку поставить нельзя"
+    },
+    "х. Навагинка": {
+      "reason": "unmapped",
+      "city": "Краснодар",
+      "note": "нет в OpenStreetMap; адрес вводится вручную, метку поставить нельзя"
+    }
+  },
+  "proof": {
+    "generated": "2026-08-31",
+    "circlesTotal": 103,
+    "selfValidated": "103/103",
+    "tightestExclusionKm": -4.5,
+    "tightestExclusionPair": [
+      "Динская",
+      "ст. Динская"
+    ]
+  }
+}

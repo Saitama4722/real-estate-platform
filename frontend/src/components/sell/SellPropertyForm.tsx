@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { LocationAutocomplete } from "@/components/crm/LocationAutocomplete";
+import { isContainerRow } from "@/components/address/addressMapConstants";
+import { AddressPicker } from "@/components/address/AddressPicker";
 import { cn } from "@/lib/utils";
 import {
   ConsentCheckbox,
@@ -40,7 +42,10 @@ const SELLING_POINTS = [
  * source of truth. If a required field is ever added, update this number too,
  * or the bar will just read "N из 8" slightly wrong; nothing will break.
  */
-const REQUIRED_STEPS = 8;
+// 9 since the precise address was added (was 8). Keep this in step with the
+// `filledCount` array below and with `validate()` — all three must agree or the
+// header reads "N из 9" while the button disagrees about what is missing.
+const REQUIRED_STEPS = 9;
 
 /** Russian plural for «поле» after a numeral (1 поле / 2 поля / 5 полей). */
 function pluralFields(n: number): string {
@@ -106,6 +111,9 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
   const [ownerPhone, setOwnerPhone] = useState(PHONE_EMPTY);
   const [cityId, setCityId] = useState("");
   const [locationKey, setLocationKey] = useState(""); // key into locationRows
+  const [address, setAddress] = useState("");
+  const [addrLat, setAddrLat] = useState<number | null>(null);
+  const [addrLng, setAddrLng] = useState<number | null>(null);
   const [description, setDescription] = useState("");
   const [propertyType, setPropertyType] = useState("");
   const [area, setArea] = useState("");
@@ -197,12 +205,17 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
             kind: "neighborhood" as const,
             name: `${n.name} (микрорайон)`,
           })),
-          ...dList.map((d: { id: number; name: string }) => ({
-            key: `d-${d.id}`,
-            id: d.id,
-            kind: "district" as const,
-            name: d.name,
-          })),
+          // ⚠ «Микрорайоны Краснодара» is a GROUPING row, not a place — nobody
+          // lives in it, it has no coordinates, and selecting it would scope the
+          // geocoder to nothing. Keep it out of the selector entirely.
+          ...dList
+            .filter((d: { name: string }) => !isContainerRow(d.name))
+            .map((d: { id: number; name: string }) => ({
+              key: `d-${d.id}`,
+              id: d.id,
+              kind: "district" as const,
+              name: d.name,
+            })),
         ];
         setLocationRows(rows);
       } catch (e) {
@@ -231,6 +244,17 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
   const cityOptions = useMemo(
     () => cities.map((c) => ({ id: c.id, name: c.name })),
     [cities],
+  );
+
+  // Plain names for the address picker: they bias the geocoder to the city the
+  // owner already chose, and re-centre the map on it before any point exists.
+  const cityName = useMemo(
+    () => cities.find((c) => String(c.id) === cityId)?.name ?? "",
+    [cities, cityId],
+  );
+  const districtName = useMemo(
+    () => locationRows.find((r) => r.key === locationKey)?.name ?? "",
+    [locationRows, locationKey],
   );
 
   const onPickPhotos = (files: FileList | null) => {
@@ -279,6 +303,8 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
       e.owner_phone = "Укажите корректный номер телефона.";
     if (!cityId) e.city = "Выберите город.";
     if (!locationKey) e.location = "Выберите район или микрорайон.";
+    if (address.trim().length < 5)
+      e.address = "Укажите точный адрес: улицу и номер дома.";
     if (description.trim().length < 10)
       e.description = "Опишите объект чуть подробнее (минимум 10 символов).";
     if (photos.length < 1) e.photos = "Добавьте хотя бы одно фото.";
@@ -307,6 +333,13 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
       fd.append("city", cityId);
       if (row?.kind === "district") fd.append("district", String(row.id));
       if (row?.kind === "neighborhood") fd.append("neighborhood", String(row.id));
+      fd.append("address", address.trim());
+      // Coordinates are optional on purpose: if the geocoder was unreachable the
+      // owner still typed an address, and the lead must go through.
+      if (addrLat != null && addrLng != null) {
+        fd.append("latitude", addrLat.toFixed(6));
+        fd.append("longitude", addrLng.toFixed(6));
+      }
       fd.append("description", description.trim());
       if (propertyType) fd.append("property_type", propertyType);
       if (area.trim()) fd.append("area", area.trim());
@@ -385,6 +418,7 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
     countPhoneDigits(ownerPhone) >= PHONE_MIN_DIGITS,
     !!cityId,
     !!locationKey,
+    address.trim().length >= 5,
     description.trim().length >= 10,
     photos.length > 0,
     captchaAnswer.trim() !== "",
@@ -513,6 +547,32 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
               return n;
             });
           }}
+        />
+      </div>
+
+      {/* Precise address + map. Required, and counted in the progress header. */}
+      <div>
+        <AddressPicker
+          required
+          value={address}
+          onChange={(v) => {
+            setAddress(v);
+            setErrors((e) => {
+              const n = { ...e };
+              delete n.address;
+              return n;
+            });
+          }}
+          lat={addrLat}
+          lng={addrLng}
+          onPointChange={(la, ln) => {
+            setAddrLat(la);
+            setAddrLng(ln);
+          }}
+          cityName={cityName}
+          districtName={districtName}
+          disabled={submitting}
+          error={errors.address}
         />
       </div>
 
@@ -792,7 +852,16 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
           type="submit"
           size="lg"
           fullWidth
-          disabled={submitting || captchaLoading || !consent}
+          // ⚠ The address is gated HERE as well as in validate(). Measured: the
+          // button was previously disabled only by `!consent` — it was never
+          // gated on the other required fields despite the header implying it —
+          // so with consent ticked the form could be submitted with the address
+          // empty and only the inline error would stop it. The new required
+          // field gates the button too; the pre-existing fields are left as they
+          // were rather than silently changing their behaviour.
+          disabled={
+            submitting || captchaLoading || !consent || address.trim().length < 5
+          }
         >
           {submitting ? "Отправка…" : "Отправить заявку"}
         </Button>

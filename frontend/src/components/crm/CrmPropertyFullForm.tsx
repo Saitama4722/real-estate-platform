@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import { LocationAutocomplete } from "@/components/crm/LocationAutocomplete";
 import { CrmPropertyPhotosManager } from "@/components/crm/CrmPropertyPhotosManager";
 import {
   CrmStagedPhotosPicker,
-  makeStagedPhoto,
   type StagedPhoto,
 } from "@/components/crm/CrmStagedPhotosPicker";
 import { xhrUpload } from "@/lib/xhrUpload";
@@ -25,6 +24,8 @@ import {
   refreshCrmAccessToken,
 } from "@/lib/crmAuth";
 import { crmBrowserApiUrl, employeeAuthAbsoluteUrl } from "@/lib/crmAuthConstants";
+
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
 import {
   type ApartmentDetailsForm,
   type ChoiceItem,
@@ -58,17 +59,31 @@ function stripPrice(formatted: string): string {
   return formatted.replace(/\D/g, "");
 }
 
-const CrmPropertyAddressMap = dynamic(
+/**
+ * ⭐ THE SAME ADDRESS PICKER THE PUBLIC /sell FORM USES — one component, not two.
+ *
+ * This replaced `CrmPropertyAddressMap`, a second implementation that had drifted
+ * badly: a plain text input with no suggestions, a map that never recentred on
+ * the selected Район, and a caption still crediting 2GIS for tiles that are now
+ * OpenStreetMap and for suggestions from a key that has not worked in months.
+ *
+ * ⚠ The CRM and the public form share this component OUTRIGHT. The one place
+ * they genuinely differ — how strictly a point is accepted — lives in the
+ * SERIALIZERS, not here: the public SaleRequest serializer rejects a point
+ * outside the service area, while the CRM property serializer does not validate
+ * coordinates at all. That is deliberate and is the realtor override; a realtor
+ * entering an address they know is right is not second-guessed. The picker
+ * itself never blocks a point, it only scopes suggestions and centres the map,
+ * so no variant prop is needed.
+ *
+ * ⚠ ssr:false is mandatory — it loads Leaflet, which reads `window` on import.
+ */
+const AddressPicker = dynamic(
   () =>
-    import("@/components/crm/CrmPropertyAddressMap").then((m) => ({
-      default: m.CrmPropertyAddressMap,
+    import("@/components/address/AddressPicker").then((m) => ({
+      default: m.AddressPicker,
     })),
-  {
-    ssr: false,
-    loading: () => (
-      <p className="text-sm text-gray-500">Загрузка блока адреса и карты…</p>
-    ),
-  },
+  { ssr: false, loading: () => <div className="h-[360px]" /> },
 );
 
 interface DuplicateCandidate {
@@ -240,6 +255,19 @@ export function CrmPropertyFullForm({
   const [rcId, setRcId] = useState("");
   const [latitudeStr, setLatitudeStr] = useState("");
   const [longitudeStr, setLongitudeStr] = useState("");
+  /** ⚠ This used to live inside CrmPropertyAddressMap's LOCAL state and was
+   *  never sent — the realtor's typed address was silently discarded on save.
+   *  It now round-trips through `public_address_text`. */
+  const [addressText, setAddressText] = useState("");
+  // What the owner's submission supplied — drives the amber review panel, so the
+  // realtor can see exactly which values they are checking rather than accepting.
+  const [submissionFilled, setSubmissionFilled] = useState<string[]>([]);
+  const [submissionAskingPrice, setSubmissionAskingPrice] = useState("");
+  const [submissionOwner, setSubmissionOwner] = useState<{
+    full_name: string;
+    phone: string;
+  } | null>(null);
+  const [submissionPhotoCount, setSubmissionPhotoCount] = useState(0);
   const [description, setDescription] = useState("");
   const [shortDescription, setShortDescription] = useState("");
 
@@ -256,6 +284,12 @@ export function CrmPropertyFullForm({
   const [choicesLoadError, setChoicesLoadError] = useState("");
 
   const [bootstrapping, setBootstrapping] = useState(mode === "edit");
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts. Only in EDIT mode: create renders its empty form immediately, so
+     there is nothing to wait for there. */
+  usePageLoading(mode === "edit" && bootstrapping);
   const [saving, setSaving] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState<DuplicateCheckResponse | null>(null);
   const [error, setError] = useState("");
@@ -467,6 +501,9 @@ export function CrmPropertyFullForm({
       setRcId(fkId(row.residential_complex));
       setLatitudeStr(row.public_latitude != null ? String(row.public_latitude) : "");
       setLongitudeStr(row.public_longitude != null ? String(row.public_longitude) : "");
+      setAddressText(
+        typeof row.public_address_text === "string" ? row.public_address_text : "",
+      );
       setDescription(typeof row.description === "string" ? row.description : "");
       setShortDescription(typeof row.short_description === "string" ? row.short_description : "");
       setAssignedRealtorId(fkId(row.assigned_realtor));
@@ -495,9 +532,18 @@ export function CrmPropertyFullForm({
     void loadProperty();
   }, [loadProperty]);
 
-  // Convert flow: pre-fill a NEW property from a "Продать недвижимость" submission.
-  // Seeds city/district/neighborhood (dependent selects self-populate off cityId),
-  // description, type, price, rooms/area, and stages the submission photos as Files.
+  /**
+   * Convert flow: pre-fill a NEW property from a «Продать недвижимость» submission.
+   *
+   * ⚠ WHAT USED TO BE DROPPED, and why it mattered: the ADDRESS, the LATITUDE
+   * and LONGITUDE the owner placed on the map, and the owner's ФИО/телефон. The
+   * realtor was retyping an address the owner had already pinned — the single
+   * most error-prone field in the form — on a page that told them the data had
+   * been carried across. Everything the submission holds is now carried.
+   *
+   * ⚠ PHOTOS ARE NO LONGER FETCHED HERE. They are copied SERVER-SIDE by
+   * `mark-converted` after the property exists; see that action for why.
+   */
   useEffect(() => {
     if (mode !== "create" || !fromSubmissionId || !getCrmAccessToken()) return;
     let cancelled = false;
@@ -508,6 +554,11 @@ export function CrmPropertyFullForm({
         );
         if (!res.ok || cancelled) return;
         const sr = (await res.json()) as {
+          owner_name?: string;
+          owner_phone?: string;
+          address?: string | null;
+          latitude?: string | null;
+          longitude?: string | null;
           description?: string;
           property_type?: string;
           area?: string | null;
@@ -516,48 +567,87 @@ export function CrmPropertyFullForm({
           city?: { id: number } | null;
           district?: { id: number } | null;
           neighborhood?: { id: number } | null;
-          photos?: { id: number; image: string }[];
+          photos?: { id: number }[];
         };
         if (cancelled) return;
 
-        if (sr.description) setDescription(sr.description);
-        if (sr.property_type) setPropertyType(sr.property_type as CrmPropertyTypeValue);
-        if (sr.asking_price != null && sr.asking_price !== "") {
-          // Backend price is a decimal string like "6500000.00" — keep integer part.
-          setPrice(String(sr.asking_price).split(".")[0]);
+        const filled: string[] = [];
+        const type = (sr.property_type || "") as CrmPropertyTypeValue;
+
+        if (sr.city?.id) {
+          setCityId(String(sr.city.id));
+          filled.push("город");
         }
-        if (sr.city?.id) setCityId(String(sr.city.id));
-        if (sr.district?.id) setDistrictId(String(sr.district.id));
-        if (sr.neighborhood?.id) setNeighborhoodId(String(sr.neighborhood.id));
-        // Rooms/area apply to the apartment detail block (the most common case).
-        if (sr.property_type === "apartment") {
-          setApt((a) => ({
-            ...a,
-            ...(sr.rooms != null ? { rooms: String(sr.rooms) } : {}),
-            ...(sr.area != null && sr.area !== ""
-              ? { area_total: String(sr.area).replace(/\.00$/, "") }
-              : {}),
-          }));
+        if (sr.district?.id) {
+          setDistrictId(String(sr.district.id));
+          filled.push("район");
+        }
+        if (sr.neighborhood?.id) {
+          setNeighborhoodId(String(sr.neighborhood.id));
+          filled.push("микрорайон");
+        }
+        if (sr.address) {
+          setAddressText(sr.address);
+          filled.push("адрес");
+        }
+        if (sr.latitude != null && sr.longitude != null) {
+          setLatitudeStr(String(sr.latitude));
+          setLongitudeStr(String(sr.longitude));
+          filled.push("координаты");
+        }
+        if (sr.description) {
+          setDescription(sr.description);
+          filled.push("описание");
+        }
+        if (sr.property_type) {
+          setPropertyType(type);
+          filled.push("тип");
         }
 
-        // Fetch each submission photo as a File and stage it for upload-on-create.
-        const photos = Array.isArray(sr.photos) ? sr.photos : [];
-        const staged: StagedPhoto[] = [];
-        for (const p of photos) {
-          try {
-            const imgRes = await fetch(p.image);
-            if (!imgRes.ok) continue;
-            const blob = await imgRes.blob();
-            const ext = (blob.type.split("/")[1] || "jpg").split(";")[0];
-            const file = new File([blob], `sale-request-${p.id}.${ext}`, {
-              type: blob.type || "image/jpeg",
-            });
-            staged.push(makeStagedPhoto(file));
-          } catch {
-            /* skip a photo that fails to fetch; not fatal */
+        // ⚠ Area and rooms used to be applied to APARTMENTS ONLY, so an owner
+        // who submitted a house or a plot had their площадь silently dropped.
+        // Each type keeps them on its own detail block.
+        const areaStr =
+          sr.area != null && sr.area !== ""
+            ? String(sr.area).replace(/\.00$/, "")
+            : "";
+        const roomsStr = sr.rooms != null ? String(sr.rooms) : "";
+        if (areaStr || roomsStr) {
+          if (type === "apartment") {
+            setApt((a) => ({
+              ...a,
+              ...(roomsStr ? { rooms: roomsStr } : {}),
+              ...(areaStr ? { area_total: areaStr } : {}),
+            }));
+          } else if (type === "house") {
+            // HouseDetailsForm has no `rooms` — the owner's room count has
+            // nowhere to go here, and is listed as unmapped in the panel.
+            setHouse((h) => ({ ...h, ...(areaStr ? { house_area: areaStr } : {}) }));
+          } else if (type === "land") {
+            setLand((l) => ({ ...l, ...(areaStr ? { land_area: areaStr } : {}) }));
+          } else if (type === "commercial") {
+            setComm((c) => ({ ...c, ...(areaStr ? { area_total: areaStr } : {}) }));
           }
+          if (areaStr) filled.push("площадь");
+          if (roomsStr && type === "apartment") filled.push("комнат");
         }
-        if (!cancelled && staged.length > 0) setStagedPhotos(staged);
+
+        // ⚠ THE OWNER'S ASKING PRICE IS NOT THE LISTING PRICE. It is pre-filled
+        // because retyping it is worse, but it is recorded separately so the UI
+        // can say whose number it is — the realtor sets the real one.
+        if (sr.asking_price != null && sr.asking_price !== "") {
+          const asking = String(sr.asking_price).split(".")[0];
+          setPrice(asking);
+          setSubmissionAskingPrice(asking);
+        }
+
+        setSubmissionOwner(
+          sr.owner_name || sr.owner_phone
+            ? { full_name: sr.owner_name || "", phone: sr.owner_phone || "" }
+            : null,
+        );
+        setSubmissionPhotoCount(Array.isArray(sr.photos) ? sr.photos.length : 0);
+        setSubmissionFilled(filled);
       } catch (e) {
         console.error("[CrmPropertyFullForm] prefill from submission", e);
       }
@@ -566,6 +656,22 @@ export function CrmPropertyFullForm({
       cancelled = true;
     };
   }, [mode, fromSubmissionId]);
+
+  /**
+   * The picker takes plain NAMES (it resolves a settlement to its service
+   * circle by name); the CRM holds ids. Derive rather than duplicate state.
+   * The Район selector is the microdistrict when one is chosen, else the
+   * district — the same precedence the /sell form uses.
+   */
+  const cityName = useMemo(
+    () => cities.find((c) => String(c.id) === cityId)?.name ?? "",
+    [cities, cityId],
+  );
+  const areaName = useMemo(() => {
+    const n = neighborhoods.find((x) => String(x.id) === neighborhoodId)?.name;
+    if (n) return n;
+    return districts.find((x) => String(x.id) === districtId)?.name ?? "";
+  }, [neighborhoods, neighborhoodId, districts, districtId]);
 
   const buildBasePayload = useCallback(() => {
     const coords = coordsPayload(latitudeStr, longitudeStr);
@@ -577,6 +683,7 @@ export function CrmPropertyFullForm({
       residential_complex: rcId ? parseInt(rcId, 10) : null,
       description: description,
       short_description: shortDescription.trim(),
+      public_address_text: addressText.trim(),
       public_latitude: coords.public_latitude,
       public_longitude: coords.public_longitude,
       real_latitude: coords.real_latitude,
@@ -605,6 +712,7 @@ export function CrmPropertyFullForm({
     longitudeStr,
     description,
     shortDescription,
+    addressText,
     mode,
     propertyType,
     apt,
@@ -651,12 +759,23 @@ export function CrmPropertyFullForm({
     return failed;
   };
 
+  /**
+   * At least one photo is required — but the owner's photos count.
+   *
+   * ⚠ They are copied SERVER-SIDE after the property exists, so at submit time
+   * `stagedPhotos` is legitimately empty in the convert flow. Requiring an
+   * upload here would make the realtor re-attach photos the owner already sent,
+   * which is the exact re-typing this task set out to remove.
+   */
+  const hasPhotos = stagedPhotos.length > 0 || submissionPhotoCount > 0;
+  const NEED_PHOTO = "Добавьте хотя бы одно фото";
+
   const submitCreate = async () => {
     setError("");
     setSuccess("");
     if (!validateLocation()) return;
-    if (stagedPhotos.length === 0) {
-      setError("Добавьте хотя бы одно фото");
+    if (!hasPhotos) {
+      setError(NEED_PHOTO);
       return;
     }
     if (!price || parseFloat(price) <= 0) {
@@ -815,9 +934,9 @@ export function CrmPropertyFullForm({
   };
 
   const handleConfirmCreate = async () => {
-    if (stagedPhotos.length === 0) {
+    if (!hasPhotos) {
       setDuplicateWarning(null);
-      setError("Добавьте хотя бы одно фото");
+      setError(NEED_PHOTO);
       return;
     }
     setDuplicateWarning(null);
@@ -914,6 +1033,28 @@ export function CrmPropertyFullForm({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Values carried over from the owner's submission. Same amber
+              language as the page-level notice above the form — the realtor is
+              REVIEWING these, not accepting them, so name them explicitly. */}
+          {fromSubmissionId && submissionFilled.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-medium">Заполнено из заявки собственника</p>
+              <p className="mt-1">
+                {submissionFilled.join(", ")}
+                {submissionPhotoCount > 0
+                  ? `, фото (${submissionPhotoCount}) — прикрепятся автоматически`
+                  : ""}
+                . Проверьте значения и при необходимости исправьте.
+              </p>
+              {submissionOwner && (
+                <p className="mt-1.5">
+                  Собственник: {submissionOwner.full_name}
+                  {submissionOwner.phone ? `, ${submissionOwner.phone}` : ""} — привяжите
+                  карточку собственника ниже. Телефон собственника не публикуется.
+                </p>
+              )}
+            </div>
+          )}
           {meRole && isStaffRole(meRole) && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -999,6 +1140,14 @@ export function CrmPropertyFullForm({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Цена (₽) <span className="text-red-500">*</span>
             </label>
+            {/* ⚠ The owner's asking price must never pass for the listing price.
+                It is pre-filled (retyping it is worse) but labelled as theirs. */}
+            {submissionAskingPrice && (
+              <p className="mb-1.5 text-xs text-amber-800">
+                {formatPrice(submissionAskingPrice)} ₽ — цена, которую хочет
+                собственник. Цену объявления устанавливает риэлтор.
+              </p>
+            )}
             <Input
               type="text"
               inputMode="numeric"
@@ -1501,11 +1650,20 @@ export function CrmPropertyFullForm({
             </div>
           </div>
 
-          <CrmPropertyAddressMap
-            latitudeStr={latitudeStr}
-            longitudeStr={longitudeStr}
-            onLatitudeChange={setLatitudeStr}
-            onLongitudeChange={setLongitudeStr}
+          <AddressPicker
+            value={addressText}
+            onChange={setAddressText}
+            lat={latitudeStr === "" ? null : Number(latitudeStr)}
+            lng={longitudeStr === "" ? null : Number(longitudeStr)}
+            onPointChange={(la, ln) => {
+              // The CRM keeps coordinates as strings (they are sent as decimal
+              // strings and shown in inputs elsewhere); 6dp matches the column.
+              setLatitudeStr(la == null ? "" : la.toFixed(6));
+              setLongitudeStr(ln == null ? "" : ln.toFixed(6));
+            }}
+            cityName={cityName}
+            districtName={areaName}
+            disabled={saving}
           />
 
           <div>
@@ -1590,6 +1748,7 @@ export function CrmPropertyFullForm({
 
       <OwnerModal
         isOpen={ownerModalOpen}
+        prefill={submissionOwner}
         onClose={() => setOwnerModalOpen(false)}
         propertyLabel={
           crmPropertyId || (mode === "create" ? "новый объект" : undefined)

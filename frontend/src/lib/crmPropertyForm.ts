@@ -1,3 +1,4 @@
+import { PROPERTY_TYPE_LABELS } from "@/lib/propertyArea";
 /** CRM property form: типы и сбор JSON для API (источник истины — backend). */
 
 export const CRM_PROPERTY_TYPE_VALUES = [
@@ -9,12 +10,13 @@ export const CRM_PROPERTY_TYPE_VALUES = [
 
 export type CrmPropertyTypeValue = (typeof CRM_PROPERTY_TYPE_VALUES)[number];
 
-export const CRM_PROPERTY_TYPE_LABELS: Record<CrmPropertyTypeValue, string> = {
-  apartment: "Квартира",
-  house: "Дом",
-  land: "Участок",
-  commercial: "Коммерция",
-};
+/**
+ * ⚠ ONE VOCABULARY. These labels are also what the public property card shows,
+ * so they live in `lib/propertyArea.ts` and are re-exported here rather than
+ * written twice — two tables of type names WILL drift.
+ */
+export const CRM_PROPERTY_TYPE_LABELS: Record<CrmPropertyTypeValue, string> =
+  PROPERTY_TYPE_LABELS;
 
 export type ChoiceItem = { value: string; label: string };
 

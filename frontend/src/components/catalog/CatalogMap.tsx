@@ -10,6 +10,13 @@ import "react-leaflet-cluster/dist/assets/MarkerCluster.css";
 import "react-leaflet-cluster/dist/assets/MarkerCluster.Default.css";
 import { CatalogPropertyItem } from "@/components/catalog/types";
 import { hasCatalogItemMapCoords } from "@/lib/mapCoordinates";
+import {
+  OSM_MAX_ZOOM,
+  OSM_TILE_ATTRIBUTION,
+  OSM_TILE_URL,
+} from "@/components/address/addressMapConstants";
+import { FitToMarkers, serviceAreaBounds } from "@/components/map/FitToMarkers";
+import { MapUnmountGuard } from "@/components/map/MapUnmountGuard";
 
 interface CatalogMapProps {
   properties: CatalogPropertyItem[];
@@ -32,18 +39,29 @@ export function CatalogMap({ properties }: CatalogMapProps) {
     [],
   );
 
+  const points = useMemo(
+    () => withCoords.map((p) => ({ lat: p.latitude, lng: p.longitude })),
+    [withCoords],
+  );
+
+  /**
+   * Mount-time view only — `FitToMarkers` takes over immediately and frames the
+   * markers. It stays the centroid so the first paint is somewhere sensible if
+   * a tile arrives before the fit runs; the ZOOM 11 that used to ship with it is
+   * what hid every marker when the listings span ~100 km.
+   */
   const center = useMemo<[number, number]>(() => {
     if (withCoords.length === 0) {
-      return [45.03547, 38.97531];
+      const c = serviceAreaBounds().getCenter();
+      return [c.lat, c.lng];
     }
-
     const lat = withCoords.reduce((acc, item) => acc + item.latitude, 0) / withCoords.length;
     const lng = withCoords.reduce((acc, item) => acc + item.longitude, 0) / withCoords.length;
     return [lat, lng];
   }, [withCoords]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200">
+    <div className="relative overflow-hidden rounded-xl border border-gray-200">
       <MapContainer
         center={center}
         zoom={11}
@@ -53,9 +71,12 @@ export function CatalogMap({ properties }: CatalogMapProps) {
       >
         <AttributionControl position="bottomright" prefix={false} />
         <TileLayer
-          attribution="&copy; 2GIS"
-          url="https://tile2.maps.2gis.com/tiles?x={x}&y={y}&z={z}&v=1"
+          attribution={OSM_TILE_ATTRIBUTION}
+          url={OSM_TILE_URL}
+          maxZoom={OSM_MAX_ZOOM}
         />
+        <FitToMarkers points={points} />
+        <MapUnmountGuard />
 
         <MarkerClusterGroup
           chunkedLoading
@@ -87,6 +108,16 @@ export function CatalogMap({ properties }: CatalogMapProps) {
           ))}
         </MarkerClusterGroup>
       </MapContainer>
+      {/* Defensive: both callers already replace the map with their own empty
+          state, so this is not normally reachable. If it ever is, the reader
+          gets the service-area view AND a reason, never a blank map. */}
+      {withCoords.length === 0 && (
+        <div className="pointer-events-none absolute inset-x-0 top-3 z-[1000] flex justify-center px-3">
+          <span className="rounded-full bg-surface-raised/95 px-3.5 py-1.5 text-xs text-fg-secondary shadow-sm">
+            По текущим фильтрам нет объектов для показа на карте
+          </span>
+        </div>
+      )}
     </div>
   );
 }

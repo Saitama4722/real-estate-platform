@@ -7,6 +7,12 @@ import "leaflet/dist/leaflet.css";
 import { Info } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { PropertySection } from "@/components/property/PropertySection";
+import { MapUnmountGuard } from "@/components/map/MapUnmountGuard";
+import {
+  OSM_MAX_ZOOM,
+  OSM_TILE_ATTRIBUTION,
+  OSM_TILE_URL,
+} from "@/components/address/addressMapConstants";
 
 interface PropertyMapProps {
   latitude: number;
@@ -63,9 +69,14 @@ export function PropertyMap({
           className="h-[210px] w-full md:h-[300px]"
         >
           <AttributionControl position="bottomright" prefix={false} />
+          <MapUnmountGuard />
+          {/* ⚠ NO FitToMarkers HERE, deliberately: this is a SINGLE-POINT view
+              of one property, so a fixed centre and zoom 14 is the correct
+              behaviour. Fitting a one-marker box would zoom to the doorstep. */}
           <TileLayer
-            attribution="&copy; 2GIS"
-            url="https://tile2.maps.2gis.com/tiles?x={x}&y={y}&z={z}&v=1"
+            attribution={OSM_TILE_ATTRIBUTION}
+            url={OSM_TILE_URL}
+            maxZoom={OSM_MAX_ZOOM}
           />
           <Marker position={[latitude, longitude]} icon={markerIcon} />
         </MapContainer>
