@@ -20,6 +20,13 @@ export type EmployeeUser = {
   role: string;
   is_active: boolean;
   is_staff: boolean;
+  /**
+   * Личная настройка звука уведомлений о новых заявках. Живёт НА СЕРВЕРЕ
+   * (`User.crm_notify_sound_enabled`), а не в localStorage: настройка
+   * пориэлторная и обязана переживать смену браузера и очистку данных сайта.
+   * По умолчанию `true` — молчащее по умолчанию уведомление не уведомляет.
+   */
+  crm_notify_sound_enabled: boolean;
   crm_capabilities?: EmployeeCrmCapabilities;
 };
 
@@ -54,6 +61,10 @@ export function parseEmployeeUser(data: unknown): EmployeeUser | null {
     role: o.role,
     is_active: Boolean(o.is_active),
     is_staff: Boolean(o.is_staff),
+    // Отсутствие ключа (старый ответ бэкенда) читаем как «включено», а не как
+    // `false`: тихо выключить уведомления из-за рассинхрона версий хуже, чем
+    // лишний раз звякнуть.
+    crm_notify_sound_enabled: o.crm_notify_sound_enabled !== false,
     crm_capabilities,
   };
 }
@@ -61,6 +72,32 @@ export function parseEmployeeUser(data: unknown): EmployeeUser | null {
 /** Staff-level roles: same CRM scope as backend `has_staff_level_access`. */
 export function isCabinetAdminRole(role: string): boolean {
   return role === "superadmin" || role === "admin";
+}
+
+/**
+ * SUPERADMIN ONLY — the exact mirror of the backend `IsSuperAdmin` permission
+ * class (`users/permissions.py`: `allowed_roles = (User.Role.SUPERADMIN,)`).
+ *
+ * ⚠ NOT `isCabinetAdminRole`. That one also admits `admin`, and every endpoint
+ * guarded by `IsSuperAdmin` returns 403 to an admin — so gating a superadmin-only
+ * request with it would still fire a doomed request for admins. Use this for any
+ * UI that decides whether to CALL an `IsSuperAdmin` endpoint, so the client-side
+ * gate and the server-side permission cannot drift apart.
+ */
+export function isSuperadminRole(role: string): boolean {
+  return role === "superadmin";
+}
+
+/**
+ * Кому положен индикатор непрочитанных заявок.
+ *
+ * ⚠ ЗЕРКАЛО `common.crm_unread.user_gets_unread_indicator` на бэкенде — держите
+ * их в одном определении. Суперадминистратор и администратор индикатор не
+ * получают: они работают со всем пулом сразу, квитанций о прочтении не создают,
+ * и ручка счётчиков честно отдаёт им нули.
+ */
+export function roleGetsUnreadIndicator(role: string): boolean {
+  return role === "realtor";
 }
 
 /** Russian labels for `User.Role` values from the backend. */

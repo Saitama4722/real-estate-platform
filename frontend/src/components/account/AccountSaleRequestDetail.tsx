@@ -4,10 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
+import { refreshCrmUnreadCounts } from "@/lib/crmUnreadCounts";
 import { isCabinetAdminRole } from "@/lib/employeeUser";
 import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { PropertyGallery } from "@/components/property/PropertyGallery";
+
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
 
 interface LocationShort {
   id: number;
@@ -16,8 +20,25 @@ interface LocationShort {
 }
 interface PhotoRow {
   id: number;
+  /** Stored original. Kept for completeness; the UI renders derivatives. */
   image: string;
+  image_large: string | null;
+  image_medium: string | null;
+  image_thumb: string | null;
   sort_order: number;
+}
+
+/**
+ * Best available derivative, degrading down the ladder to the original.
+ *
+ * The Celery worker generates derivatives just after the owner submits, so a
+ * photo viewed in the seconds before that runs — or one uploaded while the
+ * worker was down — still has only the original. Falling back keeps the panel
+ * working instead of rendering a broken image, and mirrors what
+ * CrmPropertyPhotosManager already does for property photos.
+ */
+function photoFullUrl(p: PhotoRow): string {
+  return p.image_large || p.image_medium || p.image;
 }
 interface SaleRequestDetail {
   id: number;
@@ -27,6 +48,11 @@ interface SaleRequestDetail {
   district: LocationShort | null;
   neighborhood: LocationShort | null;
   description: string;
+  /** Precise address the owner picked on /sell (street + house). */
+  address: string;
+  /** The exact point they placed; null when the geocoder was unavailable. */
+  latitude: string | null;
+  longitude: string | null;
   property_type: string;
   property_type_label: string;
   area: string | null;
@@ -61,6 +87,11 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
 
   const [data, setData] = useState<SaleRequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts.  */
+  usePageLoading(loading);
   const [error, setError] = useState("");
   const [notFound, setNotFound] = useState(false);
 
@@ -110,6 +141,28 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
       const d = (await res.json()) as SaleRequestDetail;
       setData(d);
       seedEditFields(d);
+      /*
+       * ЭТО И ЕСТЬ «риэлтор открыл заявку» — карточка загрузилась.
+       *
+       * ⛔ Отдельным POST, а не побочным эффектом GET выше: GET на списке
+       * `/api/crm/sale-requests/` тогда пришлось бы как-то отличать от GET на
+       * карточке, а «открыл список = прочитал всё» — ровно то, чего быть не
+       * должно. Отдельная ручка делает намерение явным и проверяемым.
+       *
+       * Отметка ЛИЧНАЯ: другие риэлторы своих счётчиков не теряют.
+       * Неудача молчит — счётчик просто останется прежним до следующего входа.
+       */
+      void (async () => {
+        try {
+          const r = await fetchWithCrmAuthRetry(
+            `/api/crm/sale-requests/${encodeURIComponent(id)}/mark-read/`,
+            { method: "POST" },
+          );
+          if (r.ok) refreshCrmUnreadCounts();
+        } catch {
+          /* тихо: см. выше */
+        }
+      })();
     } catch (e) {
       console.error("[AccountSaleRequestDetail] load", e);
       setError("Ошибка соединения.");
@@ -240,6 +293,34 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
             <dd className="text-sm text-slate-900">{locationText || "—"}</dd>
           </div>
           <div>
+            <dt className="text-xs text-slate-500">Адрес</dt>
+            <dd className="text-sm text-slate-900">{data.address || "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-500">Координаты</dt>
+            <dd className="text-sm text-slate-900">
+              {data.latitude && data.longitude ? (
+                <>
+                  <span className="font-mono text-xs">
+                    {data.latitude}, {data.longitude}
+                  </span>{" "}
+                  {/* Opens the exact point in 2GIS. No new map component is
+                      built for the CRM as part of this work. */}
+                  <a
+                    href={`https://2gis.ru/geo/${data.longitude},${data.latitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-700 hover:underline"
+                  >
+                    открыть на карте
+                  </a>
+                </>
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+          <div>
             <dt className="text-xs text-slate-500">Статус</dt>
             <dd className="text-sm text-slate-900">{data.status_label}</dd>
           </div>
@@ -264,19 +345,23 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
           <h2 className="text-sm font-semibold text-slate-900">
             Фотографии ({data.photos.length})
           </h2>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {data.photos.map((p) => (
-              <a
-                key={p.id}
-                href={p.image}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block aspect-square overflow-hidden rounded-lg border border-slate-200"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- Django media URL */}
-                <img src={p.image} alt="" className="h-full w-full object-cover" />
-              </a>
-            ))}
+          {/*
+            Photos render through the SHARED PropertyGallery — the same viewer
+            the public property page uses — so a click opens the largest
+            derivative in its full-screen lightbox.
+
+            ⚠ This section used to be a grid of <a href={p.image} target="_blank">
+            wrapping <img src={p.image}>: every tile downloaded the FULL original
+            just to draw a thumbnail, and clicking navigated the browser away to
+            a bare /media/ file URL. Do not restore that; route new surfaces
+            through this component instead.
+          */}
+          <div className="mt-3">
+            <PropertyGallery
+              gallery={data.photos.map(photoFullUrl)}
+              mainImage={photoFullUrl(data.photos[0])}
+              title={`Заявка #${data.id}`}
+            />
           </div>
         </section>
       )}

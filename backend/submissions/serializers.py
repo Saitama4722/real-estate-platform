@@ -1,8 +1,15 @@
 import re
 
 from django.core.cache import cache
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from common.image_compression import (
+    ALLOWED_UPLOAD_FORMATS,
+    MAX_IMAGE_UPLOAD_BYTES,
+    validate_image_upload,
+)
+from common.city_bounds import SERVED_CITIES, city_for_point
 from common.media_urls import media_url
 from locations.models import City, District, Neighborhood
 
@@ -18,6 +25,14 @@ _CAPTCHA_CACHE_KEY = "lead_captcha:{}"
 _PHONE_ALLOWED = re.compile(r"^\+?[\d\s\-()]{7,32}$")
 # Name: Cyrillic + Latin letters (incl. ё/Ё), spaces, hyphen. No digits.
 _NAME_ALLOWED = re.compile(r"^[A-Za-zА-Яа-яЁё\s\-]+$")
+
+# --- Precise address ---------------------------------------------------------
+# ⚠ SCOPE IS TWO CITIES, NOT THE KRAI. This replaced a Krasnodar-Krai bbox
+# (lat 43–47, lon 36–42) that accepted Сочи, Новороссийск, Армавир and the rest
+# of the region. The boxes live in common/city_bounds.py, mirrored from
+# frontend/src/shared/cityBounds.json with a test asserting they match.
+#: Shortest thing that can plausibly be "street + house".
+ADDRESS_MIN_LEN = 5
 
 
 class SaleRequestPhotoPublicSerializer(serializers.Serializer):
@@ -42,6 +57,16 @@ class PublicSaleRequestCreateSerializer(serializers.ModelSerializer):
     """
 
     owner_phone = serializers.CharField(max_length=32, write_only=True)
+    # ⚠ REQUIRED here even though the model column is blank=True — the column is
+    # permissive only so the migration needed no backfill for existing rows.
+    address = serializers.CharField(max_length=500, required=True, allow_blank=False)
+    # Optional BY DESIGN: if the geocoding provider is down the owner types the
+    # address by hand and gets no coordinates. A third-party outage must never
+    # block a lead. When they ARE sent, they are validated.
+    latitude = serializers.DecimalField(
+        max_digits=9, decimal_places=6, required=False, allow_null=True)
+    longitude = serializers.DecimalField(
+        max_digits=9, decimal_places=6, required=False, allow_null=True)
     # Arithmetic captcha (same mechanism as the public lead form).
     captcha_id = serializers.UUIDField(write_only=True)
     captcha_answer = serializers.CharField(
@@ -73,6 +98,9 @@ class PublicSaleRequestCreateSerializer(serializers.ModelSerializer):
             "city",
             "district",
             "neighborhood",
+            "address",
+            "latitude",
+            "longitude",
             "description",
             "property_type",
             "area",
@@ -105,6 +133,40 @@ class PublicSaleRequestCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Укажите корректный номер телефона.")
         return v
 
+    def validate_address(self, value):
+        v = (value or "").strip()
+        if len(v) < ADDRESS_MIN_LEN:
+            raise serializers.ValidationError(
+                "Укажите точный адрес: улицу и номер дома."
+            )
+        return v
+
+    def _validate_point(self, attrs):
+        """Coordinates are optional, but junk is never stored.
+
+        NEVER TRUST THE CLIENT: this runs regardless of what the browser
+        checked. Out-of-range values are rejected with a readable message —
+        not stored, and never allowed to become a 500.
+        """
+        lat = attrs.get("latitude")
+        lon = attrs.get("longitude")
+        if lat is None and lon is None:
+            return
+        if lat is None or lon is None:
+            raise serializers.ValidationError(
+                {"latitude": "Координаты передаются парой: широта и долгота."}
+            )
+        if city_for_point(float(lat), float(lon)) is None:
+            raise serializers.ValidationError(
+                {
+                    "latitude": (
+                        "Точка на карте вне зоны работы: мы работаем только по "
+                        f"городам {' и '.join(SERVED_CITIES)} и их окрестностям. "
+                        "Уточните адрес."
+                    )
+                }
+            )
+
     def validate_description(self, value):
         v = (value or "").strip()
         if len(v) < 10:
@@ -112,6 +174,34 @@ class PublicSaleRequestCreateSerializer(serializers.ModelSerializer):
                 "Опишите объект чуть подробнее (минимум 10 символов)."
             )
         return v
+
+    def validate_photos(self, value):
+        """
+        Size + real-format check on every uploaded photo.
+
+        ⚠ This endpoint is PUBLIC and unauthenticated, so it receives junk by
+        design: renamed .exe files, truncated uploads, 50 MB camera RAWs. Before
+        this existed there was NO byte limit and NO format whitelist here at all
+        — only the count cap of 10 and Pillow's implicit decodability check.
+
+        Every failure must surface as a 400 with a readable Russian message;
+        nothing here may reach the view as an unhandled exception.
+        """
+        errors = {}
+        for index, uploaded in enumerate(value):
+            try:
+                validate_image_upload(
+                    uploaded,
+                    max_bytes=MAX_IMAGE_UPLOAD_BYTES,
+                    allowed_formats=ALLOWED_UPLOAD_FORMATS,
+                )
+            except DjangoValidationError as exc:
+                # Name the offending file so the owner knows which one to swap.
+                label = getattr(uploaded, "name", "") or f"#{index + 1}"
+                errors[str(index)] = f"{label}: {' '.join(exc.messages)}"
+        if errors:
+            raise serializers.ValidationError(errors)
+        return value
 
     def _validate_captcha(self, attrs):
         # Mirrors PublicLeadCreateSerializer.validate captcha logic exactly.
@@ -145,6 +235,7 @@ class PublicSaleRequestCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         self._validate_captcha(attrs)
+        self._validate_point(attrs)
         # Ensure district/neighborhood, if given, belong to the chosen city — keeps
         # the CRM data clean and prevents cross-city mismatches.
         city = attrs.get("city")
@@ -180,14 +271,37 @@ class PublicSaleRequestCreateSerializer(serializers.ModelSerializer):
 
 
 class CrmSaleRequestPhotoSerializer(serializers.ModelSerializer):
+    """
+    CRM read representation. Exposes the derivative ladder so the cabinet can
+    render a sized preview instead of loading (or navigating to) the full
+    original — which is what it used to do.
+
+    ``image`` remains the stored original for anyone who genuinely needs it;
+    the CRM UI picks ``image_thumb`` for the grid and ``image_large`` for the
+    lightbox, falling back down the ladder when a derivative is missing (the
+    Celery worker may not have run yet).
+    """
+
     image = serializers.SerializerMethodField()
+    image_large = serializers.SerializerMethodField()
+    image_medium = serializers.SerializerMethodField()
+    image_thumb = serializers.SerializerMethodField()
 
     class Meta:
         model = SaleRequestPhoto
-        fields = ["id", "image", "sort_order"]
+        fields = ["id", "image", "image_large", "image_medium", "image_thumb", "sort_order"]
 
     def get_image(self, obj):
         return media_url(obj.image)
+
+    def get_image_large(self, obj):
+        return media_url(obj.image_large)
+
+    def get_image_medium(self, obj):
+        return media_url(obj.image_medium)
+
+    def get_image_thumb(self, obj):
+        return media_url(obj.image_thumb)
 
 
 class _CrmLocationShortSerializer(serializers.Serializer):
@@ -202,6 +316,9 @@ class CrmSaleRequestListSerializer(serializers.ModelSerializer):
     neighborhood = _CrmLocationShortSerializer(read_only=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     photos_count = serializers.IntegerField(source="photos.count", read_only=True)
+    #: Аннотация из `CrmSaleRequestViewSet.get_queryset`, а не поле модели:
+    #: пул общий, а прочтение личное. См. `common.crm_unread`.
+    is_unread = serializers.BooleanField(read_only=True, default=False)
 
     class Meta:
         model = SaleRequest
@@ -212,12 +329,14 @@ class CrmSaleRequestListSerializer(serializers.ModelSerializer):
             "city",
             "district",
             "neighborhood",
+            "address",
             "property_type",
             "asking_price",
             "status",
             "status_label",
             "converted_property",
             "photos_count",
+            "is_unread",
             "created_at",
         ]
 
@@ -242,6 +361,9 @@ class CrmSaleRequestDetailSerializer(serializers.ModelSerializer):
             "city",
             "district",
             "neighborhood",
+            "address",
+            "latitude",
+            "longitude",
             "description",
             "property_type",
             "property_type_label",

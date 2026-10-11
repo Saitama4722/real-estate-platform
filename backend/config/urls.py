@@ -35,6 +35,10 @@ urlpatterns = [
     path("api/sale-requests/", include("submissions.urls")),
     path("api/crm/sale-requests/", include("submissions.crm_urls")),
     path("api/crm/owners/", include("owners.crm_urls")),
+    path(
+        "api/crm/notifications/",
+        include("common.crm_notifications_urls"),
+    ),
     path("api/crm/realtors/", include("users.crm_urls")),
     path(
         "api/crm/activity-logs/",

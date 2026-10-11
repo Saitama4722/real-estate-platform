@@ -5,6 +5,8 @@ import Link from "next/link";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
 import { cn } from "@/lib/utils";
 
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
+
 interface LocationShort {
   id: number;
   name: string;
@@ -24,6 +26,9 @@ interface SaleRequestRow {
   status_label: string;
   converted_property: number | null;
   photos_count: number;
+  /** Не открывал ЛИ ЭТОТ сотрудник эту заявку. Пул общий, отметка личная —
+      см. `common.crm_unread`. Для не-риэлтора всегда false. */
+  is_unread?: boolean;
   created_at: string;
 }
 
@@ -78,6 +83,11 @@ const TYPE_LABELS: Record<string, string> = {
 export function AccountSaleRequestsTable() {
   const [rows, setRows] = useState<SaleRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts.  */
+  usePageLoading(loading);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
@@ -160,7 +170,26 @@ export function AccountSaleRequestsTable() {
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                     {formatDateTime(r.created_at)}
                   </td>
-                  <td className="px-4 py-3 font-medium text-slate-900">{r.owner_name}</td>
+                  {/* Маркер непрочитанного — точка цвета внимания плюс жирное
+                      имя собственника. Тот же приём, что в таблице заявок:
+                      строку не перекрашиваем, редизайна ряда нет. Открытие
+                      СПИСКА ничего не гасит — только переход в карточку. */}
+                  <td className="px-4 py-3 font-medium text-slate-900">
+                    <span className="flex items-center gap-2">
+                      {r.is_unread ? (
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full bg-accent"
+                          aria-hidden
+                        />
+                      ) : null}
+                      <span className={r.is_unread ? "font-semibold" : undefined}>
+                        {r.owner_name}
+                      </span>
+                      {r.is_unread ? (
+                        <span className="sr-only">Не просмотрено</span>
+                      ) : null}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-slate-700">
                     {r.city?.name ?? "—"}
                     {r.neighborhood?.name

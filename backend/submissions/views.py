@@ -1,5 +1,7 @@
 import logging
+import os
 
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import filters, mixins, status, viewsets
@@ -10,6 +12,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 
+from common.crm_unread import annotate_sale_request_unread, mark_sale_request_read
 from users.permissions import IsCrmUser
 
 from .choices import SaleRequestStatus
@@ -108,9 +111,15 @@ class CrmSaleRequestViewSet(
 
     def get_queryset(self):
         # Shared pool: all submissions for any CRM user. No assigned-realtor filter.
-        qs = SaleRequest.objects.select_related(
-            "city", "district", "neighborhood", "converted_property"
-        ).prefetch_related("photos")
+        # `is_unread` is PER VIEWER (one NOT EXISTS subquery, not a column on the
+        # row) precisely because the pool is shared: one realtor opening a
+        # submission must not clear it from anyone else's counter.
+        qs = annotate_sale_request_unread(
+            SaleRequest.objects.select_related(
+                "city", "district", "neighborhood", "converted_property"
+            ).prefetch_related("photos"),
+            self.request.user,
+        )
         st = self.request.query_params.get("status")
         if st:
             qs = qs.filter(status=st)
@@ -161,6 +170,80 @@ class CrmSaleRequestViewSet(
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=["post"], url_path="mark-read")
+    def mark_read(self, request, pk=None):
+        """
+        Отметить ЭТУ заявку на продажу прочитанной ТЕКУЩИМ сотрудником.
+
+        ⛔ Вызывается ТОЛЬКО при открытии карточки заявки, никогда при загрузке
+        списка. Прочтение персональное: другие риэлторы своих счётчиков не
+        теряют.
+
+        Идемпотентно: повторный вызов возвращает 200 и `created=false`.
+        """
+        sale_request = self.get_object()
+        created = mark_sale_request_read(request.user, sale_request)
+        return Response(
+            {"id": sale_request.pk, "is_unread": False, "created": created}
+        )
+
+    @staticmethod
+    def _copy_photos_to_property(sale_request, prop) -> int:
+        """COPY the owner's photos onto the new Property. Never move, never link.
+
+        ⚠ EACH PropertyPhoto GETS ITS OWN FILE. Pointing a PropertyPhoto at the
+        submission's stored path would look tidy and is a trap: deleting the
+        property (or clearing its derivatives on re-save) deletes from storage,
+        and this project has already lost a real listing's derivatives exactly
+        that way. A copy means the submission's files can never be reached by
+        anything acting on the property.
+
+        Done SERVER-SIDE on purpose. The previous mechanism made the BROWSER
+        download every photo and re-upload it: megabytes through the client, and
+        under the R2 backend the media URL is cross-origin, so `fetch` would be
+        blocked by CORS and the photos would be silently dropped — the old code
+        swallowed per-photo failures. Reading the file through the storage API
+        works under every backend.
+
+        Derivatives are NOT generated here: `PropertyPhoto.save()` enqueues
+        `generate_property_photo_derivatives` on commit whenever `original_file`
+        changes, which is exactly what creating one of these does.
+        """
+        from properties.models import PropertyPhoto
+
+        # Idempotent: re-marking an already-converted submission must not
+        # duplicate the photos.
+        if PropertyPhoto.objects.filter(property=prop).exists():
+            return 0
+
+        start = 0
+        copied = 0
+        for src in sale_request.photos.all().order_by("sort_order", "id"):
+            if not src.image:
+                continue
+            try:
+                src.image.open("rb")
+                try:
+                    data = src.image.read()
+                finally:
+                    src.image.close()
+            except (OSError, ValueError) as exc:
+                # One unreadable source file must not lose the others, and must
+                # never fail the conversion the realtor just completed.
+                logger.warning(
+                    "sale_request_photo_copy_failed sale_request_id=%s photo_id=%s err=%s",
+                    sale_request.pk, src.pk, exc,
+                )
+                continue
+            base = os.path.basename(src.image.name) or "photo.jpg"
+            photo = PropertyPhoto(property=prop, sort_order=start + copied)
+            photo.original_file.save(
+                f"sr{sale_request.pk}-{src.pk}-{base}", ContentFile(data), save=False
+            )
+            photo.save()
+            copied += 1
+        return copied
+
     @action(detail=True, methods=["post"], url_path="mark-converted")
     def mark_converted(self, request, pk=None):
         """
@@ -201,13 +284,17 @@ class CrmSaleRequestViewSet(
                     "updated_at",
                 ]
             )
+            copied = self._copy_photos_to_property(sale_request, prop)
         logger.info(
-            "sale_request_marked_converted id=%s property_id=%s user_id=%s",
+            "sale_request_marked_converted id=%s property_id=%s user_id=%s photos_copied=%s",
             sale_request.pk,
             prop.pk,
             getattr(request.user, "pk", None),
+            copied,
         )
         out = CrmSaleRequestDetailSerializer(
             sale_request, context=self.get_serializer_context()
         )
-        return Response(out.data)
+        data = dict(out.data)
+        data["photos_copied"] = copied
+        return Response(data)

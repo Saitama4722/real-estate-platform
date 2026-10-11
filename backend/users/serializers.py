@@ -122,6 +122,9 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             # this only saves the user from discovering it via a 403.
             "must_change_password",
             "crm_capabilities",
+            # Личная настройка звука уведомлений о новых заявках. Читается
+            # шапкой/боковым меню; пишется через CurrentUserUpdateSerializer.
+            "crm_notify_sound_enabled",
             "short_bio",
             "public_name",
             "public_phone",
@@ -175,6 +178,9 @@ class CurrentUserUpdateSerializer(serializers.ModelSerializer):
             "last_name",
             "phone",
             "avatar",
+            # Переключатель звука уведомлений. Своя настройка — редактирует её
+            # сам сотрудник, роль и права здесь по-прежнему не трогаются.
+            "crm_notify_sound_enabled",
             "short_bio",
             "public_name",
             "public_phone",
@@ -184,6 +190,7 @@ class CurrentUserUpdateSerializer(serializers.ModelSerializer):
             "last_name": {"required": False},
             "phone": {"required": False, "allow_blank": True},
             "avatar": {"required": False, "allow_null": True},
+            "crm_notify_sound_enabled": {"required": False},
         }
 
     def update(self, instance, validated_data):
@@ -374,9 +381,18 @@ class ChangeOwnEmailSerializer(serializers.Serializer):
 
 
 class EmployeeActivityLogSerializer(serializers.ModelSerializer):
-    """Список журнала активности для CRM (только чтение администратором)."""
+    """Список журнала активности для CRM (только чтение администратором).
 
-    user_email = serializers.EmailField(source="user.email", read_only=True)
+    ⚠ `EmployeeActivityLog.user` — NULLABLE ПО ЗАМЫСЛУ: у записи `login_failed`
+    по НЕСУЩЕСТВУЮЩЕМУ адресу нет пользователя, которому её приписать, а
+    введённый адрес лежит в `attempted_email`. Поэтому оба поля ниже —
+    SerializerMethodField с явной проверкой на None: раньше здесь был
+    `EmailField(source="user.email")` плюс безусловное обращение к
+    `obj.user.first_name`, и весь список падал с AttributeError, как только в
+    выборку попадала хотя бы одна такая строка.
+    """
+
+    user_email = serializers.SerializerMethodField()
     user_display_name = serializers.SerializerMethodField()
     action_label = serializers.CharField(source="get_action_type_display", read_only=True)
 
@@ -395,9 +411,21 @@ class EmployeeActivityLogSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    def get_user_email(self, obj):
+        """Email аккаунта, а для попытки входа по несуществующему адресу —
+        сам введённый адрес. Это идентификатор, а не секрет (пароль сюда не
+        попадает никогда). Ключ присутствует в ответе ВСЕГДА: фронтенд
+        объявляет его как обязательную строку."""
+        if obj.user_id is not None and obj.user is not None:
+            return obj.user.email
+        return obj.attempted_email or ""
+
     def get_user_display_name(self, obj):
-        name = f"{obj.user.first_name} {obj.user.last_name}".strip()
-        return name or obj.user.email
+        user = obj.user if obj.user_id is not None else None
+        if user is None:
+            return obj.attempted_email or "Неизвестный пользователь"
+        name = f"{user.first_name} {user.last_name}".strip()
+        return name or user.email
 
 
 class RealtorCrmReadSerializer(serializers.ModelSerializer):

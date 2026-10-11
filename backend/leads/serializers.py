@@ -183,6 +183,12 @@ class CrmLeadListSerializer(serializers.ModelSerializer):
     assigned_realtor = RealtorShortSerializer(read_only=True, allow_null=True)
     agency = AgencyShortSerializer(read_only=True, allow_null=True)
     client_phone = serializers.SerializerMethodField()
+    #: Приходит АННОТАЦИЕЙ из `CrmLeadViewSet.get_queryset`
+    #: (`common.crm_unread.annotate_lead_unread`), не из поля модели — прочтение
+    #: персональное, у каждого сотрудника своё. `default=False` держит ключ на
+    #: месте, если сериализатор когда-нибудь применят к неаннотированной строке:
+    #: пропавшее поле фронтенд прочитал бы как «прочитано», а это тихая ложь.
+    is_unread = serializers.BooleanField(read_only=True, default=False)
 
     class Meta:
         model = Lead
@@ -198,6 +204,7 @@ class CrmLeadListSerializer(serializers.ModelSerializer):
             "processed_at",
             "assigned_realtor",
             "agency",
+            "is_unread",
             "created_at",
             "updated_at",
         ]

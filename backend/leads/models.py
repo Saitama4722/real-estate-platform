@@ -280,3 +280,56 @@ class LeadActionLog(models.Model):
         if self.pk:
             return f"{self.action_type} (лид #{lid}, #{self.pk})"
         return f"{self.action_type} (лид #{lid})"
+
+
+class LeadReadReceipt(models.Model):
+    """
+    «Этот риэлтор открывал эту заявку». ОДНА строка = один (лид, пользователь).
+
+    ⛔ ЧИТАТЕЛЬ ЗДЕСЬ — ПЕРСОНАЛЬНЫЙ, А НЕ ГЛОБАЛЬНЫЙ. Никогда не заменяйте это
+    поле-флагом `Lead.is_read`: булево поле на самом лиде по построению общее для
+    всех, и первый же открывший погасил бы счётчик остальным. Наличие СТРОКИ —
+    и есть состояние «прочитано»; отдельного `is_read` нет намеренно, поэтому
+    «прочитано» невозможно выразить наполовину.
+
+    Ставится ТОЛЬКО при открытии карточки конкретного лида
+    (`POST /api/crm/leads/<pk>/mark-read/`), никогда при открытии списка.
+
+    Каскад с обеих сторон: удалённый лид или удалённый сотрудник не оставляют
+    ни висячей строки, ни завышенного счётчика.
+    """
+
+    lead = models.ForeignKey(
+        "leads.Lead",
+        on_delete=models.CASCADE,
+        related_name="read_receipts",
+        verbose_name="Лид",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="lead_read_receipts",
+        verbose_name="Сотрудник",
+    )
+    read_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        verbose_name="Когда открыл",
+    )
+
+    class Meta:
+        verbose_name = "Отметка о прочтении лида"
+        verbose_name_plural = "Отметки о прочтении лидов"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["lead", "user"], name="uniq_lead_read_receipt_per_user"
+            ),
+        ]
+        # Счётчик непрочитанных всегда спрашивает «что этот пользователь уже
+        # открыл», поэтому user идёт первым в составном индексе.
+        indexes = [
+            models.Index(fields=["user", "lead"], name="lead_read_user_lead_idx"),
+        ]
+
+    def __str__(self):
+        return f"Лид #{self.lead_id} прочитан пользователем #{self.user_id}"

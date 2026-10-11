@@ -3,10 +3,12 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
-import { playCrmNewInquirySound } from "@/lib/crmInquiryNotifySound";
+import { refreshCrmUnreadCounts } from "@/lib/crmUnreadCounts";
 import { isCabinetAdminRole } from "@/lib/employeeUser";
 import { cn } from "@/lib/utils";
 import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
+
+import { usePageLoading } from "@/components/layout/pageLoadingSignal";
 
 const INQUIRIES_POLL_INTERVAL_MS = 15_000;
 const NEW_INQUIRY_HIGHLIGHT_MS = 45_000;
@@ -26,6 +28,9 @@ type LeadRow = {
   created_at: string;
   property: LeadPropertyRef | null;
   assigned_realtor: { id: number; first_name: string; last_name: string } | null;
+  /** Не открывал ЛИ ЭТОТ сотрудник эту заявку. Аннотация с сервера, личная —
+      см. `common.crm_unread`. Для не-риэлтора всегда false. */
+  is_unread?: boolean;
 };
 
 type RealtorOpt = { id: number; display_name: string };
@@ -314,6 +319,12 @@ export function AccountInquiriesTable() {
     isAdmin || (user.crm_capabilities?.change_status ?? false);
 
   const [rows, setRows] = useState<LeadRow[] | null>(null);
+
+  /* Holds the global navigation indicator until the content the user
+     navigated for is really on screen. A skeleton is not a loaded page.
+     See components/layout/pageLoadingSignal.ts. `rows === null` IS this table's loading state — it renders
+     «Загрузка…» until the first response lands. */
+  usePageLoading(rows === null);
   const [realtors, setRealtors] = useState<RealtorOpt[]>([]);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -446,8 +457,14 @@ export function AccountInquiriesTable() {
       const prevKnown = knownIdsRef.current;
       const freshIds = list.map((r) => r.id).filter((id) => !prevKnown.has(id));
       if (freshIds.length > 0) {
-        playCrmNewInquirySound();
+        /* ⚠ ЗВУК ЗДЕСЬ БОЛЬШЕ НЕ ИГРАЕТСЯ, НАМЕРЕННО. Он принадлежит одному
+           хранилищу счётчиков (`lib/crmUnreadCounts.ts`): только там известен
+           личный переключатель риэлтора, и только там гарантировано «на рост и
+           не при загрузке». Два источника звука означали бы двойной сигнал на
+           этой странице и звонок в обход выключателя. Подсветку «новая заявка»
+           оставляем — это сессионный маркер прибытия, а не прочтения. */
         registerNewArrivals(freshIds);
+        refreshCrmUnreadCounts();
       }
       setRows(list);
       knownIdsRef.current = new Set(list.map((r) => r.id));
@@ -509,6 +526,37 @@ export function AccountInquiriesTable() {
       setError("Не удалось сохранить статус. Попробуйте снова.");
     }
   };
+
+  /**
+   * Отметить заявку прочитанной — ТОЛЬКО при раскрытии её карточки.
+   *
+   * ⛔ Никогда не зовите это из `load()` / `pollLeads()`: открытие СПИСКА
+   * прочтением не является, и обнуление счётчика при заходе на страницу
+   * уничтожило бы весь смысл счётчика.
+   *
+   * Оптимистично гасим маркер строки, затем просим общий счётчик пересчитаться.
+   * Отказ сети откатывает маркер — «прочитано», которого нет на сервере, врёт.
+   */
+  const markLeadRead = useCallback(async (id: number) => {
+    /* `prev === null` — таблица ещё грузится. Возвращаем prev как есть: сложить
+       её в `[]` значило бы подменить «загрузка» на «заявок нет». */
+    const setUnread = (id_: number, value: boolean) =>
+      setRows((prev) =>
+        prev === null
+          ? prev
+          : prev.map((r) => (r.id === id_ ? { ...r, is_unread: value } : r)),
+      );
+    setUnread(id, false);
+    try {
+      const res = await fetchWithCrmAuthRetry(`/api/crm/leads/${id}/mark-read/`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("mark-read failed");
+      refreshCrmUnreadCounts();
+    } catch {
+      setUnread(id, true);
+    }
+  }, []);
 
   const revealPhone = async (id: number) => {
     setRevealBusy(id);
@@ -614,7 +662,24 @@ export function AccountInquiriesTable() {
                 >
                   <td className="px-3 py-2.5 font-medium text-slate-900">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span>{r.client_name}</span>
+                      {/* Маркер НЕПРОЧИТАННОГО: точка цвета внимания + жирное
+                          начертание имени. Намеренно скромно — строку не
+                          перекрашиваем, это не редизайн; и намеренно НЕ теми же
+                          средствами, что янтарная подсветка «новая заявка»
+                          выше: та живёт 45 секунд в этой вкладке, а эта
+                          отметка — состояние на сервере и переживёт перезаход. */}
+                      {r.is_unread ? (
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full bg-accent"
+                          aria-hidden
+                        />
+                      ) : null}
+                      <span className={r.is_unread ? "font-semibold" : undefined}>
+                        {r.client_name}
+                      </span>
+                      {r.is_unread ? (
+                        <span className="sr-only">Не просмотрено</span>
+                      ) : null}
                       {newArrivalSet.has(r.id) ? (
                         <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950 ring-1 ring-amber-300/80">
                           Новая заявка
@@ -690,7 +755,12 @@ export function AccountInquiriesTable() {
                       onClick={() => {
                         setExpandedLeadId((cur) => {
                           const next = cur === r.id ? null : r.id;
-                          if (next === r.id) dismissNewHighlight(r.id);
+                          if (next === r.id) {
+                            dismissNewHighlight(r.id);
+                            /* Раскрытие карточки — И ЕСТЬ «открыл заявку».
+                               Отдельной страницы у лида нет; это его карточка. */
+                            void markLeadRead(r.id);
+                          }
                           return next;
                         });
                       }}

@@ -772,6 +772,47 @@ class EmployeeActivityLogTests(TestCase):
         self.assertEqual(len(res.data), 1)
         self.assertEqual(res.data[0]["action_type"], EmployeeActivityLog.ActionType.LOGIN)
 
+    def test_list_includes_rows_with_no_user(self):
+        """Регрессия: строка login_failed по НЕСУЩЕСТВУЮЩЕМУ адресу имеет
+        user=NULL, и сериализатор ронял ВЕСЬ список с
+        AttributeError: 'NoneType' object has no attribute 'first_name'.
+        Ни один прежний тест такую строку не создавал — поэтому и не поймал."""
+        EmployeeActivityLog.objects.create(
+            user=None,
+            action_type=EmployeeActivityLog.ActionType.LOGIN_FAILED,
+            attempted_email="ghost@nowhere.invalid",
+            reason=EmployeeActivityLog.FailureReason.BAD_CREDENTIALS,
+        )
+        EmployeeActivityLog.objects.create(
+            user=self.realtor,
+            action_type=EmployeeActivityLog.ActionType.LOGIN,
+        )
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get("/api/crm/activity-logs/")
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(len(res.data), 2)
+
+        orphan = next(r for r in res.data if r["user"] is None)
+        # Обе колонки «Сотрудник» получают введённый адрес, а не падение.
+        self.assertEqual(orphan["user_display_name"], "ghost@nowhere.invalid")
+        self.assertEqual(orphan["user_email"], "ghost@nowhere.invalid")
+        # Ключи присутствуют ВСЕГДА: фронтенд объявляет их обязательными строками.
+        for key in ("user_email", "user_display_name", "action_label"):
+            self.assertIn(key, orphan)
+
+    def test_malformed_user_filter_is_ignored_not_500(self):
+        """Мусор в ?user= игнорируется и отдаёт нефильтрованный список."""
+        EmployeeActivityLog.objects.create(
+            user=self.realtor,
+            action_type=EmployeeActivityLog.ActionType.LOGIN,
+        )
+        self.client.force_authenticate(user=self.admin)
+        for bad in ("", "abc", "-5", "0", "9" * 30, "1.5"):
+            with self.subTest(user=bad):
+                res = self.client.get("/api/crm/activity-logs/", {"user": bad})
+                self.assertEqual(res.status_code, 200, f"{bad!r} -> {res.status_code}")
+                self.assertEqual(len(res.data), 1)
+
 
 class PublicRealtorApiTests(TestCase):
     """Публичная страница риэлтора: GET /api/realtors/<crm_id>/."""

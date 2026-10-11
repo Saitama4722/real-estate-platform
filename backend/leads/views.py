@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
 
+from common.crm_unread import annotate_lead_unread, mark_lead_read
 from leads.choices import LeadActionType, LeadStatus
 from leads.models import (
     Lead,
@@ -180,16 +181,54 @@ class CrmLeadViewSet(
     ordering = ["-created_at"]
 
     def get_queryset(self):
+        # Each of these ends in `__realtor_profile` for the same reason as the
+        # select_related block below: the nested serializers render the author /
+        # editor through `RealtorShortSerializer`, whose `is_public` reads that
+        # reverse OneToOne. Prefetching it keeps the cost flat instead of one
+        # query per comment author.
         prefetch = [
-            "comments__author_user",
-            "status_history__changed_by",
+            "comments__author_user__realtor_profile",
+            "status_history__changed_by__realtor_profile",
         ]
         if self.action == "retrieve":
-            prefetch.append("notes__author")
-        qs = (
+            prefetch.append("notes__author__realtor_profile")
+        # `is_unread` — ОДИН коррелированный подзапрос NOT EXISTS на всю
+        # выборку, а не запрос на строку. Для не-риэлторов это константа False
+        # (см. common.crm_unread), поэтому суперадмин не видит «непрочитано» на
+        # всём подряд.
+        qs = annotate_lead_unread(
             crm_lead_queryset_for_user(self.request.user)
-            .select_related("property", "assigned_realtor", "agency")
-            .prefetch_related(*prefetch)
+            .select_related(
+                "property",
+                "assigned_realtor",
+                "agency",
+                # ⭐ EVERY `realtor_profile` HOP BELOW IS AN N+1 FIX, NOT TIDINESS.
+                # `RealtorShortSerializer.is_public` calls
+                # `realtor_profile_is_public()`, which reads the reverse OneToOne
+                # `User.realtor_profile`. Without these it is ONE query PER ROW
+                # per realtor field. Measured on this endpoint: 14 rows cost 62
+                # queries before, 8 after.
+                #
+                # ⚠ The fix lives HERE, in the view, not in the serializer —
+                # `PropertyViewSet` and `CrmPropertyViewSet` already do exactly
+                # this, so each surface states its own query shape and none of
+                # them can be changed by an edit to a shared serializer.
+                "assigned_realtor__realtor_profile",
+                # `CrmLeadListSerializer.property` nests
+                # `CrmPropertyListSerializer`, which serialises the property's
+                # city/district/agency/owner AND two more realtor fields — so a
+                # lead that HAS a property costs those too.
+                "property__city",
+                "property__district",
+                "property__agency",
+                "property__owner",
+                "property__created_by",
+                "property__created_by__realtor_profile",
+                "property__assigned_realtor",
+                "property__assigned_realtor__realtor_profile",
+            )
+            .prefetch_related(*prefetch),
+            self.request.user,
         )
         st = self.request.query_params.get("status")
         if st:
@@ -321,6 +360,23 @@ class CrmLeadViewSet(
             request, lead, ser.validated_data["status"]
         )
 
+    @action(detail=True, methods=["post"], url_path="mark-read")
+    def mark_read(self, request, pk=None):
+        """
+        Отметить ЭТУ заявку прочитанной ТЕКУЩИМ сотрудником.
+
+        ⛔ Вызывается ТОЛЬКО при открытии карточки лида, никогда при загрузке
+        списка. Открытие списка, гасящее все счётчики, обессмысливает сам
+        счётчик — ради этого метод сделан отдельным POST, а не побочным
+        эффектом GET.
+
+        Идемпотентно: повторный вызов возвращает 200 и `created=false`.
+        """
+        require_crm_capability(request, "view_clients")
+        lead = self.get_object()
+        created = mark_lead_read(request.user, lead)
+        return Response({"id": lead.pk, "is_unread": False, "created": created})
+
     @action(
         detail=True,
         methods=["post"],
@@ -384,7 +440,11 @@ class CrmLeadViewSet(
         require_crm_capability(request, "view_clients")
         lead = self.get_object()
         if request.method == "GET":
-            qs = lead.notes.select_related("author").order_by("-created_at")
+            # `author__realtor_profile`: CrmLeadNoteReadSerializer renders the
+            # author via RealtorShortSerializer — see the get_queryset note.
+            qs = lead.notes.select_related("author__realtor_profile").order_by(
+                "-created_at"
+            )
             ser = CrmLeadNoteReadSerializer(
                 qs, many=True, context={"request": request}
             )
@@ -417,7 +477,11 @@ class CrmLeadViewSet(
     def action_history(self, request, pk=None):
         require_crm_capability(request, "view_clients")
         lead = self.get_object()
-        qs = lead.action_logs.select_related("user").order_by("-created_at")
+        # `user__realtor_profile`: CrmLeadActionLogReadSerializer renders the
+        # actor via RealtorShortSerializer — see the get_queryset note.
+        qs = lead.action_logs.select_related("user__realtor_profile").order_by(
+            "-created_at"
+        )
         ser = CrmLeadActionLogReadSerializer(
             qs, many=True, context={"request": request}
         )
