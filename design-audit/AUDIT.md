@@ -185,11 +185,11 @@ during the crawl. (The «N» overlay is the Next.js dev indicator, not a bug.)
 
 ## 5. CRM authentication note
 
-The only password documented anywhere in the project is the seed default `12345678`
-(`create_initial_admin.py`, which targets `admin@admin.com` — an account that does **not** exist in
-this DB). The three real accounts are `daitama@yandex.ru` (superadmin), `admin@admin.ru`
-(superadmin), `vl@vl.ru` (realtor). Logging in through the app's own `/account/login` form with
-`12345678` for all three returned **HTTP 401** (confirmed in the Django log) — the password is
+The only password documented anywhere in the project was the seed default, the local dev password
+(see local notes), in `create_initial_admin.py` — which targeted an account that does **not** exist in
+this DB (the hard-coded default has since been removed). The three real accounts are superadmin
+id 1, a second superadmin and one realtor. Logging in through the app's own `/account/login` form with
+the local dev password for all three returned **HTTP 401** (confirmed in the Django log) — the password is
 genuinely wrong (matching the project's own "do not assume a default password" warning). Test files
 only contain ephemeral `@example.com` accounts that live in the test DB, not the dev DB.
 
