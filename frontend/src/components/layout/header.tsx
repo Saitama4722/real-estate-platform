@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { HeaderAccountControls } from "@/components/layout/header-account-controls";
 import { HeaderFavoritesLink } from "@/components/layout/HeaderFavoritesLink";
@@ -15,20 +16,37 @@ const navLinks = [
   { label: "Статьи", href: "/articles" },
 ];
 
-/** Wordmark: Golos Text 700 + the accent-red dot. No logo file was supplied. */
-export function Wordmark({ inverse = false }: { inverse?: boolean }) {
+/**
+ * The horizontal logo (mark + outlined wordmark, viewBox 311×88), from
+ * public/brand/. `inverse` = the all-white version for the dark footer.
+ *
+ * Height is set by the caller's className, width follows the 311:88 ratio.
+ * ⚠ In the header it is 28px tall = 99px wide below 1280px, EXACTLY the old
+ * text wordmark's width — the 1024–1139 band has no spare pixel (see the HEADER
+ * FIT BAND in globals.css), so the logo must not grow there. Re-measure with a
+ * favourite present before changing either size.
+ * `unoptimized`: an SVG gains nothing from the image optimizer, and the default
+ * loader refuses SVG without `dangerouslyAllowSVG` anyway.
+ */
+export function SiteLogo({
+  inverse = false,
+  priority = false,
+  className = "",
+}: {
+  inverse?: boolean;
+  priority?: boolean;
+  className?: string;
+}) {
   return (
-    <span
-      className={`inline-flex items-start gap-0.5 text-[22px] font-bold leading-none tracking-[-0.01em] ${
-        inverse ? "text-white" : "text-fg"
-      }`}
-    >
-      Centreal
-      <span
-        aria-hidden="true"
-        className="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-[2px] bg-accent"
-      />
-    </span>
+    <Image
+      src={inverse ? "/brand/logo-footer-reversed.svg" : "/brand/logo-header.svg"}
+      alt="Centreal"
+      width={311}
+      height={88}
+      unoptimized
+      priority={priority}
+      className={`block w-auto ${className}`}
+    />
   );
 }
 
@@ -59,7 +77,9 @@ export async function Header() {
             from 64px to 52px — see the COMPACT HEADER block in globals.css. */}
         <div className="ctr-header__row flex h-16 items-center justify-between gap-2">
           <Link href="/" className="shrink-0">
-            <Wordmark />
+            {/* 28px (99px wide) below 1280 — the 1024–1279 rows have no slack;
+                32px (113px) from 1280, where the row has room to spare. */}
+            <SiteLogo priority className="h-7 min-[1280px]:h-8" />
           </Link>
           <div className="flex min-w-0 items-center gap-2 lg:gap-4">
             {/* Desktop nav row. Hidden in favour of the hamburger (MobileNav)

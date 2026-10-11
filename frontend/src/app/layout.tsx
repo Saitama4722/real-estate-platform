@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Golos_Text } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/header";
@@ -24,9 +24,48 @@ const golosText = Golos_Text({
   variable: "--font-golos",
 });
 
+const OG_IMAGE = {
+  url: "/og-image.png",
+  width: 1200,
+  height: 630,
+  alt: "Centreal — недвижимость Краснодара и Геленджика",
+};
+
+/**
+ * Icons, manifest and OG image are declared HERE ONLY. The files live in
+ * public/ (copied from the brand package, SVGs stripped of C2PA metadata).
+ * ⚠ Do not add app/favicon.ico or app/icon.* — the App Router auto-serves those
+ * and they would emit a second, competing set of <link rel="icon"> tags.
+ *
+ * metadataBase makes the OG/twitter image URLs absolute. Same env var as
+ * siteOrigin(), but with an unconditional fallback: `new URL("")` would throw.
+ */
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3001",
+  ),
   title: "Centreal — Недвижимость",
   description: "Платформа недвижимости Краснодарского края",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
+  openGraph: {
+    images: [OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: [OG_IMAGE],
+  },
+};
+
+/* Next 15 moved themeColor out of `metadata` into the viewport export. */
+export const viewport: Viewport = {
+  themeColor: "#2563EB",
 };
 
 export default function RootLayout({

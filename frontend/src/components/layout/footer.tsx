@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
-import { Wordmark } from "@/components/layout/header";
+import { SiteLogo } from "@/components/layout/header";
 
 /** Bottom-row nav/legal links. Horizontal, right of the copyright. */
 const legalLinks = [
@@ -76,7 +76,7 @@ export function Footer() {
           <div className="grid gap-7 border-b border-white/12 pb-10 sm:grid-cols-[1.4fr_1fr_1fr] sm:gap-10">
             <div>
               <Link href="/" className="inline-block">
-                <Wordmark inverse />
+                <SiteLogo inverse className="h-8" />
               </Link>
               <p className="mt-3.5 max-w-[300px] text-small text-white/72">
                 Недвижимость в Краснодаре и Геленджике: квартиры, дома, участки и

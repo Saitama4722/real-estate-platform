@@ -10,6 +10,8 @@
  * panel becomes a header band.
  */
 
+import Image from "next/image";
+
 const SHAPE_STROKE = {
   fill: "none",
   strokeWidth: 2,
@@ -127,35 +129,18 @@ export function AuthBrandPanel() {
       {/* Content. On the ≤1024 band this collapses to logo + subline on one row. */}
       <div className="relative z-[1] flex h-full flex-col justify-between px-5 max-[1024px]:flex-row max-[1024px]:items-center min-[1025px]:px-20 min-[1025px]:py-14 md:max-[1024px]:px-8">
         <div className="flex items-center gap-3 max-[1024px]:gap-2.5">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 36 36"
-            fill="none"
+          {/* Brand mark, WHITE version: the primary-blue mark has too little
+              contrast on this navy panel. alt="" — the "Centreal" text beside
+              it already names the brand. */}
+          <Image
+            src="/brand/centreal-mark-white.svg"
+            alt=""
+            width={88}
+            height={88}
+            unoptimized
+            priority
             className="h-7 w-7 shrink-0 md:h-8 md:w-8 min-[1025px]:h-9 min-[1025px]:w-9"
-          >
-            <rect width="36" height="36" rx="10" className="fill-brand" />
-            <path
-              d="M9 17.5 18 10l9 7.5"
-              stroke="#FFFFFF"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M12 18v8h12v-8"
-              stroke="#FFFFFF"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M16 26v-4h4v4"
-              stroke="#FFFFFF"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          />
           <div>
             <div className="text-[17px] leading-none font-bold tracking-[-0.02em] text-white md:text-[18px] min-[1025px]:text-[22px]">
               Centreal
