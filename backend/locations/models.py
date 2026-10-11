@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Q
 
+from common.image_compression import compress_field_in_place
 from common.models import BaseTimestampedModel
 
 
@@ -262,6 +263,12 @@ class DistrictGuide(BaseTimestampedModel):
 
     def __str__(self) -> str:
         return self.title
+
+    def save(self, *args, **kwargs):
+        # Cover renders at one size, so no derivative ladder — the shared
+        # 1920/q85 cap only. See the image-pipeline rule in CLAUDE.md.
+        compress_field_in_place(self.cover_image)
+        return super().save(*args, **kwargs)
 
     #: Section fields in reading order. One definition, so a sixth section
     #: cannot be added to the model and silently missed by word_count.

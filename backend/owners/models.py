@@ -1,5 +1,6 @@
 from django.db import models
 
+from common.image_compression import compress_field_in_place
 from common.models import BaseTimestampedModel
 
 
@@ -42,3 +43,10 @@ class Owner(BaseTimestampedModel):
         if self.pk:
             return f"Собственник #{self.pk}: {label}"
         return f"Собственник: {label}"
+
+    def save(self, *args, **kwargs):
+        # Single display size, so no derivative ladder — just the shared 1920/q85
+        # cap with EXIF orientation applied. Owner photos were previously stored
+        # completely unprocessed (2.1 MB 1122x1402 PNGs measured on disk).
+        compress_field_in_place(self.photo)
+        return super().save(*args, **kwargs)

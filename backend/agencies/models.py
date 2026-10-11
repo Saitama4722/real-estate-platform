@@ -4,6 +4,7 @@ Agency model — expanded entity for realtor profiles and future property assign
 from django.db import models
 from django.utils.text import slugify
 
+from common.image_compression import compress_field_in_place
 from common.models import BaseTimestampedModel
 
 
@@ -36,4 +37,6 @@ class Agency(BaseTimestampedModel):
     def save(self, *args, **kwargs):
         if not self.slug and self.name:
             self.slug = slugify(self.name)
+        # Single display size — shared 1920/q85 cap, no derivative ladder.
+        compress_field_in_place(self.logo)
         super().save(*args, **kwargs)

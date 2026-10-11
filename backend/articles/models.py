@@ -1,5 +1,6 @@
 from django.db import models
 
+from common.image_compression import compress_field_in_place
 from common.models import BaseTimestampedModel
 
 from .choices import ArticleCategory, ArticleStatus
@@ -88,6 +89,12 @@ class Article(BaseTimestampedModel):
 
     def __str__(self) -> str:
         return self.title
+
+    def save(self, *args, **kwargs):
+        # Cover renders at one size, so no derivative ladder — the shared
+        # 1920/q85 cap only. See the image-pipeline rule in CLAUDE.md.
+        compress_field_in_place(self.cover_image)
+        return super().save(*args, **kwargs)
 
 
 class ArticleSection(models.Model):
