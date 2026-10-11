@@ -8,6 +8,7 @@ from django.db import IntegrityError, models, transaction
 
 from common.models import BaseTimestampedModel
 from common.slug_latin import join_slug_parts, slugify_latin
+from common.upload_paths import UniqueUploadTo
 from locations.choices import (
     BathroomType,
     BuildingType,
@@ -783,23 +784,23 @@ class PropertyPhoto(BaseTimestampedModel):
         verbose_name="Объект недвижимости",
     )
     original_file = models.ImageField(
-        upload_to="properties/photos/",
+        upload_to=UniqueUploadTo("properties/photos"),
         verbose_name="Исходный файл",
     )
     image_large = models.ImageField(
-        upload_to="properties/photos/large/",
+        upload_to=UniqueUploadTo("properties/photos/large"),
         null=True,
         blank=True,
         verbose_name="Крупное изображение",
     )
     image_medium = models.ImageField(
-        upload_to="properties/photos/medium/",
+        upload_to=UniqueUploadTo("properties/photos/medium"),
         null=True,
         blank=True,
         verbose_name="Среднее изображение",
     )
     image_thumb = models.ImageField(
-        upload_to="properties/photos/thumb/",
+        upload_to=UniqueUploadTo("properties/photos/thumb"),
         null=True,
         blank=True,
         verbose_name="Миниатюра",

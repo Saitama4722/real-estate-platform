@@ -83,27 +83,22 @@ def default_storages_entry(
             "secret_key": secret_key,
             # Files are public — no signed URLs needed for avatars.
             "querystring_auth": False,
-            # ⚠⚠ THIS OVERWRITES. The comment here used to claim the OPPOSITE
-            # ("prevent django-storages from overwriting files with the same
-            # name") — it was wrong, and the wrong version is the one a reader
-            # would have trusted. `file_overwrite=True` makes S3Boto3Storage's
-            # `get_available_name()` return the requested key UNCHANGED, so a
-            # second upload to an existing key REPLACES the stored object.
-            # `False` is what appends a suffix and preserves both.
+            # NEVER overwrite an existing object. With `True`, S3Boto3Storage's
+            # `get_available_name()` returns the requested key unchanged, so a
+            # second upload to an existing key REPLACES the stored object; that
+            # was hosting blocker #1 (resolved 2026-10-12, see CLAUDE.md).
             #
-            # ⛔ THIS IS A HOSTING BLOCKER, DELIBERATELY LEFT AS-IS FOR NOW.
-            # Stored names come from `_jpeg_name()`, which derives them from the
-            # UPLOADER'S OWN filename with nothing unique added — so two owners
-            # sending `IMG_0042.jpg`, or two employees sending `photo.jpg`,
-            # collide and the second silently replaces the first. Dormant today
-            # only because MEDIA_STORAGE_BACKEND=local, and FileSystemStorage
-            # has no such option (it always suffixes).
-            # Do NOT flip this without reading the analysis in CLAUDE.md
-            # → «Cloud storage is a HOSTING BLOCKER»: `False` fixes the
-            # collisions but orphans a bucket object on every regeneration of a
-            # SALE-REQUEST derivative, because that task deliberately never
-            # deletes. The two have to be resolved together.
-            "file_overwrite": True,
+            # This is the SECOND safety net. The first is that every upload_to
+            # is `common.upload_paths.UniqueUploadTo`, so keys are
+            # `<folder>/<yyyy>/<mm>/<uuid4>.<ext>` and never collide. With
+            # `False`, a collision that slips through anyway gets a suffix
+            # instead of destroying the other file, the same as
+            # FileSystemStorage does locally.
+            #
+            # ⚠ `migrate_media_to_r2` builds its OWN storage with `True` on
+            # purpose: it copies files to the exact keys the DB already holds,
+            # and a suffixed key there would 404.
+            "file_overwrite": False,
         }
 
         endpoint = os.environ.get("AWS_S3_ENDPOINT_URL", "").strip()

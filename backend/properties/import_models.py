@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 
 from common.models import BaseTimestampedModel
+from common.upload_paths import UniqueUploadTo
 
 from properties.import_choices import (
     ImportDedupOutcome,
@@ -18,7 +19,7 @@ class ImportJob(BaseTimestampedModel):
     """
 
     source_file = models.FileField(
-        upload_to="imports/jobs/",
+        upload_to=UniqueUploadTo("imports/jobs"),
         verbose_name="Файл источника",
     )
     source_format = models.CharField(

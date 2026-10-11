@@ -2,6 +2,7 @@ from django.db import models
 
 from common.image_compression import compress_field_in_place
 from common.models import BaseTimestampedModel
+from common.upload_paths import UniqueUploadTo
 
 from .choices import ArticleCategory, ArticleStatus
 
@@ -64,7 +65,7 @@ class Article(BaseTimestampedModel):
         db_index=True,
     )
     cover_image = models.ImageField(
-        upload_to="articles/covers/",
+        upload_to=UniqueUploadTo("articles/covers"),
         blank=True,
         null=True,
         verbose_name="Обложка",

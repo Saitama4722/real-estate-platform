@@ -6,6 +6,7 @@ from django.utils.text import slugify
 
 from common.image_compression import compress_field_in_place
 from common.models import BaseTimestampedModel
+from common.upload_paths import UniqueUploadTo
 
 
 class Agency(BaseTimestampedModel):
@@ -17,7 +18,7 @@ class Agency(BaseTimestampedModel):
     )
     logo = models.ImageField(
         "Логотип",
-        upload_to="agencies/logos/",
+        upload_to=UniqueUploadTo("agencies/logos"),
         blank=True,
         null=True,
     )

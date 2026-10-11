@@ -3,6 +3,7 @@ from django.db.models import Q
 
 from common.image_compression import compress_field_in_place
 from common.models import BaseTimestampedModel
+from common.upload_paths import UniqueUploadTo
 
 
 class City(BaseTimestampedModel):
@@ -228,7 +229,7 @@ class DistrictGuide(BaseTimestampedModel):
         help_text="Выводится карточкой «Главное» в конце гида.",
     )
     cover_image = models.ImageField(
-        upload_to="districts/covers/",
+        upload_to=UniqueUploadTo("districts/covers"),
         blank=True,
         null=True,
         verbose_name="Обложка",

@@ -2,6 +2,7 @@ from django.db import models
 
 from common.image_compression import compress_field_in_place
 from common.models import BaseTimestampedModel
+from common.upload_paths import UniqueUploadTo
 
 
 class Owner(BaseTimestampedModel):
@@ -22,7 +23,7 @@ class Owner(BaseTimestampedModel):
     full_name = models.CharField(max_length=255, verbose_name="ФИО")
     phone = models.CharField(max_length=32, verbose_name="Телефон")
     photo = models.ImageField(
-        upload_to="owners/photos/",
+        upload_to=UniqueUploadTo("owners/photos"),
         blank=True,
         null=True,
         verbose_name="Фото",

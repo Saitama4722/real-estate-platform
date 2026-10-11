@@ -3,6 +3,7 @@ from django.db import models, transaction
 
 from common.image_compression import compress_to_max_edge, validate_image_upload
 from common.models import BaseTimestampedModel
+from common.upload_paths import UniqueUploadTo
 
 from .choices import SaleRequestPropertyType, SaleRequestStatus
 
@@ -175,23 +176,23 @@ class SaleRequestPhoto(BaseTimestampedModel):
         verbose_name="Заявка на продажу",
     )
     image = models.ImageField(
-        upload_to="sale_requests/photos/",
+        upload_to=UniqueUploadTo("sale_requests/photos"),
         verbose_name="Фото",
     )
     image_large = models.ImageField(
-        upload_to="sale_requests/photos/large/",
+        upload_to=UniqueUploadTo("sale_requests/photos/large"),
         null=True,
         blank=True,
         verbose_name="Крупное изображение",
     )
     image_medium = models.ImageField(
-        upload_to="sale_requests/photos/medium/",
+        upload_to=UniqueUploadTo("sale_requests/photos/medium"),
         null=True,
         blank=True,
         verbose_name="Среднее изображение",
     )
     image_thumb = models.ImageField(
-        upload_to="sale_requests/photos/thumb/",
+        upload_to=UniqueUploadTo("sale_requests/photos/thumb"),
         null=True,
         blank=True,
         verbose_name="Миниатюра",

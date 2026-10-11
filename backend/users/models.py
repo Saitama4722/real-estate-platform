@@ -10,6 +10,7 @@ from django.db import IntegrityError, models
 
 from common.image_compression import compress_avatar
 from common.models import BaseTimestampedModel
+from common.upload_paths import UniqueUploadTo
 
 from .managers import UserManager
 
@@ -51,7 +52,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     phone = models.CharField("Телефон", max_length=32, blank=True)
     avatar = models.ImageField(
         "Аватар",
-        upload_to="users/avatars/",
+        upload_to=UniqueUploadTo("users/avatars"),
         blank=True,
         null=True,
     )
@@ -305,7 +306,7 @@ class RealtorProfile(BaseTimestampedModel):
     public_phone = models.CharField("Публичный телефон", max_length=32, blank=True)
     photo = models.ImageField(
         "Фото",
-        upload_to="realtors/photos/",
+        upload_to=UniqueUploadTo("realtors/photos"),
         blank=True,
         null=True,
     )

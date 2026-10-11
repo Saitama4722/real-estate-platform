@@ -137,6 +137,10 @@ class Command(BaseCommand):
             "access_key": access_key,
             "secret_key": secret_key,
             "querystring_auth": False,
+            # ⚠ True ON PURPOSE, unlike the app's storage (media_storage.py,
+            # False). This command copies each file to the EXACT key its DB row
+            # already holds; a suffixed key would leave the row pointing at a
+            # missing object. Do not "align" it with the app setting.
             "file_overwrite": True,
             "object_parameters": {"CacheControl": "max-age=86400"},
         }
