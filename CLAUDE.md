@@ -87,6 +87,16 @@ Start with `Start Centreal.bat` (→ `scripts\start_local.ps1`). Stop with
 `scripts\stop_local.ps1`. **Always stop before relaunching** — a second stack
 exhausts Postgres connections and produces intermittent `OperationalError`.
 
+### Git on the pCloud drive
+
+**Automatic git gc/maintenance is disabled on the pCloud repo because repack
+hangs on pCloud I/O.** Repo-local config: `gc.auto=0`, `maintenance.auto=false`.
+`[measured]` 2026-10-12: a `git fetch` started `maintenance run --auto`, and
+its `pack-objects` sat for 4+ minutes using 0.3 s of CPU (waiting on disk)
+until it was killed. `fsck --connectivity-only` was clean afterwards. Do not
+re-enable them. If the object store ever needs repacking, do it from a copy on
+a local disk.
+
 ### Environment files
 
 Django reads **`backend/.env`** only (python-dotenv looks for exactly `.env`, never
