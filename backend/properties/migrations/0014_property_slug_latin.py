@@ -4,10 +4,79 @@ from django.db import migrations, models
 
 
 def recompute_property_slugs(apps, schema_editor):
-    from properties.models import Property
+    from django.core.exceptions import ObjectDoesNotExist
 
-    # Не подтягивать поля, добавленные миграциями после 0014 — колонок ещё нет в БД.
-    qs = Property.objects.defer("crm_property_id").select_related(
+    from common.slug_latin import join_slug_parts, slugify_latin
+
+    # Историческая модель содержит только поля, существующие на позиции 0014,
+    # поэтому defer() для более поздних колонок не нужен — и невозможен:
+    # defer("crm_property_id") здесь поднимает FieldDoesNotExist.
+    Property = apps.get_model("properties", "Property")
+
+    # ЗАМОРОЖЕННАЯ КОПИЯ Property.build_generated_slug() по состоянию на
+    # миграцию 0014. У исторической модели (apps.get_model) нет собственных
+    # методов, менеджеров и save(), поэтому логика продублирована здесь
+    # намеренно.
+    #
+    # НЕ ОБНОВЛЯТЬ эту копию вслед за изменениями метода в properties/models.py.
+    # Миграция данных обязана воспроизводить поведение своей точки во времени:
+    # если копия начнёт следовать за моделью, прогон на чистой базе даст не те
+    # slug'и, что уже записаны в проде. Меняете метод модели — эту копию не
+    # трогайте.
+    def build_generated_slug(prop):
+        if not prop.pk:
+            return ""
+        parts = []
+        pt = prop.property_type
+        if pt == "apartment":
+            parts.append("kvartira")
+            try:
+                ad = prop.apartment_details
+            except ObjectDoesNotExist:
+                ad = None
+            if ad is not None and ad.rooms is not None:
+                parts.append(f"{ad.rooms}-komnaty")
+        elif pt == "house":
+            parts.append("dom")
+        elif pt == "land":
+            parts.append("uchastok")
+        elif pt == "commercial":
+            parts.append("kommercheskoe")
+            try:
+                cd = prop.commercial_details
+            except ObjectDoesNotExist:
+                cd = None
+            if cd is not None and cd.commercial_type:
+                parts.append(str(cd.commercial_type))
+        else:
+            label = prop.get_property_type_display() or ""
+            seg = slugify_latin(label)
+            if seg:
+                parts.append(seg)
+
+        try:
+            city = prop.city
+        except ObjectDoesNotExist:
+            city = None
+        if city is not None and getattr(city, "name", None):
+            cn = slugify_latin(city.name)
+            if cn:
+                parts.append(cn)
+
+        try:
+            district = prop.district
+        except ObjectDoesNotExist:
+            district = None
+        if district is not None and getattr(district, "name", None):
+            dn = slugify_latin(district.name)
+            if dn:
+                parts.append(dn)
+
+        parts.append(str(prop.pk))
+        base = join_slug_parts(*parts, max_length=320)
+        return base or f"property-{prop.pk}"
+
+    qs = Property.objects.select_related(
         "city",
         "district",
         "apartment_details",
@@ -16,7 +85,7 @@ def recompute_property_slugs(apps, schema_editor):
         "commercial_details",
     )
     for prop in qs.iterator(chunk_size=200):
-        new_slug = prop.build_generated_slug()
+        new_slug = build_generated_slug(prop)
         if new_slug:
             Property.objects.filter(pk=prop.pk).update(slug=new_slug)
 
