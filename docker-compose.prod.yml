@@ -1,0 +1,191 @@
+# Centreal — production stack for the Beget VPS (Ubuntu 24.04, 2 vCPU / 4 GB).
+#
+#   docker compose -f docker-compose.prod.yml --env-file deploy/.env.prod up -d --build
+#
+# ⛔ Built and run ONLY on the VPS. Docker is never run on the Windows dev
+# machines. Step-by-step instructions (in Russian): deploy/README.md.
+#
+# Network layout: only `caddy` publishes ports (80/443). db and redis publish
+# nothing and sit ONLY on `data` (internal: no route in or out). App containers
+# join `data` + `web`; `web` has normal egress, which they need: R2 uploads,
+# Telegram notifications, Nominatim geocoding from the frontend.
+#
+# The local-dev docker-compose.yml is a separate, unrelated reference file.
+
+name: centreal
+
+x-django-env: &django-env
+  # ⚠ Marks the process as DEPLOYED (config/settings.py → IS_DEPLOYED): makes
+  # DJANGO_SECRET_KEY mandatory, refuses DJANGO_DEBUG=True, and makes
+  # DATABASE_URL win over CENTREAL_DATABASE_URL. Never remove it.
+  CENTREAL_DEPLOYED: "1"
+  # Note the DJANGO_ prefix: a bare SECRET_KEY / DEBUG is read by nothing.
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY in deploy/.env.prod}
+  DJANGO_DEBUG: "False"
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?set DJANGO_ALLOWED_HOSTS}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+  # Built from the POSTGRES_* values so the two can never disagree. The password
+  # is placed in a URL: keep it to letters and digits (see .env.prod.example).
+  DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  CONN_MAX_AGE: ${CONN_MAX_AGE:-600}
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/0
+  MEDIA_STORAGE_BACKEND: ${MEDIA_STORAGE_BACKEND:-r2}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-}
+  AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
+  AWS_S3_REGION_NAME: ${AWS_S3_REGION_NAME:-auto}
+  AWS_S3_CUSTOM_DOMAIN: ${AWS_S3_CUSTOM_DOMAIN:-}
+  SITE_URL: ${SITE_URL:?set SITE_URL}
+  LEADS_NOTIFICATIONS_ENABLED: ${LEADS_NOTIFICATIONS_ENABLED:-True}
+  TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+  TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+  INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
+  INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+  PYTHONUNBUFFERED: "1"
+
+x-django-service: &django-service
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+  image: centreal-backend:latest
+  restart: unless-stopped
+  environment: *django-env
+  volumes:
+    # Used only when MEDIA_STORAGE_BACKEND=local (Caddy serves it read-only).
+    - media:/app/media
+  networks: [data, web]
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      # postgres:18 keeps its data under /var/lib/postgresql/<major>/ — mount
+      # the parent, as the 18+ images expect.
+      - pgdata:/var/lib/postgresql
+      # Drop dump files here on the host to pg_restore them (deploy/README.md).
+      - ./deploy/backups:/backups
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # NO `ports:` — never reachable from the internet.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks: [data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # NO `ports:` — internal only.
+
+  backend:
+    <<: *django-service
+    # Same order as the Dockerfile CMD (migrate → create_initial_admin →
+    # gunicorn); only the bind port and worker count differ: 3 workers fit 4 GB.
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py create_initial_admin &&
+             exec gunicorn config.wsgi:application --bind 0.0.0.0:8000
+             --workers 3 --timeout 60 --access-logfile -"
+    healthcheck:
+      # /admin/login/ answers 200 without auth. Host "localhost" must be in
+      # DJANGO_ALLOWED_HOSTS.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/admin/login/', timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  celery:
+    <<: *django-service
+    command: ["celery", "-A", "config.celery", "worker", "-l", "info", "--concurrency", "2"]
+    depends_on:
+      backend:
+        condition: service_healthy   # migrations are applied by backend first
+
+  celery-beat:
+    <<: *django-service
+    # Fires CELERY_BEAT_SCHEDULE (flush-expired-jwt-tokens daily at 04:00).
+    # Exactly ONE beat may run, or every periodic task fires twice.
+    command: ["celery", "-A", "config.celery", "beat", "-l", "info", "-s", "/tmp/celerybeat-schedule"]
+    volumes: []
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        # Inlined at BUILD time — changing them needs `up -d --build frontend`.
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?set NEXT_PUBLIC_SITE_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?set NEXT_PUBLIC_API_URL}
+        # Django on the internal network (server-side fetches + rewrites).
+        BACKEND_URL: http://backend:8000
+    image: centreal-frontend:latest
+    restart: unless-stopped
+    environment:
+      # Server-side fetches read it at RUNTIME too (lib/publicProperty.ts).
+      BACKEND_URL: http://backend:8000
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      # Server-side only (geo route handlers → Nominatim User-Agent).
+      NOMINATIM_CONTACT_EMAIL: ${NOMINATIM_CONTACT_EMAIL:-}
+    networks: [web]
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - media:/srv/media:ro
+    networks: [web]
+    depends_on:
+      - backend
+      - frontend
+
+networks:
+  # db + redis only. internal: true = no external connectivity in either direction.
+  data:
+    internal: true
+  # Caddy, frontend and the Django containers; normal egress (R2, Telegram,
+  # Nominatim, Let's Encrypt ACME).
+  web: {}
+
+volumes:
+  pgdata:
+  media:
+  caddy_data:
+  caddy_config:

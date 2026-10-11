@@ -104,6 +104,16 @@ function resolveDjangoBaseForApiRewrites(): string {
  * the trailing-slash normalisation redirect never fires for /api/* paths.
  */
 const nextConfig: NextConfig = {
+  /*
+   * Production image (frontend/Dockerfile.prod) runs `.next/standalone/server.js`
+   * — a minimal server with only the traced node_modules. Affects `next build`
+   * only; `next dev` ignores it.
+   *
+   * ⚠ rewrites() below is evaluated at BUILD time and baked into the routes
+   * manifest, so BACKEND_URL must be a build ARG of the image, not just a
+   * runtime env var.
+   */
+  output: "standalone",
   async rewrites() {
     const backend = resolveDjangoBaseForApiRewrites();
     const apiBase = `${backend}/api`;

@@ -1,2 +1,12 @@
-node_modules
-.next
+# Build context for frontend/Dockerfile.prod (and Dockerfile.dev).
+# ⛔ Anything secret or local-only must be listed here BEFORE any image build.
+node_modules/
+.next/
+.env*
+coverage/
+playwright-report/
+test-results/
+*.log
+tsconfig.tsbuildinfo
+# Brand source package (C2PA-tagged masters) — must never ship.
+public/Direction options for Central logo/

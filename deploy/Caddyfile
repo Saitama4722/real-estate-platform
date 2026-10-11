@@ -1,0 +1,55 @@
+# Centreal reverse proxy — the ONLY service that publishes ports (80/443).
+#
+# SITE_ADDRESS (from deploy/.env.prod):
+#   ":80"                        → plain HTTP on the server IP (now)
+#   "centreal.ru, www.centreal.ru" → Caddy obtains Let's Encrypt certificates
+#                                   automatically and redirects HTTP → HTTPS.
+# Changing it needs only `docker compose ... up -d caddy` (plus a frontend
+# rebuild for the new NEXT_PUBLIC_SITE_URL — see deploy/README.md).
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# --- Django API -----------------------------------------------------------
+	# Same contract as the Next.js rewrite in frontend/next.config.ts: Django
+	# always receives a trailing slash. Without it APPEND_SLASH answers a
+	# slash-less POST with a 301, and the browser re-sends it as a GET with no
+	# body. Query strings are preserved.
+	@api_no_slash path_regexp ^/api/.*[^/]$
+	rewrite @api_no_slash {path}/?{query}
+
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# --- Django admin + its static files (WhiteNoise in the backend) -----------
+	handle /admin* {
+		reverse_proxy backend:8000
+	}
+	handle /static/* {
+		reverse_proxy backend:8000
+	}
+
+	# --- Media -----------------------------------------------------------------
+	# MEDIA_STORAGE_BACKEND=r2 (production): Django emits ABSOLUTE bucket URLs
+	# (MEDIA_URL = https://<AWS_S3_CUSTOM_DOMAIN>/), so nothing on the site points
+	# at /media/ and these requests are only stale links → 404 is the honest
+	# answer.
+	# MEDIA_STORAGE_BACKEND=local: files live in the shared `media` volume
+	# (written by backend + celery) and Caddy serves them read-only. Django
+	# itself only serves /media/ when DEBUG=True, which production never is.
+	handle /media/* {
+		root * /srv
+		file_server
+	}
+
+	# --- Everything else → Next.js -----------------------------------------------
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

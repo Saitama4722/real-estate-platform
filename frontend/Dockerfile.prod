@@ -1,0 +1,63 @@
+# Production image for the Next.js frontend (docker-compose.prod.yml → frontend).
+# Built ONLY on the VPS — Docker is never run on the Windows dev machines.
+#
+#   deps    npm ci, NODE_ENV UNSET: with NODE_ENV=production npm silently skips
+#           devDependencies (no tailwindcss / typescript) and the build breaks.
+#   build   next build with NODE_ENV=production and output: "standalone".
+#   runner  node server.js as a non-root user, only the standalone output.
+#
+# ⚠ NEXT_PUBLIC_* values are inlined into the client bundle at BUILD time, and
+# next.config.ts rewrites() (which read BACKEND_URL) are baked into the routes
+# manifest at build time too. Changing any of them means REBUILDING this image,
+# not just restarting it.
+
+ARG NODE_IMAGE=node:22-alpine
+
+# --- deps --------------------------------------------------------------------
+FROM ${NODE_IMAGE} AS deps
+WORKDIR /app
+# libc6-compat: some prebuilt native binaries (e.g. @next/swc) expect glibc symbols.
+RUN apk add --no-cache libc6-compat
+# .npmrc carries legacy-peer-deps=true — without it npm ci fails on the
+# react-leaflet-cluster peer conflict.
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci --include=dev
+
+# --- build -------------------------------------------------------------------
+FROM ${NODE_IMAGE} AS build
+WORKDIR /app
+
+ARG NEXT_PUBLIC_SITE_URL
+ARG NEXT_PUBLIC_API_URL
+ARG BACKEND_URL=http://backend:8000
+ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL} \
+    NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
+    BACKEND_URL=${BACKEND_URL} \
+    NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    NODE_OPTIONS=--max-old-space-size=2048
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+# --- runner ------------------------------------------------------------------
+FROM ${NODE_IMAGE} AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
+
+RUN addgroup -S -g 1001 nodejs && adduser -S -u 1001 -G nodejs nextjs
+
+# standalone = server.js + traced node_modules; static assets and public/ are
+# NOT included by Next and must be copied next to it.
+COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=build --chown=nextjs:nodejs /app/public ./public
+
+USER nextjs
+EXPOSE 3000
+CMD ["node", "server.js"]

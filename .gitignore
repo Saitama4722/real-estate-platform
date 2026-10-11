@@ -4,6 +4,13 @@
 !.env.example
 .env.local
 .env.*.local
+# Production: the real env lives ONLY on the server; the example is tracked.
+deploy/.env.prod
+!deploy/.env.prod.example
+# pg_dump files for restores — password hashes and real contacts. Never commit.
+deploy/backups/
+# Design mockup that embeds a realtor's personal contact data. Local only.
+docs/design/Realtor Dashboard.html
 
 # Python
 __pycache__/
@@ -78,5 +85,6 @@ Thumbs.db
 backend/venv/
 backend/.venv/
 backend/db.sqlite3
+backend/backup_local.json
 **/__pycache__/
 *.pyc
