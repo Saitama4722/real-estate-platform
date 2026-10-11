@@ -5,13 +5,17 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from common.homepage_constants import HOMEPAGE_TEXT_BLOCK_KEYS
+from common.homepage_constants import (
+    HOMEPAGE_TEXT_BLOCK_KEYS,
+    SUPERADMIN_ONLY_TEXT_BLOCK_KEYS,
+)
 from common.homepage_serializers import (
     HomepageTextBlockCrmPatchSerializer,
     HomepageTextBlockPublicSerializer,
 )
 from common.models import HomepageTextBlock
 from users.models import User
+from users.permissions import IsSuperAdmin
 
 
 class HomepageTextBlockPublicListView(APIView):
@@ -53,6 +57,17 @@ class HomepageTextBlockCrmPatchView(APIView):
             return Response(
                 {"detail": "Неизвестный ключ блока."},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+        # Site-wide values are narrower than homepage copy: superadmin only.
+        # Reuses the project's own role-list permission class rather than
+        # re-deriving `role == "superadmin"` here — one definition of the role.
+        # `is_active` is already established by the staff check above, which
+        # `HasAllowedRole` itself does not perform.
+        if key in SUPERADMIN_ONLY_TEXT_BLOCK_KEYS and not IsSuperAdmin().has_permission(
+            request, self
+        ):
+            raise PermissionDenied(
+                detail="Изменять телефон агентства может только суперадминистратор.",
             )
         instance = get_object_or_404(HomepageTextBlock, pk=key)
         ser = HomepageTextBlockCrmPatchSerializer(

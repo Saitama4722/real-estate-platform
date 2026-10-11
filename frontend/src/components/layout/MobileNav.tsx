@@ -7,6 +7,7 @@ import { HeaderFavoritesLink } from "@/components/layout/HeaderFavoritesLink";
 import { HeaderCompareLink } from "@/components/layout/HeaderCompareLink";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Icon, Icons } from "@/components/ui/icon";
+import { formatPhoneParens, telHref } from "@/lib/phoneFormat";
 
 export interface MobileNavLink {
   label: string;
@@ -30,10 +31,18 @@ const MOBILE_NAV_ICONS: Record<string, (typeof Icons)[keyof typeof Icons]> = {
  * so it spans the full header width regardless of where this component sits
  * inside the header's flex row.
  */
-export function MobileNav({ navLinks }: { navLinks: MobileNavLink[] }) {
+export function MobileNav({
+  navLinks,
+  phone = "",
+}: {
+  navLinks: MobileNavLink[];
+  /** Canonical agency phone, or "" when the superadmin has cleared it. */
+  phone?: string;
+}) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
+  const phoneValue = (phone || "").trim();
 
   // Close when navigation actually happens (covers the reused badge links,
   // which don't expose an onClick prop).
@@ -90,6 +99,22 @@ export function MobileNav({ navLinks }: { navLinks: MobileNavLink[] }) {
         >
           <nav aria-label="Мобильная навигация" className="px-4 py-2">
             <ul className="flex flex-col">
+              {/* The agency phone leads the panel: the header bar only has room
+                  for the 44px icon at this width, so the readable number lives
+                  here. Rendered only when set — a cleared value leaves no row
+                  and no border. */}
+              {phoneValue && (
+                <li className="border-b border-gray-100 pb-2">
+                  <a
+                    href={telHref(phoneValue)}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-2 py-3 text-base font-semibold text-brand transition-colors duration-150 hover:bg-brand-tint"
+                  >
+                    <Icon icon={Icons.Phone} size={20} className="shrink-0" />
+                    {formatPhoneParens(phoneValue)}
+                  </a>
+                </li>
+              )}
               {navLinks.map((link) => (
                 <li key={link.href}>
                   <Link

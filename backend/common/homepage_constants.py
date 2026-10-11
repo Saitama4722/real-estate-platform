@@ -1,6 +1,16 @@
 """
-Predefined homepage text blocks (Stage 15). Keys are the only editable zones; no free-form DOM editing.
+Predefined editable site values (Stage 15). Keys are the only editable zones; no
+free-form DOM editing.
+
+Originally homepage copy only. The table is now also the home of SITE-WIDE
+contact values (`agency_phone`), because it is this project's ONLY key-value
+config mechanism and a second one would immediately be a second source of truth.
+Keys outside the homepage carry their own permission and validation — see
+`SUPERADMIN_ONLY_TEXT_BLOCK_KEYS` and `PHONE_TEXT_BLOCK_KEYS` below.
 """
+
+#: Site-wide agency phone rendered in the header. See CLAUDE.md — SINGLE SOURCE.
+AGENCY_PHONE_BLOCK_KEY = "agency_phone"
 
 HOMEPAGE_TEXT_BLOCK_DEFINITIONS = (
     {
@@ -77,6 +87,21 @@ HOMEPAGE_TEXT_BLOCK_DEFINITIONS = (
             "опубликованных объектов, статьи для покупателей и форма заявки по выбранному объекту."
         ),
     },
+    {
+        "key": AGENCY_PHONE_BLOCK_KEY,
+        "label": "Контакты: телефон агентства (шапка сайта)",
+        # The number already published on the only real listing — seeding it
+        # means the header shows the same phone visitors could already reach.
+        "value": "+79283330837",
+    },
 )
 
 HOMEPAGE_TEXT_BLOCK_KEYS = frozenset(d["key"] for d in HOMEPAGE_TEXT_BLOCK_DEFINITIONS)
+
+#: Keys only a SUPERADMIN may PATCH. Homepage copy stays staff-level (superadmin
+#: or admin) — unchanged. A site-wide contact number is a different weight of
+#: decision, so it is narrowed to the single-superadmin role this project uses.
+SUPERADMIN_ONLY_TEXT_BLOCK_KEYS = frozenset({AGENCY_PHONE_BLOCK_KEY})
+
+#: Keys stored as a canonical phone rather than free text.
+PHONE_TEXT_BLOCK_KEYS = frozenset({AGENCY_PHONE_BLOCK_KEY})

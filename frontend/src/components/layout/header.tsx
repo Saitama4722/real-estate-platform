@@ -3,9 +3,11 @@ import { HeaderAccountControls } from "@/components/layout/header-account-contro
 import { HeaderFavoritesLink } from "@/components/layout/HeaderFavoritesLink";
 import { HeaderCompareLink } from "@/components/layout/HeaderCompareLink";
 import { HeaderNavLink } from "@/components/layout/HeaderNavLink";
+import { HeaderPhone } from "@/components/layout/HeaderPhone";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Container } from "@/components/layout/container";
 import { ButtonLink } from "@/components/ui/button-link";
+import { fetchAgencyPhone } from "@/lib/homepageTextBlocks";
 
 const navLinks = [
   { label: "Каталог", href: "/catalog" },
@@ -30,7 +32,16 @@ export function Wordmark({ inverse = false }: { inverse?: boolean }) {
   );
 }
 
-export function Header() {
+export async function Header() {
+  /*
+   * Awaited on the SERVER so the number is present in the first paint — no
+   * client fetch, no post-hydration insertion, no layout shift. It shares the
+   * homepage text-blocks fetch (same URL + `revalidate: 60`), so on `/` it is
+   * free and elsewhere it is one small cached JSON. A failed fetch yields ""
+   * and the phone is simply absent.
+   */
+  const agencyPhone = await fetchAgencyPhone();
+
   return (
     /*
      * `sticky` also anchors the MobileNav dropdown panel (absolute inset-x-0
@@ -73,6 +84,39 @@ export function Header() {
                 <li>
                   <HeaderCompareLink />
                 </li>
+                {/*
+                  AGENCY PHONE — between the nav links and the CTA, as specified.
+                  The conditional is on the <li>, not inside HeaderPhone: an
+                  empty-but-rendered flex child would still take the row's gap,
+                  so a cleared phone must remove the element entirely.
+
+                  TWO desktop forms, and BOTH breakpoints are MEASURED, not
+                  chosen. The row already needs ~1047px at lg with a favourite
+                  present (see the HEADER FIT BAND in globals.css), so:
+                    • 1280+  full number (173px). Clean in all four states.
+                    • 1140–1279  44px icon. `[measured]` the icon at 1100 gave
+                      scrollWidth 1121 with one favourite — 1140 is the first
+                      width where it fits.
+                    • 1024–1139  NOTHING. There is genuinely no room: the header
+                      is already at capacity in this band, which is the
+                      pre-existing open bug (a favourite alone makes it 1047 at
+                      1024). Adding anything here would make a known overflow
+                      worse. Freeing this band means fixing that bug first —
+                      hide the count badge below 1100, or raise the desktop-nav
+                      breakpoint.
+                  If you retune any of this, re-measure WITH a favourite present
+                  AND logged in — both widen the row.
+                */}
+                {agencyPhone && (
+                  <li className="hidden min-[1280px]:block">
+                    <HeaderPhone phone={agencyPhone} variant="full" />
+                  </li>
+                )}
+                {agencyPhone && (
+                  <li className="hidden min-[1140px]:block min-[1280px]:hidden">
+                    <HeaderPhone phone={agencyPhone} variant="icon" />
+                  </li>
+                )}
                 <li className="ml-2">
                   {/* Was an inline `bg-blue-600` <Link> duplicating Button's
                       styling — now the shared ButtonLink so it cannot drift. */}
@@ -82,8 +126,23 @@ export function Header() {
                 </li>
               </ul>
             </nav>
+            {/* Below lg the desktop <ul> is display:none, so the phone needs its
+                own tappable affordance next to the hamburger.
+
+                ⚠ It starts at `sm` (640px), NOT 0. `[measured]`: at 375px a
+                LOGGED-IN header is 392px with this icon — the account chip is
+                164px against the logged-out button's 81px, and the extra 44px
+                tips it over. Logged out at 375 had room, but the visibility of
+                a server-rendered element cannot depend on a client-side login
+                state, so the safe width wins. Below 640px the number lives in
+                the MobileNav panel, one tap away. */}
+            {agencyPhone && (
+              <div className="hidden sm:block lg:hidden">
+                <HeaderPhone phone={agencyPhone} variant="icon" />
+              </div>
+            )}
             <HeaderAccountControls />
-            <MobileNav navLinks={navLinks} />
+            <MobileNav navLinks={navLinks} phone={agencyPhone} />
           </div>
         </div>
       </Container>

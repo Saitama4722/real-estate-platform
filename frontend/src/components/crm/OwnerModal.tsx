@@ -37,6 +37,13 @@ interface OwnerModalProps {
   variant?: "link" | "registry";
   /** Registry variant only: open directly editing this owner; omit to create. */
   initialOwner?: OwnerData | null;
+  /**
+   * Link variant only: ФИО/телефон the owner already supplied in a sale request.
+   * Seeds the search box with the phone (so an owner already in the registry is
+   * found straight away) and pre-fills the create form, so a realtor converting
+   * a submission never retypes contact details the owner has given.
+   */
+  prefill?: { full_name: string; phone: string } | null;
 }
 
 const PHONE_EMPTY = "+7 ";
@@ -75,6 +82,7 @@ export function OwnerModal({
   onUnlinked,
   variant = "link",
   initialOwner = null,
+  prefill = null,
 }: OwnerModalProps) {
   const [mode, setMode] = useState<Mode>({ kind: "search" });
   const [query, setQuery] = useState("");
@@ -109,16 +117,18 @@ export function OwnerModal({
         }
       } else {
         setMode({ kind: "search" });
-        setFullName("");
-        setPhone(PHONE_EMPTY);
+        setFullName(prefill?.full_name ?? "");
+        setPhone(prefill?.phone ? formatPhoneMask(prefill.phone) : PHONE_EMPTY);
         setNote("");
       }
-      setQuery("");
+      // Searching by the owner's phone surfaces an existing registry card
+      // immediately; if there is none, startCreate() keeps what is seeded here.
+      setQuery(variant === "link" && prefill?.phone ? prefill.phone : "");
       setResults([]);
       setError("");
       setPhotoFile(null);
     }
-  }, [isOpen, variant, initialOwner]);
+  }, [isOpen, variant, initialOwner, prefill]);
 
   // Debounced search by phone or ФИО.
   const runSearch = useCallback(async (q: string) => {
@@ -157,7 +167,16 @@ export function OwnerModal({
 
   const startCreate = () => {
     setError("");
-    // Seed the create form with whatever was typed (phone digits or a name).
+    // Contact details from a sale request win: they are the owner's own words.
+    if (prefill && (prefill.full_name || prefill.phone)) {
+      setFullName(prefill.full_name || "");
+      setPhone(prefill.phone ? formatPhoneMask(prefill.phone) : PHONE_EMPTY);
+      setNote("");
+      setPhotoFile(null);
+      setMode({ kind: "create" });
+      return;
+    }
+    // Otherwise seed with whatever was typed (phone digits or a name).
     if (countDigits(query) >= 3) {
       setPhone(formatPhoneMask(query));
       setFullName("");

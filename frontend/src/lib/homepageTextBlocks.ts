@@ -20,7 +20,16 @@ export const HOMEPAGE_TEXT_FALLBACKS = {
   seo_section_title: "Недвижимость в Краснодарском крае",
   seo_section_body:
     "Centreal помогает купить недвижимость в Краснодаре и Геленджике: квартиры, дома, участки и коммерческие помещения. На сайте — актуальный каталог опубликованных объектов, статьи для покупателей и форма заявки по выбранному объекту.",
+  /**
+   * Site-wide agency phone shown in the header. THE fallback is deliberately
+   * EMPTY: if the API is unreachable the header renders no phone at all rather
+   * than a number that may be out of date. A wrong phone is worse than none.
+   */
+  agency_phone: "",
 } as const;
+
+/** Key of the site-wide agency phone. SINGLE SOURCE — see CLAUDE.md. */
+export const AGENCY_PHONE_BLOCK_KEY = "agency_phone" as const;
 
 export type HomepageTextBlockKey = keyof typeof HOMEPAGE_TEXT_FALLBACKS;
 
@@ -61,4 +70,17 @@ export async function fetchHomepageTextBlockMap(): Promise<HomepageTextMap> {
     console.error("[fetchHomepageTextBlockMap]", e);
     return base;
   }
+}
+
+/**
+ * The site-wide agency phone, canonical `+7XXXXXXXXXX` or `""`.
+ *
+ * Shares `fetchHomepageTextBlockMap`'s request: same URL, same options, so
+ * Next's fetch cache serves BOTH the header and the homepage from one entry —
+ * the header costs no extra round trip on the homepage, and one small cached
+ * JSON elsewhere.
+ */
+export async function fetchAgencyPhone(): Promise<string> {
+  const map = await fetchHomepageTextBlockMap();
+  return (map.agency_phone ?? "").trim();
 }
