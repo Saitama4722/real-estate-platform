@@ -36,8 +36,8 @@ not a dependency here). Any claim resting on "the Tailwind CLI probe" is folklor
 - **Frontend:** Next.js 15 (App Router, TypeScript) in `frontend/`, Tailwind v4.
 - **Maps:** Leaflet / react-leaflet, **OpenStreetMap tiles**, **Nominatim**
   geocoding. 2GIS and Yandex are both gone — their keys are dead.
-- **Production:** Railway exists but **the project is local-only today.** The
-  target is a Beget VPS via Docker. See «Production deploy» below.
+- **Production:** a Beget VPS via Docker, **live by IP since 2026-10-12**
+  (Railway is no longer used). See «Production deploy» below.
 - **⛔ Docker is NEVER run on the Windows dev machines** (no `docker build`, no
   `docker compose`, not even to "just check"). Production images are built
   and checked **only on the VPS**. Locally you may only validate the files
@@ -75,6 +75,38 @@ template is `deploy/.env.prod.example`. The real `deploy/.env.prod` and
 - Caddy appends the trailing slash to `/api/*` paths itself (the same
   contract as the Next.js rewrite), because browser `/api` calls now reach
   Django directly.
+
+#### Current server state (first deploy 2026-10-12)
+
+- **Server:** `217.114.1.193` (Beget, Ubuntu 24.04, 2 vCPU / 3.8 GiB). Repo at
+  **`/opt/centreal`**, branch `design-system-audit`. Access: `ssh root@217.114.1.193`.
+- **Compose command** (from `/opt/centreal`):
+  `docker compose -f docker-compose.prod.yml --env-file deploy/.env.prod <cmd>`.
+  `deploy/.env.prod` exists only on the server (`chmod 600`). Its secrets were
+  generated there and are never copied off it.
+- **Running mode:** IP only, `SITE_ADDRESS=:80`, `MEDIA_STORAGE_BACKEND=local`,
+  `LEADS_NOTIFICATIONS_ENABLED=False`. All 7 services are up and backend is
+  healthy `[measured]`. One superadmin (pk 1) was created by
+  `create_initial_admin`; `INITIAL_ADMIN_PASSWORD` was then removed from the env.
+- **Data:** only the public content is loaded, from **fixtures `01_locations` +
+  `02_articles`** (283 objects: 2 cities, 89 districts, 33 neighborhoods, 51
+  residential complexes, 24 guides, 15 articles), and all 41 sequences were
+  reset. **Users, owners and properties (incl. PID000001) are NOT restored
+  yet.** That waits for the desktop `pg_dump` (`deploy/README.md`, Вариант А,
+  including the mandatory superuser-password step). No covers exist in this
+  data, so there are no media files to move yet.
+- **Server hardening:** **ufw enabled, allowing only 22/80/443 tcp**. Docker
+  publishes only Caddy's 80/443; db/redis sit on an internal network
+  `[measured from the server]`. **2 GiB swap** at `/swapfile` (in fstab),
+  `vm.swappiness=10` in `/etc/sysctl.d/99-centreal-swap.conf`, so frontend
+  rebuilds don't run out of memory.
+- **⚠ Port checks from the laptop are worthless.** Its VPN/proxy TUN
+  interface (`198.18.0.1`) accepts every TCP connection, so even random ports
+  look "open". Check exposure ON the server (`ss -tln`, Docker port mappings,
+  connecting to the public IP from the host).
+- **⚠ Remote scripts:** in `ssh … 'bash -s' <<EOF`, give every
+  `docker compose exec -T` a `</dev/null`. Otherwise it swallows the rest of
+  the script from stdin and the remaining commands silently never run.
 
 ### Ports are FIXED. Do not auto-select, do not walk.
 
