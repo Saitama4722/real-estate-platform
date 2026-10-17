@@ -36,8 +36,9 @@ not a dependency here). Any claim resting on "the Tailwind CLI probe" is folklor
 - **Frontend:** Next.js 15 (App Router, TypeScript) in `frontend/`, Tailwind v4.
 - **Maps:** Leaflet / react-leaflet, **OpenStreetMap tiles**, **Nominatim**
   geocoding. 2GIS and Yandex are both gone — their keys are dead.
-- **Production:** a Beget VPS via Docker, **live by IP since 2026-10-12**
-  (Railway is no longer used). See «Production deploy» below.
+- **Production:** a Beget VPS via Docker, live by IP since 2026-10-12 and
+  **at https://centreal.ru since 2026-10-18** (Railway is no longer used).
+  See «Production deploy» below.
 - **⛔ Docker is NEVER run on the Windows dev machines** (no `docker build`, no
   `docker compose`, not even to "just check"). Production images are built
   and checked **only on the VPS**. Locally you may only validate the files
@@ -76,7 +77,7 @@ template is `deploy/.env.prod.example`. The real `deploy/.env.prod` and
   contract as the Next.js rewrite), because browser `/api` calls now reach
   Django directly.
 
-#### Current server state (first deploy 2026-10-12)
+#### Current server state (first deploy 2026-10-12, domain + HTTPS 2026-10-18)
 
 - **Server:** `217.114.1.193` (Beget, Ubuntu 24.04, 2 vCPU / 3.8 GiB). Repo at
   **`/opt/centreal`**, branch `design-system-audit`. Access: `ssh root@217.114.1.193`.
@@ -84,8 +85,21 @@ template is `deploy/.env.prod.example`. The real `deploy/.env.prod` and
   `docker compose -f docker-compose.prod.yml --env-file deploy/.env.prod <cmd>`.
   `deploy/.env.prod` exists only on the server (`chmod 600`). Its secrets were
   generated there and are never copied off it.
-- **Running mode:** IP only, `SITE_ADDRESS=:80`, `MEDIA_STORAGE_BACKEND=local`,
-  `LEADS_NOTIFICATIONS_ENABLED=False`. All 7 services are up and backend is
+- **Running mode: domain + HTTPS since 2026-10-18.** `SITE_ADDRESS=centreal.ru,
+  www.centreal.ru`, `CANONICAL_HOST=centreal.ru`, `PUBLIC_IP=217.114.1.193`;
+  site/API/CSRF/CORS URLs are all `https://centreal.ru`. Caddy obtained Let's
+  Encrypt certificates for both names on the first try (tls-alpn-01; it
+  renews them itself). `www` → 301 → apex, `http://` → 308 → `https://`,
+  `http://217.114.1.193` → 301 → `https://centreal.ru{uri}`; session/CSRF
+  cookies are `Secure`; **no HSTS yet** `[measured with curl --resolve from
+  the server]`. The pre-switch env is at
+  `/root/env.prod.before-domain.2026-10-17-221052` (mode 600). Going back to
+  IP-only: `deploy/README.md` → «Переход на домен».
+- **DNS is at REG.RU** (ns1/ns2.reg.ru), **managed by a friend of the owner**,
+  not by us: `A @` → 217.114.1.193, `www` is a CNAME to it, no AAAA, no CAA.
+  Yandex mail records exist there too, and so do old district CNAME subdomains.
+  Don't touch either. Ask the owner for any DNS change.
+- `MEDIA_STORAGE_BACKEND=local`, `LEADS_NOTIFICATIONS_ENABLED=False`. All 7 services are up and backend is
   healthy `[measured]`. One superadmin (pk 1) was created by
   `create_initial_admin`; `INITIAL_ADMIN_PASSWORD` was then removed from the env.
 - **Data:** only the public content is loaded, from **fixtures `01_locations` +
