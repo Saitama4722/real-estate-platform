@@ -1,13 +1,18 @@
 # Centreal reverse proxy — the ONLY service that publishes ports (80/443).
 #
-# SITE_ADDRESS (from deploy/.env.prod):
-#   ":80"                        → plain HTTP on the server IP (now)
-#   "centreal.ru, www.centreal.ru" → Caddy obtains Let's Encrypt certificates
-#                                   automatically and redirects HTTP → HTTPS.
-# Changing it needs only `docker compose ... up -d caddy` (plus a frontend
+# Variables (from deploy/.env.prod, passed through docker-compose.prod.yml):
+#   SITE_ADDRESS    ":80" → plain HTTP on the server IP (IP-only mode, default)
+#                   "centreal.ru, www.centreal.ru" → Caddy obtains Let's Encrypt
+#                   certificates automatically and redirects HTTP → HTTPS.
+#   CANONICAL_HOST  "centreal.ru" — www.<it> answers 301 → https://<it>{uri}.
+#   PUBLIC_IP       "217.114.1.193" — http://<it> answers 301 → https://<CANONICAL_HOST>{uri}.
+# With CANONICAL_HOST / PUBLIC_IP unset the defaults below match no real
+# request (www.localhost, 192.0.2.1 = TEST-NET-1), so IP-only mode is unchanged.
+# Changing them needs only `docker compose ... up -d caddy` (plus a frontend
 # rebuild for the new NEXT_PUBLIC_SITE_URL — see deploy/README.md).
+# No HSTS yet: add it only once HTTPS has been stable for a while.
 
-{$SITE_ADDRESS} {
+(site_routes) {
 	encode zstd gzip
 
 	# --- Django API -----------------------------------------------------------
@@ -52,4 +57,18 @@
 		output stdout
 		format console
 	}
+}
+
+{$SITE_ADDRESS::80} {
+	# www → the bare domain. redir runs before rewrite/handle, so {uri} is the
+	# original request URI.
+	@www host www.{$CANONICAL_HOST:localhost}
+	redir @www https://{$CANONICAL_HOST:localhost}{uri} permanent
+
+	import site_routes
+}
+
+# Requests by bare IP → the domain. Only port 80: no certificate exists for an IP.
+http://{$PUBLIC_IP:192.0.2.1} {
+	redir https://{$CANONICAL_HOST:localhost}{uri} permanent
 }

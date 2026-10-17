@@ -383,6 +383,14 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     USE_X_FORWARDED_HOST = True
 
+# Secure cookies only when the public site really is HTTPS: over plain HTTP (the
+# IP-only phase) browsers drop Secure cookies and admin login fails with a CSRF
+# 403. The DEBUG guard keeps local dev on http://localhost working even though
+# backend/.env may carry the production SITE_URL.
+_site_is_https = not DEBUG and SITE_URL.startswith("https://")
+SESSION_COOKIE_SECURE = _site_is_https
+CSRF_COOKIE_SECURE = _site_is_https
+
 # TLS terminates at the platform (Railway). Never let Django emit HTTP→HTTPS redirects:
 # internal HTTP hops from Next.js → Django would loop with SECURE_SSL_REDIRECT=True.
 SECURE_SSL_REDIRECT = False

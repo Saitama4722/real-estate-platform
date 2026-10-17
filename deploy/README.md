@@ -174,11 +174,14 @@ dc exec -T db pg_dump -U postgres -Fc real_estate_db > deploy/backups/real_estat
 
 ## 6. Переход на домен centreal.ru
 
-1. У регистратора создать A-записи `centreal.ru` и `www.centreal.ru` → `217.114.1.193`.
-   Дождаться, пока `ping centreal.ru` покажет этот IP.
-2. В `deploy/.env.prod` изменить:
+1. У регистратора создать A-запись `centreal.ru` → `217.114.1.193` и для `www`
+   A-запись или CNAME на `centreal.ru`. Дождаться, пока `dig +short centreal.ru @8.8.8.8`
+   покажет этот IP. AAAA-записей быть не должно (иначе Let's Encrypt пойдёт по IPv6).
+2. В `deploy/.env.prod` изменить (без кавычек):
    ```
-   SITE_ADDRESS="centreal.ru, www.centreal.ru"
+   SITE_ADDRESS=centreal.ru, www.centreal.ru
+   CANONICAL_HOST=centreal.ru
+   PUBLIC_IP=217.114.1.193
    DJANGO_ALLOWED_HOSTS=centreal.ru,www.centreal.ru,217.114.1.193,backend,localhost
    CSRF_TRUSTED_ORIGINS=https://centreal.ru,https://www.centreal.ru
    CORS_ALLOWED_ORIGINS=https://centreal.ru,https://www.centreal.ru
@@ -192,7 +195,15 @@ dc exec -T db pg_dump -U postgres -Fc real_estate_db > deploy/backups/real_estat
    dc up -d
    ```
 4. Caddy сам получит сертификаты Let's Encrypt (это видно в `dc logs caddy`) и
-   начнёт перенаправлять HTTP на HTTPS.
+   начнёт перенаправлять HTTP на HTTPS. Дальше:
+   - `www.centreal.ru` → 301 на `https://centreal.ru` (тот же путь);
+   - `http://217.114.1.193` → 301 на `https://centreal.ru`;
+   - cookie сессии и CSRF становятся `Secure` сами, потому что `SITE_URL` начинается
+     с `https://` (`backend/config/settings.py`).
+5. HSTS пока не включён. Включать, только когда HTTPS поработает без проблем.
+
+Вернуться к режиму «только IP»: `SITE_ADDRESS=:80`, `CANONICAL_HOST=` и `PUBLIC_IP=`
+пустые, адреса снова `http://217.114.1.193` (как в `.env.prod.example`), затем шаг 3.
 
 ## 7. Полезное
 
