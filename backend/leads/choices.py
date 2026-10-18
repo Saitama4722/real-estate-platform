@@ -30,3 +30,6 @@ class LeadActionType(models.TextChoices):
     STATUS_CHANGED = "status_changed", "Изменение статуса"
     PHONE_REVEALED = "phone_revealed", "Раскрытие телефона"
     NOTE_ADDED = "note_added", "Комментарий"
+    TAKEN = "taken", "Взята в работу"
+    RETURNED = "returned", "Возвращена в общие"
+    ASSIGNED = "assigned", "Назначен ответственный"

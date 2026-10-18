@@ -341,6 +341,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "users.flush_expired_tokens",
         "schedule": crontab(hour=4, minute=0),
     },
+    # Bell notifications older than 7 days (the bell shows only 24 h). Leads
+    # and sale requests themselves are never deleted.
+    "purge-old-crm-notifications": {
+        "task": "common.purge_old_crm_notifications",
+        "schedule": crontab(hour=4, minute=15),
+    },
 }
 
 # --- Public site URL (used to build absolute links in notifications, etc.) ---

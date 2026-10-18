@@ -12,8 +12,25 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 
+from common import crm_notify
 from common.crm_unread import annotate_sale_request_unread, mark_sale_request_read
-from users.permissions import IsCrmUser
+from users.permissions import IsCrmUser, crm_sale_request_queryset_for_user
+
+#: Ответ на любое действие со свободной заявкой, кроме просмотра и «взять».
+FREE_SALE_REQUEST_DETAIL = "Сначала возьмите заявку в работу."
+
+
+class CrmSaleRequestSearchFilter(filters.SearchFilter):
+    """
+    Phone search for staff only. For a realtor it would turn the free queue
+    into an oracle around the masked owner phone, so realtors search by name
+    and description (`search_fields` on the view).
+    """
+
+    def get_search_fields(self, view, request):
+        if getattr(request.user, "has_staff_level_access", False):
+            return ["owner_name", "owner_phone", "description"]
+        return super().get_search_fields(view, request)
 
 from .choices import SaleRequestStatus
 from .models import SaleRequest
@@ -74,6 +91,10 @@ class PublicSaleRequestViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet)
         serializer.is_valid(raise_exception=True)
         sale_request = serializer.save()
         logger.info("sale_request_created id=%s", sale_request.pk)
+        # A new sale request starts FREE: every active realtor gets a bell entry.
+        transaction.on_commit(
+            lambda: crm_notify.run_safely(crm_notify.notify_new_sale_request, sale_request)
+        )
         # Minimal confirmation only — do NOT serialize the object back (that would
         # risk leaking fields). Owner phone is never returned.
         return Response(
@@ -96,34 +117,104 @@ class CrmSaleRequestViewSet(
     """
     CRM management of sell-your-property submissions.
 
-    SHARED POOL: every CRM user (realtor / admin / superadmin) sees ALL
-    submissions — not a per-realtor assigned subset (unlike Lead/Property).
+    QUEUE (2026-10-18, replaced the old «shared pool forever»): a realtor sees
+    their own submissions plus the FREE ones (`assigned_realtor IS NULL`). A
+    free one is look-only with a masked owner phone until «Взять в работу»;
+    after that the other realtors no longer see it. Staff (admin/superadmin)
+    see everything and keep their previous abilities, but never take or get
+    notified (`common.crm_notify`).
 
     DELETE: admin/superadmin only (staff-level). Realtors may view, edit the
-    description/details, and convert — but NOT delete.
+    description/details, and convert their own — but NOT delete.
     """
 
     permission_classes = [IsCrmUser]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["owner_name", "owner_phone", "description"]
+    filter_backends = [CrmSaleRequestSearchFilter, filters.OrderingFilter]
+    search_fields = ["owner_name", "description"]
     ordering_fields = ["created_at", "updated_at", "status"]
     ordering = ["-created_at"]
 
     def get_queryset(self):
-        # Shared pool: all submissions for any CRM user. No assigned-realtor filter.
-        # `is_unread` is PER VIEWER (one NOT EXISTS subquery, not a column on the
-        # row) precisely because the pool is shared: one realtor opening a
-        # submission must not clear it from anyone else's counter.
+        # `is_unread` is PER VIEWER (one NOT EXISTS subquery, not a column on
+        # the row): one realtor opening a free submission must not clear it
+        # from anyone else's counter.
         qs = annotate_sale_request_unread(
-            SaleRequest.objects.select_related(
-                "city", "district", "neighborhood", "converted_property"
-            ).prefetch_related("photos"),
+            crm_sale_request_queryset_for_user(self.request.user)
+            .select_related(
+                "city", "district", "neighborhood", "converted_property",
+                "assigned_realtor",
+            )
+            .prefetch_related("photos"),
             self.request.user,
         )
         st = self.request.query_params.get("status")
         if st:
             qs = qs.filter(status=st)
+        scope = self.request.query_params.get("scope")
+        if scope == "free":
+            qs = qs.filter(assigned_realtor__isnull=True)
+        elif scope == "mine":
+            qs = qs.filter(assigned_realtor=self.request.user)
         return qs
+
+    def _require_owned(self, sale_request):
+        user = self.request.user
+        if getattr(user, "has_staff_level_access", False):
+            return
+        if sale_request.assigned_realtor_id != user.pk:
+            raise PermissionDenied(detail=FREE_SALE_REQUEST_DETAIL)
+
+    @action(detail=True, methods=["post"], url_path="take")
+    def take(self, request, pk=None):
+        """«Взять в работу». 409 «Заявку уже взял другой риэлтор», если опоздал."""
+        if not crm_notify.is_workflow_realtor(request.user):
+            raise PermissionDenied(detail="Брать заявки в работу могут только риэлторы.")
+        # Not get_object(): a request taken by someone else has left this
+        # realtor's queryset, and the loser of the race must see «уже взял».
+        sr = SaleRequest.objects.filter(pk=pk).first()
+        if sr is None:
+            return Response({"detail": "Не найдено."}, status=status.HTTP_404_NOT_FOUND)
+        if sr.assigned_realtor_id not in (None, request.user.pk):
+            return Response(
+                {"detail": "Заявку уже взял другой риэлтор."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if sr.assigned_realtor_id is None:
+            try:
+                crm_notify.take_sale_request(sr.pk, request.user)
+            except crm_notify.AlreadyTaken:
+                return Response(
+                    {"detail": "Заявку уже взял другой риэлтор."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            logger.info("sale_request_taken id=%s user_id=%s", sr.pk, request.user.pk)
+        return Response(
+            CrmSaleRequestDetailSerializer(
+                self.get_object(), context=self.get_serializer_context()
+            ).data
+        )
+
+    @action(detail=True, methods=["post"], url_path="return")
+    def return_to_queue(self, request, pk=None):
+        """«Вернуть в общие» — свою, ещё не превращённую в объект."""
+        if not crm_notify.is_workflow_realtor(request.user):
+            raise PermissionDenied(detail="Возвращать заявки могут только риэлторы.")
+        sr = self.get_object()
+        try:
+            crm_notify.return_sale_request(sr.pk, request.user)
+        except crm_notify.NotOwner:
+            raise PermissionDenied(detail="Вернуть в общие может только ответственный риэлтор.")
+        except crm_notify.NotReturnable:
+            return Response(
+                {"detail": "По заявке уже создан объект — она остаётся у вас."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        logger.info("sale_request_returned id=%s user_id=%s", sr.pk, request.user.pk)
+        return Response(
+            CrmSaleRequestDetailSerializer(
+                self.get_object(), context=self.get_serializer_context()
+            ).data
+        )
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -140,6 +231,7 @@ class CrmSaleRequestViewSet(
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
+        self._require_owned(instance)
         ser = self.get_serializer(instance, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         ser.save()
@@ -255,6 +347,7 @@ class CrmSaleRequestViewSet(
         create a property can mark the source submission converted).
         """
         sale_request = self.get_object()
+        self._require_owned(sale_request)
         property_id = request.data.get("property_id")
         if not property_id:
             return Response(

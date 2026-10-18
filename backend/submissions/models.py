@@ -140,6 +140,31 @@ class SaleRequest(BaseTimestampedModel):
         verbose_name="Кто создал объект",
     )
 
+    # --- Queue (2026-10-18) ---
+    # NULL = «свободная»: её видят все активные риэлторы, телефон маскирован.
+    # Риэлтор забирает её себе атомарно (`POST …/take/`, условный UPDATE), после
+    # чего остальные риэлторы её больше не видят. Это ЗАМЕНИЛО прежний «общий
+    # пул навсегда».
+    assigned_realtor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_sale_requests",
+        verbose_name="Ответственный риэлтор",
+    )
+    assigned_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="Когда взята в работу"
+    )
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Кто назначил",
+    )
+
     class Meta:
         verbose_name = "Заявка на продажу"
         verbose_name_plural = "Заявки на продажу"

@@ -468,22 +468,40 @@ class CrmLeadInquiryWorkflowTests(TestCase):
         note_rows = [row for row in rh.data if row["action_type"] == LeadActionType.NOTE_ADDED]
         self.assertEqual(note_rows[0]["description"], "Добавлена внутренняя заметка")
 
+    def _other_realtor(self):
+        return User.objects.create_user(
+            email="rel-inq-other@test.local",
+            password="pw",
+            first_name="O",
+            last_name="Ther",
+            role=User.Role.REALTOR,
+        )
+
     def test_realtor_sees_only_assigned_leads(self):
-        unassigned = Lead.objects.create(
-            client_name="Без ответственного",
+        # Since 2026-10-18 an UNASSIGNED lead is the free queue and IS visible;
+        # "foreign" now means assigned to another realtor.
+        foreign = Lead.objects.create(
+            client_name="Чужой",
             client_phone="+79990000000",
+            assigned_realtor=self._other_realtor(),
+        )
+        free = Lead.objects.create(
+            client_name="Свободный",
+            client_phone="+79990000001",
         )
         self.client.force_authenticate(user=self.realtor)
         r = self.client.get("/api/crm/leads/")
         self.assertEqual(r.status_code, 200)
         ids = {row["id"] for row in self._rows(r.data)}
         self.assertIn(self.lead.pk, ids)
-        self.assertNotIn(unassigned.pk, ids)
+        self.assertIn(free.pk, ids)
+        self.assertNotIn(foreign.pk, ids)
 
     def test_notes_on_foreign_lead_returns_404(self):
         other = Lead.objects.create(
             client_name="Чужой",
             client_phone="+79991112233",
+            assigned_realtor=self._other_realtor(),
         )
         self.client.force_authenticate(user=self.realtor)
         r = self.client.get(f"/api/crm/leads/{other.pk}/notes/")

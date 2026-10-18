@@ -88,9 +88,16 @@ def user_can_access_crm_property(user, property_obj) -> bool:
 
 def crm_lead_queryset_for_user(user):
     """
-    Base Lead queryset for CRM: staff see all; realtors see only leads assigned
-    to them (assigned_realtor).
+    Base Lead queryset for CRM: staff see all; realtors see the leads assigned
+    to them PLUS the free queue (`assigned_realtor IS NULL`, 2026-10-18).
+
+    ⭐ The list, the detail, every action and the unread counter all start
+    here, so a realtor can never be shown a lead that 404s on open. A free lead
+    is LOOK-ONLY until taken (`leads.views.CrmLeadViewSet._require_owned`):
+    masked phone, no reveal / status / comments / notes.
     """
+    from django.db.models import Q
+
     from leads.models import Lead
 
     qs = Lead.objects.all()
@@ -99,7 +106,26 @@ def crm_lead_queryset_for_user(user):
     if user.has_staff_level_access:
         return qs
     if user.is_realtor_role:
-        return qs.filter(assigned_realtor=user)
+        return qs.filter(Q(assigned_realtor=user) | Q(assigned_realtor__isnull=True))
+    return qs.none()
+
+
+def crm_sale_request_queryset_for_user(user):
+    """
+    SaleRequest queryset for CRM: staff see all; realtors see their own plus
+    the free queue. Replaced the old «shared pool forever» on 2026-10-18.
+    """
+    from django.db.models import Q
+
+    from submissions.models import SaleRequest
+
+    qs = SaleRequest.objects.all()
+    if not user or not user.is_authenticated or not isinstance(user, User):
+        return qs.none()
+    if user.has_staff_level_access:
+        return qs
+    if user.is_realtor_role:
+        return qs.filter(Q(assigned_realtor=user) | Q(assigned_realtor__isnull=True))
     return qs.none()
 
 
@@ -329,6 +355,7 @@ __all__ = [
     "require_crm_capability",
     "crm_property_queryset_for_user",
     "crm_lead_queryset_for_user",
+    "crm_sale_request_queryset_for_user",
     "crm_import_job_queryset_for_user",
     "user_can_access_crm_property",
     "user_can_access_crm_lead",

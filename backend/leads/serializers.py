@@ -189,6 +189,8 @@ class CrmLeadListSerializer(serializers.ModelSerializer):
     #: месте, если сериализатор когда-нибудь применят к неаннотированной строке:
     #: пропавшее поле фронтенд прочитал бы как «прочитано», а это тихая ложь.
     is_unread = serializers.BooleanField(read_only=True, default=False)
+    #: «Свободная» — без ответственного, её может взять любой риэлтор.
+    is_free = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
@@ -205,12 +207,16 @@ class CrmLeadListSerializer(serializers.ModelSerializer):
             "assigned_realtor",
             "agency",
             "is_unread",
+            "is_free",
             "created_at",
             "updated_at",
         ]
 
     def get_client_phone(self, obj):
         return mask_client_phone(obj.client_phone)
+
+    def get_is_free(self, obj):
+        return obj.assigned_realtor_id is None
 
 
 class LeadStatusHistoryReadSerializer(serializers.ModelSerializer):
@@ -264,6 +270,7 @@ class CrmLeadDetailSerializer(serializers.ModelSerializer):
     notes = CrmLeadNoteReadSerializer(many=True, read_only=True)
     status_history = LeadStatusHistoryReadSerializer(many=True, read_only=True)
     client_phone = serializers.SerializerMethodField()
+    is_free = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
@@ -279,6 +286,7 @@ class CrmLeadDetailSerializer(serializers.ModelSerializer):
             "processed_at",
             "assigned_realtor",
             "agency",
+            "is_free",
             "comments",
             "notes",
             "status_history",
@@ -288,6 +296,9 @@ class CrmLeadDetailSerializer(serializers.ModelSerializer):
 
     def get_client_phone(self, obj):
         return mask_client_phone(obj.client_phone)
+
+    def get_is_free(self, obj):
+        return obj.assigned_realtor_id is None
 
 
 class CrmLeadSetStatusSerializer(serializers.Serializer):

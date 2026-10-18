@@ -39,11 +39,9 @@ def unread_lead_count(user) -> int:
     """
     Сколько заявок (лидов) этот риэлтор ещё не открывал.
 
-    Область = `crm_lead_queryset_for_user(user)`, т.е. лиды, назначенные ему.
-    ⚠ Лиды БЕЗ ответственного (`assigned_realtor IS NULL` — заявки с главной
-    страницы) сюда не попадают, потому что риэлтор их и открыть не может:
-    та же выборка отдаёт список и карточку. Это осознанное решение, а не
-    потеря — см. отчёт и CLAUDE.md.
+    Область = `crm_lead_queryset_for_user(user)`: его лиды плюс свободная
+    очередь (с 2026-10-18 риэлтор видит и открывает свободные лиды, поэтому
+    они наконец попадают в счётчик — прежний «пробел» закрыт той же функцией).
     """
     if not user_gets_unread_indicator(user):
         return 0
@@ -62,27 +60,36 @@ def unread_sale_request_count(user) -> int:
     """
     Сколько заявок на продажу этот риэлтор ещё не открывал.
 
-    Заявки на продажу — ОБЩИЙ ПУЛ (`CrmSaleRequestViewSet`: их видят все), так
-    что область здесь — все строки, а личным остаётся только прочтение.
+    Область = `crm_sale_request_queryset_for_user(user)`: свои плюс свободная
+    очередь (раньше — весь общий пул навсегда; заменено 2026-10-18).
     """
     if not user_gets_unread_indicator(user):
         return 0
-    from submissions.models import SaleRequest, SaleRequestReadReceipt
+    from submissions.models import SaleRequestReadReceipt
+    from users.permissions import crm_sale_request_queryset_for_user
 
     read = SaleRequestReadReceipt.objects.filter(
         user=user, sale_request=OuterRef("pk")
     )
-    return SaleRequest.objects.filter(~Exists(read)).count()
+    return crm_sale_request_queryset_for_user(user).filter(~Exists(read)).count()
 
 
 def unread_counts_for_user(user) -> dict:
-    """Полезная нагрузка `GET /api/crm/notifications/unread-counts/`."""
+    """
+    Полезная нагрузка `GET /api/crm/notifications/unread-counts/` — ОДИН опрос
+    и для бокового меню (непрочитанные заявки), и для колокольчика
+    (`notifications` + `latest_notification_id`, по нему фронтенд решает,
+    звучать ли — см. `lib/crmUnreadCounts.ts`).
+    """
+    from common.crm_notify import bell_summary
+
     inquiries = unread_lead_count(user)
     sale_requests = unread_sale_request_count(user)
     return {
         "inquiries": inquiries,
         "sale_requests": sale_requests,
         "total": inquiries + sale_requests,
+        **bell_summary(user),
     }
 
 
@@ -128,9 +135,11 @@ def mark_lead_read(user, lead) -> bool:
     """
     if not user_gets_unread_indicator(user):
         return False
+    from common.crm_notify import mark_target_notifications_read
     from leads.models import LeadReadReceipt
 
     _, created = LeadReadReceipt.objects.get_or_create(lead=lead, user=user)
+    mark_target_notifications_read(user, lead=lead)
     return created
 
 
@@ -138,11 +147,13 @@ def mark_sale_request_read(user, sale_request) -> bool:
     """Отметить заявку на продажу прочитанной ЭТИМ пользователем. Идемпотентно."""
     if not user_gets_unread_indicator(user):
         return False
+    from common.crm_notify import mark_target_notifications_read
     from submissions.models import SaleRequestReadReceipt
 
     _, created = SaleRequestReadReceipt.objects.get_or_create(
         sale_request=sale_request, user=user
     )
+    mark_target_notifications_read(user, sale_request=sale_request)
     return created
 
 

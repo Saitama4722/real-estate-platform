@@ -267,7 +267,8 @@ class PublicSaleRequestCreateSerializer(serializers.ModelSerializer):
 
 # ─────────────────────────── CRM serializers ───────────────────────────
 # These are served ONLY by CRM-authenticated endpoints. owner_phone IS included
-# here (CRM realtors need it) — but never on any public route.
+# here — full for staff and for the realtor who took the request, masked for a
+# realtor looking at a FREE one — and never on any public route.
 
 
 class CrmSaleRequestPhotoSerializer(serializers.ModelSerializer):
@@ -310,7 +311,45 @@ class _CrmLocationShortSerializer(serializers.Serializer):
     slug = serializers.CharField()
 
 
-class CrmSaleRequestListSerializer(serializers.ModelSerializer):
+class _CrmSaleRequestQueueMixin(serializers.Serializer):
+    """
+    Queue fields shared by the CRM list and detail (2026-10-18).
+
+    `owner_phone` is MASKED for a realtor until the request is theirs: a free
+    request is look-only, exactly like a free lead. Staff keep the full number
+    they always had.
+    """
+
+    owner_phone = serializers.SerializerMethodField()
+    is_free = serializers.SerializerMethodField()
+    assigned_realtor = serializers.SerializerMethodField()
+
+    def _viewer(self):
+        request = self.context.get("request")
+        return getattr(request, "user", None)
+
+    def get_owner_phone(self, obj):
+        user = self._viewer()
+        if getattr(user, "has_staff_level_access", False):
+            return obj.owner_phone
+        if user is not None and obj.assigned_realtor_id == getattr(user, "pk", None):
+            return obj.owner_phone
+        from leads.serializers import mask_client_phone  # lazy: avoids an import cycle
+
+        return mask_client_phone(obj.owner_phone)
+
+    def get_is_free(self, obj):
+        return obj.assigned_realtor_id is None
+
+    def get_assigned_realtor(self, obj):
+        u = obj.assigned_realtor
+        if u is None:
+            return None
+        name = f"{(u.first_name or '').strip()} {(u.last_name or '').strip()}".strip()
+        return {"id": u.pk, "name": name or u.email}
+
+
+class CrmSaleRequestListSerializer(_CrmSaleRequestQueueMixin, serializers.ModelSerializer):
     city = _CrmLocationShortSerializer(read_only=True)
     district = _CrmLocationShortSerializer(read_only=True)
     neighborhood = _CrmLocationShortSerializer(read_only=True)
@@ -325,7 +364,9 @@ class CrmSaleRequestListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "owner_name",
-            "owner_phone",  # CRM-only endpoint — allowed here, never public.
+            "owner_phone",  # CRM-only, masked for realtors until taken.
+            "is_free",
+            "assigned_realtor",
             "city",
             "district",
             "neighborhood",
@@ -341,7 +382,7 @@ class CrmSaleRequestListSerializer(serializers.ModelSerializer):
         ]
 
 
-class CrmSaleRequestDetailSerializer(serializers.ModelSerializer):
+class CrmSaleRequestDetailSerializer(_CrmSaleRequestQueueMixin, serializers.ModelSerializer):
     city = _CrmLocationShortSerializer(read_only=True)
     district = _CrmLocationShortSerializer(read_only=True)
     neighborhood = _CrmLocationShortSerializer(read_only=True)
@@ -357,7 +398,9 @@ class CrmSaleRequestDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "owner_name",
-            "owner_phone",  # CRM-only endpoint.
+            "owner_phone",  # CRM-only, masked for realtors until taken.
+            "is_free",
+            "assigned_realtor",
             "city",
             "district",
             "neighborhood",

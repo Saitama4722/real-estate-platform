@@ -4,16 +4,18 @@ import uuid
 
 from django.core.cache import cache
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import filters, mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import Throttled
+from rest_framework.exceptions import PermissionDenied, Throttled
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
 
+from common import crm_notify
 from common.crm_unread import annotate_lead_unread, mark_lead_read
 from leads.choices import LeadActionType, LeadStatus
 from leads.models import (
@@ -51,6 +53,32 @@ def _crm_lead_status_label(value: str) -> str:
         return LeadStatus(value).label
     except ValueError:
         return value
+
+
+#: Ответ на любое действие со свободной заявкой, кроме просмотра и «взять».
+FREE_LEAD_DETAIL = "Сначала возьмите заявку в работу."
+
+
+class CrmLeadSearchFilter(filters.SearchFilter):
+    """
+    Поиск по имени — везде; поиск по ТЕЛЕФОНУ для риэлтора — только среди его
+    собственных лидов. Иначе свободную очередь можно было бы использовать как
+    оракул «есть ли у нас такой номер», обходя маску телефона.
+    """
+
+    def filter_queryset(self, request, queryset, view):
+        user = request.user
+        if getattr(user, "has_staff_level_access", False):
+            return super().filter_queryset(request, queryset, view)
+        terms = self.get_search_terms(request)
+        if not terms:
+            return queryset
+        for term in terms:
+            queryset = queryset.filter(
+                Q(client_name__icontains=term)
+                | Q(client_phone__icontains=term, assigned_realtor=user)
+            )
+        return queryset
 
 
 class PublicLeadThrottle(SimpleRateThrottle):
@@ -165,6 +193,11 @@ class PublicLeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
         transaction.on_commit(
             lambda: send_lead_telegram_notification.delay(lead_id)
         )
+        # Колокольчик CRM — тоже после коммита. Свободная заявка уходит всем
+        # активным риэлторам, заявка по объекту/риэлтору — только ему.
+        transaction.on_commit(
+            lambda: crm_notify.run_safely(crm_notify.notify_new_lead, lead)
+        )
 
 
 class CrmLeadViewSet(
@@ -175,7 +208,7 @@ class CrmLeadViewSet(
     viewsets.GenericViewSet,
 ):
     permission_classes = [IsCrmUser, IsCrmLeadStaffOrOwner]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [CrmLeadSearchFilter, filters.OrderingFilter]
     search_fields = ["client_name", "client_phone"]
     ordering_fields = ["created_at", "processed_at", "updated_at"]
     ordering = ["-created_at"]
@@ -239,7 +272,25 @@ class CrmLeadViewSet(
         assigned_to = self.request.query_params.get("assigned_to")
         if assigned_to:
             qs = qs.filter(assigned_realtor_id=assigned_to)
+        # «Свободные / Мои / Все доступные». Для сотрудника «mine» = назначенные
+        # на него (обычно пусто — суперадмин в процессе не участвует).
+        scope = self.request.query_params.get("scope")
+        if scope == "free":
+            qs = qs.filter(assigned_realtor__isnull=True)
+        elif scope == "mine":
+            qs = qs.filter(assigned_realtor=self.request.user)
         return qs
+
+    def _require_owned(self, lead):
+        """
+        Свободная заявка для риэлтора — только посмотреть и взять. Сотрудники
+        (суперадмин/админ) сохраняют прежние права над любой заявкой.
+        """
+        user = self.request.user
+        if getattr(user, "has_staff_level_access", False):
+            return
+        if lead.assigned_realtor_id != user.pk:
+            raise PermissionDenied(detail=FREE_LEAD_DETAIL)
 
     def get_object(self):
         """
@@ -252,6 +303,8 @@ class CrmLeadViewSet(
             filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
             obj = get_object_or_404(Lead.objects.all(), **filter_kwargs)
             self.check_object_permissions(self.request, obj)
+            # A realtor may delete only their own leads, never the free queue.
+            self._require_owned(obj)
             return obj
         return super().get_object()
 
@@ -295,6 +348,7 @@ class CrmLeadViewSet(
     def partial_update(self, request, *args, **kwargs):
         require_crm_capability(request, "change_status")
         lead = self.get_object()
+        self._require_owned(lead)
         ser = CrmLeadSetStatusSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         return self._change_lead_status(request, lead, ser.validated_data["status"])
@@ -354,11 +408,63 @@ class CrmLeadViewSet(
     def set_status(self, request, pk=None):
         require_crm_capability(request, "change_status")
         lead = self.get_object()
+        self._require_owned(lead)
         ser = CrmLeadSetStatusSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         return self._change_lead_status(
             request, lead, ser.validated_data["status"]
         )
+
+    @action(detail=True, methods=["post"], url_path="take")
+    def take(self, request, pk=None):
+        """
+        «Взять в работу»: атомарно назначить свободную заявку на себя.
+
+        409 «Заявку уже взял другой риэлтор», если кто-то успел раньше. Только
+        для риэлторов: суперадмин и админ в процессе не участвуют.
+        """
+        require_crm_capability(request, "view_clients")
+        if not crm_notify.is_workflow_realtor(request.user):
+            raise PermissionDenied(detail="Брать заявки в работу могут только риэлторы.")
+        # NOT get_object(): once the other realtor has taken it, the lead has
+        # left this user's queryset, and the loser of the race must see «уже
+        # взял», not a 404.
+        lead = get_object_or_404(Lead.objects.all(), pk=pk)
+        if lead.assigned_realtor_id == request.user.pk:
+            return Response(CrmLeadDetailSerializer(lead, context={"request": request}).data)
+        if lead.assigned_realtor_id is not None:
+            return Response(
+                {"detail": "Заявку уже взял другой риэлтор."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            lead = crm_notify.take_lead(lead.pk, request.user)
+        except crm_notify.AlreadyTaken:
+            return Response(
+                {"detail": "Заявку уже взял другой риэлтор."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        logger.info("crm_lead_taken lead_id=%s user_id=%s", lead.pk, request.user.pk)
+        return Response(CrmLeadDetailSerializer(lead, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"], url_path="return")
+    def return_to_queue(self, request, pk=None):
+        """«Вернуть в общие» — свою заявку без объекта. Остальным уйдёт уведомление."""
+        require_crm_capability(request, "view_clients")
+        if not crm_notify.is_workflow_realtor(request.user):
+            raise PermissionDenied(detail="Возвращать заявки могут только риэлторы.")
+        lead = self.get_object()
+        try:
+            lead = crm_notify.return_lead(lead.pk, request.user)
+        except crm_notify.NotOwner:
+            raise PermissionDenied(detail="Вернуть в общие может только ответственный риэлтор.")
+        except crm_notify.NotReturnable:
+            return Response(
+                {"detail": "Заявка по объекту остаётся у риэлтора этого объекта."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        logger.info("crm_lead_returned lead_id=%s user_id=%s", lead.pk, request.user.pk)
+        return Response(CrmLeadDetailSerializer(lead, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], url_path="mark-read")
     def mark_read(self, request, pk=None):
@@ -386,6 +492,7 @@ class CrmLeadViewSet(
     def reveal_phone(self, request, pk=None):
         require_crm_capability(request, "view_clients")
         lead = self.get_object()
+        self._require_owned(lead)
         raw_phone = (lead.client_phone or "").strip()
         if not raw_phone:
             return Response(
@@ -418,6 +525,7 @@ class CrmLeadViewSet(
     def add_comment(self, request, pk=None):
         require_crm_capability(request, "view_clients")
         lead = self.get_object()
+        self._require_owned(lead)
         ser = CrmLeadCommentCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         comment = LeadComment.objects.create(
@@ -449,6 +557,7 @@ class CrmLeadViewSet(
                 qs, many=True, context={"request": request}
             )
             return Response(ser.data)
+        self._require_owned(lead)
         ser = CrmLeadNoteCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         with transaction.atomic():

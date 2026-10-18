@@ -1,4 +1,10 @@
 from common.models.base import BaseTimestampedModel
+from common.models.crm_notification import CrmNotification, CrmNotificationType
 from common.models.homepage_text_block import HomepageTextBlock
 
-__all__ = ["BaseTimestampedModel", "HomepageTextBlock"]
+__all__ = [
+    "BaseTimestampedModel",
+    "CrmNotification",
+    "CrmNotificationType",
+    "HomepageTextBlock",
+]

@@ -143,9 +143,13 @@ class LeadAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         previous_status = None
+        previous_owner_id = None
         if change and obj.pk:
-            previous_status = (
-                Lead.objects.filter(pk=obj.pk).values_list("status", flat=True).first()
+            previous_status, previous_owner_id = (
+                Lead.objects.filter(pk=obj.pk)
+                .values_list("status", "assigned_realtor_id")
+                .first()
+                or (None, None)
             )
         super().save_model(request, obj, form, change)
         user = (
@@ -153,6 +157,34 @@ class LeadAdmin(admin.ModelAdmin):
             if getattr(request, "user", None) and request.user.is_authenticated
             else None
         )
+        # Reassignment by staff: the new realtor gets «заявка назначена вам»,
+        # everyone else's bell entries for it go; cleared → back to the queue.
+        if change and previous_owner_id != obj.assigned_realtor_id:
+            from common import crm_notify
+            from leads.choices import LeadActionType
+            from leads.models import LeadActionLog
+
+            new_owner = obj.assigned_realtor
+            LeadActionLog.objects.create(
+                lead=obj,
+                user=user,
+                action_type=LeadActionType.ASSIGNED,
+                description=(
+                    f"Ответственный назначен: {new_owner}" if new_owner
+                    else "Ответственный снят, заявка в общих"
+                ),
+            )
+            crm_notify.on_lead_owner_changed(
+                obj, previous_owner_id, new_owner, by_self=False
+            )
+        elif not change:
+            from django.db import transaction
+
+            from common import crm_notify
+
+            transaction.on_commit(
+                lambda: crm_notify.run_safely(crm_notify.notify_new_lead, obj)
+            )
         if not change:
             LeadStatusHistory.record(
                 lead=obj,
