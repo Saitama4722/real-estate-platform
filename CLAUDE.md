@@ -105,9 +105,13 @@ template is `deploy/.env.prod.example`. The real `deploy/.env.prod` and
   renews them itself). `www` → 301 → apex, `http://` → 308 → `https://`,
   `http://217.114.1.193` → 301 → `https://centreal.ru{uri}`; session/CSRF
   cookies are `Secure`; **no HSTS yet** `[measured with curl --resolve from
-  the server]`. The pre-switch env is at
-  `/root/env.prod.before-domain.2026-10-17-221052` (mode 600). Going back to
-  IP-only: `deploy/README.md` → «Переход на домен».
+  the server]`. Going back to IP-only: `deploy/README.md` → «Переход на
+  домен».
+- **No env backups are kept on the server.** The two `/root/env.prod.*`
+  copies made during the domain and Telegram changes were `shred -u`'d on
+  2026-10-18 (none remain anywhere outside the repo `[measured]`). If you
+  back up `deploy/.env.prod` before an edit, keep it mode 600 and shred it
+  when done.
 - **DNS is at REG.RU** (ns1/ns2.reg.ru), **managed by a friend of the owner**,
   not by us: `A @` → 217.114.1.193, `www` is a CNAME to it, no AAAA, no CAA.
   Yandex mail records exist there too, and so do old district CNAME subdomains.
@@ -115,8 +119,7 @@ template is `deploy/.env.prod.example`. The real `deploy/.env.prod` and
 - **Telegram lead notifications are ON in prod since 2026-10-18**
   (`LEADS_NOTIFICATIONS_ENABLED=True`). `TELEGRAM_BOT_TOKEN` and
   `TELEGRAM_CHAT_ID` were copied from the laptop's local `backend/.env`
-  (same bot, same supergroup), piped over ssh stdin and never printed. The
-  previous env is at `/root/env.prod.before-telegram.2026-10-18-101423`.
+  (same bot, same supergroup), piped over ssh stdin and never printed.
   `[measured]` end to end: a public `POST /api/leads/` (lead #2, «Тест
   Пидтест», then deleted; counts back to baseline, real lead #1 untouched) →
   celery `send_lead_telegram_notification` received → «Telegram lead
