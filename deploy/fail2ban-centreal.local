@@ -1,0 +1,19 @@
+# Installed as /etc/fail2ban/jail.d/zz-centreal.local (deploy/README.md §10).
+# Loaded after Ubuntu's defaults-debian.conf, so these values win.
+#
+# ⛔ A ban must NEVER block the website. The sshd jail therefore uses the
+# PORT-SCOPED action `iptables-ipset-proto6` with `port = ssh`, which rejects
+# only tcp/22 from a banned address. Never switch it to an *allports* action:
+# a realtor's office IP that mistyped an SSH password would lose the CRM.
+[DEFAULT]
+# Owner's networks: never banned. 5.180.243.152 = the laptop's current
+# public IP (2026-10-18). Add others here, space-separated.
+ignoreip = 127.0.0.1/8 ::1 5.180.243.152
+
+[sshd]
+enabled  = true
+port     = ssh
+banaction = iptables-ipset-proto6
+maxretry = 10
+findtime = 10m
+bantime  = 10m

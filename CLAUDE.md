@@ -146,6 +146,27 @@ template is `deploy/.env.prod.example`. The real `deploy/.env.prod` and
   interface (`198.18.0.1`) accepts every TCP connection, so even random ports
   look "open". Check exposure ON the server (`ss -tln`, Docker port mappings,
   connecting to the public IP from the host).
+- **⚠ "centreal.ru doesn't open from the laptop" = the laptop's VPN, not the
+  server (2026-10-18).** The VPN client is **Koala Clash** (`mihomo` core, TUN
+  adapter «Meta», DNS `198.18.0.2`). It hijacks ALL DNS, even direct queries to
+  8.8.8.8, answers `centreal.ru` with the fake-IP `198.18.0.5`, and its
+  domain rule sends the site through a proxy that resets the TLS handshake.
+  `[measured]` the same laptop got HTTP 200 with
+  `curl --resolve centreal.ru:443:217.114.1.193`, SSH worked, its IP was not
+  banned, and Caddy had served it. Fix on the laptop: a `DIRECT` rule plus a
+  fake-ip-filter entry for `centreal.ru` in Koala Clash, or quit the app
+  completely (the TUN adapter outlives "VPN off"). Diagnose with
+  `Resolve-DnsName centreal.ru`: a `198.18.x.x` answer means the VPN client.
+- **fail2ban (2026-10-18), `deploy/README.md` §10.** One jail, `sshd`, from
+  `deploy/fail2ban-centreal.local` → `/etc/fail2ban/jail.d/zz-centreal.local`:
+  `maxretry 10` / `findtime 10m` / `bantime 10m`, owner IP `5.180.243.152` in
+  `ignoreip`. **⛔ The ban action must stay port-scoped**
+  (`iptables-ipset-proto6`, `port = ssh` → the rule matches `--dports 22`
+  only): a ban must never block the website. Never use an *allports* action.
+  At setup it held 1 ban (`195.178.110.26`, a username-guessing scanner) with
+  760 bans and ~11.9k failures in total: SSH on 22 is scanned constantly.
+- **SSH from scripts:** always `-o BatchMode=yes -o ConnectTimeout=10`, one
+  attempt, no retry loops (`scripts/pull_db_backup.ps1`, not scheduled yet).
 - **⛔ NEVER prune or remove Docker VOLUMES on the server.** The database
   (`centreal_pgdata`) and media (`centreal_media`) are volumes; Redis's
   `/data` is an anonymous one. Forbidden: `docker system prune -a`,

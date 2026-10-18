@@ -304,3 +304,25 @@ dc up -d                                                     # миграции 
 > Копии лежат на том же сервере, что и база: если пропадёт сервер, пропадут и
 > они. Регулярно забирайте копию куда-нибудь ещё (см. CLAUDE.md → «Резервные
 > копии»).
+
+## 10. fail2ban (защита SSH) — бан НИКОГДА не блокирует сайт
+
+На сервере работает fail2ban с одной тюрьмой `sshd`. Наши настройки лежат в
+`deploy/fail2ban-centreal.local` → `/etc/fail2ban/jail.d/zz-centreal.local`:
+бан только на **порт 22** (действие `iptables-ipset-proto6`, `port = ssh`),
+`maxretry = 10` за 10 минут, бан на 10 минут, IP владельца в `ignoreip`.
+Сайт (80/443) забаненному адресу остаётся доступен.
+
+```bash
+install -m 644 deploy/fail2ban-centreal.local /etc/fail2ban/jail.d/zz-centreal.local
+fail2ban-client -t && systemctl restart fail2ban
+fail2ban-client status sshd                 # кто забанен
+fail2ban-client set sshd unbanip 1.2.3.4    # разбанить один адрес
+iptables -S | grep f2b                      # правило должно содержать --dports 22
+```
+
+Если забанили вас самих и SSH недоступен — веб-консоль Beget (VNC):
+`fail2ban-client set sshd unbanip ВАШ_IP` (или `fail2ban-client unban --all`).
+
+Снаружи забрать свежую копию базы на компьютер: `scripts\pull_db_backup.ps1`
+(одна попытка, `BatchMode=yes`, `ConnectTimeout=10`, без повторов).
