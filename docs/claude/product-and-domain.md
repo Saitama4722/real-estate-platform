@@ -690,12 +690,24 @@ of them came from the generic form. The other two belong to realtor id 3.
 `Lead.assigned_realtor` is also `on_delete=SET_NULL`, so deleting a realtor
 orphans their leads into the same state.
 
-### ⚠ OPEN: unassigned leads are in NOBODY's unread count
+### ✅ CLOSED 2026-10-18: unassigned leads are now a shared queue (option 1)
 
-`crm_lead_queryset_for_user` gives a realtor **only** `assigned_realtor=self`, so
-a realtor cannot list or open an unassigned lead at all — only staff can. The
-counter is deliberately built on that same function, so those 5 leads count for
-no realtor.
+The owner chose option 1 below, and extended it to sale requests. A realtor's
+queryset is now **own + free** (`assigned_realtor IS NULL`) for both leads and
+sale requests. Free items are look-only until «Взять в работу» (atomic
+conditional UPDATE, 409 for the loser), and the counters follow the same
+functions, so homepage leads now count for every realtor who can open them.
+Sale requests stopped being a "shared pool forever": once taken, other
+realtors no longer see one. The rules, the notification bell and the
+superadmin role rule live in CLAUDE.md → «Lead queue + notification bell».
+The section below is kept as the history of the decision.
+
+### (history) unassigned leads were in NOBODY's unread count
+
+`crm_lead_queryset_for_user` gave a realtor **only** `assigned_realtor=self`, so
+a realtor could not list or open an unassigned lead at all — only staff could.
+The counter was deliberately built on that same function, so those 5 leads
+counted for no realtor.
 
 **This is a visibility gap that predates the counter, not something the counter
 introduced.** Counting them for a realtor would put a badge on a row that 404s
@@ -726,6 +738,10 @@ decision because each changes the access model:**
   staff-level (`has_staff_level_access`) and see the whole pool. There are zero
   `admin` users today, so this is untested against a real one; flipping it is one
   line in `common/crm_unread.py: user_gets_unread_indicator`.
+- **Superadmin and admin are not part of the lead workflow** (owner, 2026-10-18):
+  no notifications, no take/return, never auto-assigned; they keep oversight
+  and their old abilities. `user_gets_unread_indicator` and
+  `crm_notify.is_workflow_realtor` both mean "active realtor".
 - **The inquiries table's own 15s poll no longer plays a sound.** It still
   highlights new arrivals for 45s (a session-local *arrival* marker, unrelated to
   the persistent *read* state). The sound moved to the single count store so the

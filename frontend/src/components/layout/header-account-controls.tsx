@@ -15,19 +15,16 @@ import {
   roleGetsUnreadIndicator,
   type EmployeeUser,
 } from "@/lib/employeeUser";
-import {
-  configureCrmUnread,
-  formatUnreadBadge,
-  useCrmUnreadCounts,
-} from "@/lib/crmUnreadCounts";
+import { configureCrmUnread } from "@/lib/crmUnreadCounts";
+import { cn } from "@/lib/utils";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Icons } from "@/components/ui/icon";
+import { HeaderNotificationsBell } from "@/components/layout/HeaderNotificationsBell";
 
 export function HeaderAccountControls() {
   const pathname = usePathname();
   const [user, setUser] = useState<EmployeeUser | null>(null);
   const [ready, setReady] = useState(false);
-  const { counts } = useCrmUnreadCounts();
 
   const loadMe = useCallback(async () => {
     const token = getCrmAccessToken();
@@ -68,6 +65,7 @@ export function HeaderAccountControls() {
     configureCrmUnread({
       isRealtor: Boolean(user) && roleGetsUnreadIndicator(user!.role),
       soundEnabled: user?.crm_notify_sound_enabled ?? true,
+      userId: user?.id ?? null,
     });
   }, [user]);
 
@@ -122,38 +120,35 @@ export function HeaderAccountControls() {
     return e ? e.toUpperCase() : "?";
   })();
 
-  /* Ноль непрочитанных = бейджа НЕТ вовсе (не бейдж с нулём), и `counts === null`
-     («ещё не знаем») рисуется так же — пусто. Поэтому на первой отрисовке
-     ничего не мигает: пустое сменяется пустым либо бейджем. */
-  const unreadTotal = counts?.total ?? 0;
-  const showBadge = roleGetsUnreadIndicator(user.role) && unreadTotal > 0;
+  /*
+    ⭐ РИЭЛТОР: КОЛОКОЛЬЧИК ВМЕСТО БЕЙДЖА НА АВАТАРЕ, ЧИП БЕЗ ИМЕНИ ДО 1440px
+    (решение владельца 2026-10-18, порог сдвинут измерением).
+
+    Шапка на пределе (HEADER FIT BAND в globals.css): колокольчик (40px + 8px
+    зазора) можно оплатить только шириной чипа. Задумано было «имя с 1280px»,
+    но `[measured]` с одним избранным при 1280 строка вышла на 1284 даже с
+    коротким именем (чип 155px), поэтому имя появляется с 1440px. Итог: чип
+    46px до 1439, 155px с 1440; scrollWidth == ширине окна на 390, 1024, 1040,
+    1100, 1279, 1280, 1439, 1440, 1600. У суперадмина и админа колокольчика
+    нет, и их чип не меняется.
+
+    Прежний бейдж на аватаре (непрочитанные заявки) убран: колокольчик — один
+    индикатор вместо двух. Счётчики непрочитанных заявок остались в боковом
+    меню кабинета. Бейдж колокольчика, как и прежний, `absolute` — его число
+    не меняет ширину строки.
+  */
+  const isRealtor = roleGetsUnreadIndicator(user.role);
 
   return (
+    <div className="flex shrink-0 items-center gap-2">
     <Link
       href="/account"
-      className="inline-flex max-w-[min(20rem,45vw)] items-center gap-2.5 rounded-lg border border-border bg-surface-raised py-1.5 pl-1.5 pr-3 text-left text-sm text-fg transition-colors duration-150 hover:border-border-strong hover:bg-gray-50"
+      title={displayName}
+      className={cn(
+        "inline-flex max-w-[min(20rem,45vw)] items-center gap-2.5 rounded-lg border border-border bg-surface-raised py-1.5 pl-1.5 text-left text-sm text-fg transition-colors duration-150 hover:border-border-strong hover:bg-gray-50",
+        isRealtor ? "pr-1.5 min-[1440px]:pr-3" : "pr-3",
+      )}
     >
-      {/*
-        ⭐ БЕЙДЖ ВИСИТ НА АВАТАРЕ И `absolute` — ЭТО НЕ УКРАШЕНИЕ, А ТРЕБОВАНИЕ.
-
-        Шапка уже на пределе: с одним избранным строка требует ~1047px, и в
-        полосе 1024–1139px места нет вообще (известный открытый баг, см.
-        product-and-domain.md → «Agency phone in the header»). Абсолютно
-        позиционированный потомок НЕ УЧАСТВУЕТ в раскладке, поэтому собственная
-        ширина чипа не меняется НИ НА ПИКСЕЛЬ ни при каком значении счётчика —
-        включая «99+». Ставить бейдж отдельным flex-элементом рядом с именем
-        нельзя: это добавило бы ширину ровно в той полосе, которую запрещено
-        ухудшать.
-
-        Аватар 32px, у чипа `pl-1.5` (6px) и `py-1.5` (6px), смещения бейджа
-        −4px, так что он остаётся ВНУТРИ границ чипа и не может расширить
-        документ даже будучи последним элементом строки на десктопе.
-
-        Цвет — `bg-accent` (#DE2B37), «внимание». По дизайн-системе accent
-        разрешён именно как маркер внимания и запрещён как фон КНОПКИ; бейдж
-        кнопкой не является. Синий бейдж «Избранное» рядом остаётся синим —
-        это пассивный счётчик, а не сигнал.
-      */}
       <span className="relative shrink-0">
         {hasPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element -- external or media URL from API
@@ -170,24 +165,17 @@ export function HeaderAccountControls() {
             {initials}
           </div>
         )}
-        {showBadge && (
-          <>
-            <span
-              className="pointer-events-none absolute -right-1 -top-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-surface-raised"
-              aria-hidden
-            >
-              {formatUnreadBadge(unreadTotal)}
-            </span>
-            {/* `sr-only` — position:absolute, раскладке чипа не мешает. */}
-            <span className="sr-only">
-              {`Непрочитанных заявок: ${unreadTotal}`}
-            </span>
-          </>
-        )}
       </span>
-      <span className="min-w-0 truncate font-medium" title={displayName}>
+      <span
+        className={cn(
+          "min-w-0 truncate font-medium",
+          isRealtor && "sr-only min-[1440px]:not-sr-only",
+        )}
+      >
         {displayName}
       </span>
     </Link>
+    {isRealtor && <HeaderNotificationsBell />}
+    </div>
   );
 }

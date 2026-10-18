@@ -79,8 +79,8 @@ export async function Header() {
             from 64px to 52px — see the COMPACT HEADER block in globals.css. */}
         <div className="ctr-header__row flex h-16 items-center justify-between gap-2">
           <Link href="/" className="shrink-0">
-            {/* 28px (99px wide) below 1280 — the 1024–1279 rows have no slack;
-                32px (113px) from 1280, where the row has room to spare. */}
+            {/* 26px (106px wide) below 1280, 27px (110px) to 1439, 32px (131px)
+                from 1440 — measured sizes, see the SiteLogo comment above. */}
             <SiteLogo priority className="h-6.5 min-[1280px]:h-6.75 min-[1440px]:h-8" />
           </Link>
           <div className="flex min-w-0 items-center gap-2 lg:gap-4">

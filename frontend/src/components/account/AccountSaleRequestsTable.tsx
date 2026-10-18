@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
+import { takeCrmItem, type CrmQueueScope } from "@/lib/crmQueue";
+import { roleGetsUnreadIndicator } from "@/lib/employeeUser";
 import { cn } from "@/lib/utils";
+import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
+import { FreeBadge, QueueScopeFilter } from "@/components/account/CrmQueueControls";
 
 import { usePageLoading } from "@/components/layout/pageLoadingSignal";
 
@@ -29,6 +33,9 @@ interface SaleRequestRow {
   /** Не открывал ЛИ ЭТОТ сотрудник эту заявку. Пул общий, отметка личная —
       см. `common.crm_unread`. Для не-риэлтора всегда false. */
   is_unread?: boolean;
+  /** Без ответственного: видна всем риэлторам, телефон маскирован, пока не взята. */
+  is_free?: boolean;
+  assigned_realtor?: { id: number; name: string } | null;
   created_at: string;
 }
 
@@ -81,8 +88,14 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export function AccountSaleRequestsTable() {
+  const user = useEmployeeUser();
+  /** Участник очереди. Суперадмин/админ видят всё, но не берут заявки. */
+  const isRealtor = roleGetsUnreadIndicator(user.role);
   const [rows, setRows] = useState<SaleRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scope, setScope] = useState<CrmQueueScope>("");
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [notice, setNotice] = useState("");
 
   /* Holds the global navigation indicator until the content the user
      navigated for is really on screen. A skeleton is not a loaded page.
@@ -100,7 +113,10 @@ export function AccountSaleRequestsTable() {
     setLoading(true);
     setError("");
     try {
-      const qs = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
+      const p = new URLSearchParams();
+      if (statusFilter) p.set("status", statusFilter);
+      if (scope) p.set("scope", scope);
+      const qs = p.toString() ? `?${p.toString()}` : "";
       const res = await fetchWithCrmAuthRetry(`/api/crm/sale-requests/${qs}`);
       if (!res.ok) {
         setError("Не удалось загрузить заявки.");
@@ -115,14 +131,34 @@ export function AccountSaleRequestsTable() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, scope]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  /** «Взять в работу» прямо из списка. Опоздавшему — 409, строка уходит. */
+  const take = async (id: number) => {
+    setBusyId(id);
+    setNotice("");
+    setError("");
+    const res = await takeCrmItem<Partial<SaleRequestRow>>("sale_request", id);
+    setBusyId(null);
+    if (res.ok) {
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...res.data, is_free: false } : r)));
+      setNotice("Заявка взята в работу.");
+      return;
+    }
+    setNotice(res.message);
+    if (res.conflict) setRows((prev) => prev.filter((r) => r.id !== id));
+  };
+
   return (
     <div className="mt-6">
+      <div className="mb-3">
+        <QueueScopeFilter value={scope} onChange={setScope} />
+      </div>
+      {notice && <p className="mb-3 text-sm text-slate-700">{notice}</p>}
       <div className="flex flex-wrap items-center gap-2">
         {STATUS_FILTERS.map((f) => (
           <button
@@ -188,6 +224,7 @@ export function AccountSaleRequestsTable() {
                       {r.is_unread ? (
                         <span className="sr-only">Не просмотрено</span>
                       ) : null}
+                      {r.is_free ? <FreeBadge /> : null}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-700">
@@ -216,12 +253,24 @@ export function AccountSaleRequestsTable() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/account/sale-requests/${r.id}`}
-                      className="text-sm font-medium text-blue-600 hover:underline"
-                    >
-                      Открыть
-                    </Link>
+                    <span className="inline-flex items-center gap-3">
+                      {isRealtor && r.is_free ? (
+                        <button
+                          type="button"
+                          disabled={busyId === r.id}
+                          onClick={() => void take(r.id)}
+                          className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {busyId === r.id ? "…" : "Взять в работу"}
+                        </button>
+                      ) : null}
+                      <Link
+                        href={`/account/sale-requests/${r.id}`}
+                        className="text-sm font-medium text-blue-600 hover:underline"
+                      >
+                        Открыть
+                      </Link>
+                    </span>
                   </td>
                 </tr>
               ))}

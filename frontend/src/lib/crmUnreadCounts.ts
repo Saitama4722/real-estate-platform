@@ -22,9 +22,17 @@
  * 3. **Неудачный опрос МОЛЧИТ.** Ни исключения наружу, ни состояния ошибки, ни
  *    записи в консоль: сеть моргнула — просто ждём следующего интервала.
  *    Счётчик не имеет права ломать шапку.
- * 4. **Звук — только на РОСТ.** Первый успешный ответ после монтирования лишь
- *    задаёт базовый уровень и НИКОГДА не звучит, поэтому «звук при загрузке
- *    страницы» невозможен по построению.
+ * 4. **Звук — по УВЕДОМЛЕНИЯМ колокольчика, по «последнему прозвоненному id»
+ *    (2026-10-18, заменило правило «никогда при загрузке»).** Ручка отдаёт
+ *    `latest_notification_id` — id самого свежего НЕПРОЧИТАННОГО уведомления
+ *    за 24 часа. В localStorage (ключ на пользователя) лежит id, для которого
+ *    уже звучали. Звук ⇔ `latest > lastChimed`; сразу после этого `lastChimed
+ *    = latest`. Отсюда ровно три свойства:
+ *      • пришло, пока риэлтора не было, — ОДИН сигнал при входе;
+ *      • пришло, пока он на сайте, — один сигнал на новое уведомление;
+ *      • перезагрузка / переход по страницам — тишина: id тот же.
+ *    Вкладки делят localStorage, поэтому две открытые вкладки не звонят
+ *    дважды (кто опросил первым, тот и записал id).
  */
 
 import { useSyncExternalStore } from "react";
@@ -36,7 +44,30 @@ export type CrmUnreadCounts = {
   inquiries: number;
   sale_requests: number;
   total: number;
+  /** Непрочитанные уведомления колокольчика за 24 часа. */
+  notifications: number;
+  /** id самого свежего из них, 0 — нет ни одного. По нему решается звук. */
+  latest_notification_id: number;
 };
+
+const LAST_CHIMED_LS_PREFIX = "centreal_crm_last_chimed_notification:";
+
+function readLastChimed(uid: number): number {
+  try {
+    const v = Number(window.localStorage.getItem(LAST_CHIMED_LS_PREFIX + uid));
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeLastChimed(uid: number, id: number): void {
+  try {
+    window.localStorage.setItem(LAST_CHIMED_LS_PREFIX + uid, String(id));
+  } catch {
+    /* приватный режим / квота — максимум прозвоним ещё раз, ничего не ломаем */
+  }
+}
 
 /** 30 секунд — согласованный интервал. Меняя его, поменяйте и CLAUDE.md. */
 const POLL_INTERVAL_MS = 30_000;
@@ -47,9 +78,8 @@ let counts: CrmUnreadCounts | null = null;
 let soundEnabled = true;
 /** Индикатор положен только риэлтору — сюда это приходит из /api/auth/me/. */
 let enabled = false;
-/** База для сравнения. `null` до первого успешного ответа — это и есть защита
-    от звука на загрузке страницы. */
-let lastTotal: number | null = null;
+/** Чей это опрос: ключ «последнего прозвоненного id» — на пользователя. */
+let userId: number | null = null;
 
 let timerId: ReturnType<typeof setInterval> | null = null;
 let inFlight = false;
@@ -76,7 +106,9 @@ function sameCounts(a: CrmUnreadCounts | null, b: CrmUnreadCounts | null): boole
   return (
     a.inquiries === b.inquiries &&
     a.sale_requests === b.sale_requests &&
-    a.total === b.total
+    a.total === b.total &&
+    a.notifications === b.notifications &&
+    a.latest_notification_id === b.latest_notification_id
   );
 }
 
@@ -93,6 +125,8 @@ function parseCounts(raw: unknown): CrmUnreadCounts | null {
     inquiries,
     sale_requests,
     total: total === null ? inquiries + sale_requests : total,
+    notifications: n(o.notifications) ?? 0,
+    latest_notification_id: n(o.latest_notification_id) ?? 0,
   };
 }
 
@@ -106,15 +140,21 @@ async function fetchCounts(): Promise<void> {
     const next = parseCounts(await res.json());
     if (!next) return;
 
-    /* Звук СТРОГО на рост и только после того, как база уже установлена.
-       На первом успешном ответе lastTotal === null → база задана, тишина. */
-    const grew = lastTotal !== null && next.total > lastTotal;
-    lastTotal = next.total;
+    /* Звук — см. пункт 4 в шапке файла. Записываем id ВСЕГДА, даже при
+       выключенном звуке: иначе включение звука прозвенело бы за давно
+       пришедшее уведомление. */
+    let chime = false;
+    if (userId !== null && next.latest_notification_id > 0) {
+      if (next.latest_notification_id > readLastChimed(userId)) {
+        writeLastChimed(userId, next.latest_notification_id);
+        chime = true;
+      }
+    }
 
     const changed = !sameCounts(counts, next);
     counts = next;
     if (changed) publish();
-    if (grew && soundEnabled) playCrmNotifySound();
+    if (chime && soundEnabled) playCrmNotifySound();
   } catch {
     /* Молча. Пункт 3 в шапке файла. */
   } finally {
@@ -154,7 +194,6 @@ function bindVisibility(): void {
 function reset(): void {
   stopTimer();
   counts = null;
-  lastTotal = null;
   publish();
 }
 
@@ -169,14 +208,22 @@ function reset(): void {
 export function configureCrmUnread(opts: {
   isRealtor: boolean;
   soundEnabled?: boolean;
+  userId?: number | null;
 }): void {
   const nextSound = opts.soundEnabled ?? soundEnabled;
   const soundChanged = nextSound !== soundEnabled;
   soundEnabled = nextSound;
+  const nextUser = opts.isRealtor ? (opts.userId ?? null) : null;
+  const userChanged = nextUser !== userId;
+  userId = nextUser;
 
-  if (opts.isRealtor === enabled) {
+  if (opts.isRealtor === enabled && !userChanged) {
     if (soundChanged) publish();
     return;
+  }
+  if (userChanged && enabled && opts.isRealtor) {
+    // Другой риэлтор в той же вкладке: его счётчики — с чистого листа.
+    counts = null;
   }
   enabled = opts.isRealtor;
   if (!enabled) {

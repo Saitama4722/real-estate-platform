@@ -568,8 +568,13 @@ export function CrmPropertyFullForm({
           district?: { id: number } | null;
           neighborhood?: { id: number } | null;
           photos?: { id: number }[];
+          is_free?: boolean;
         };
         if (cancelled) return;
+        // A FREE request reaches a realtor with a MASKED owner phone, and its
+        // mark-converted would 403 (take it first, 2026-10-18). Never prefill
+        // a masked number into the owner record. Staff get the full number.
+        if (sr.is_free && (sr.owner_phone ?? "").includes("•")) return;
 
         const filled: string[] = [];
         const type = (sr.property_type || "") as CrmPropertyTypeValue;

@@ -400,9 +400,10 @@ one `(item, user)` pair. **The presence of the ROW is the state** — there is
 deliberately no `is_read` boolean anywhere, so "read" cannot be expressed halfway.
 
 - **⛔ NEVER "simplify" this into a flag on `Lead` / `SaleRequest`.** A column on
-  the item is GLOBAL by construction: sale requests are a shared pool every realtor
-  sees, so the first person to open one would silently clear it from everyone
-  else's counter. That is the single failure this design exists to prevent.
+  the item is GLOBAL by construction: free leads and free sale requests are seen
+  by every realtor, so the first person to open one would silently clear it from
+  everyone else's counter. That is the single failure this design exists to
+  prevent.
 - **⛔ NEVER mark read from a LIST view.** The receipt is written only by
   `POST /api/crm/leads/<pk>/mark-read/` and
   `POST /api/crm/sale-requests/<pk>/mark-read/`, called when the realtor opens
@@ -412,27 +413,89 @@ deliberately no `is_read` boolean anywhere, so "read" cannot be expressed halfwa
 - **Read is permanent.** An edit to an item does NOT resurrect it. If re-notifying
   on edit is ever wanted, raise it — do not just add it.
 - **The count is defined by what the realtor can OPEN.** `common/crm_unread.py`
-  builds the inquiry count from `crm_lead_queryset_for_user` — the same function
-  that serves the list — so the badge can never point at a row that 404s. Leads
-  with `assigned_realtor IS NULL` (homepage-form leads) are therefore in NOBODY's
-  count, because no realtor can open them. **That is a known gap, not an
-  oversight** — see `docs/claude/product-and-domain.md` → «Unread counters».
+  builds the inquiry count from `crm_lead_queryset_for_user` and the sale-request
+  count from `crm_sale_request_queryset_for_user`, the same functions that
+  serve the lists, so a badge can never point at a row that 404s. Since
+  2026-10-18 both return **the realtor's own items plus the free queue**, so
+  homepage-form leads are finally in every realtor's count (the old "known
+  gap" is closed; see the queue section below).
 - **Realtors only** (`role=realtor`). `user_gets_unread_indicator()` is the ONE
   definition, mirrored in `lib/employeeUser.ts: roleGetsUnreadIndicator`. Staff
   roles get honest zeros, not a 403.
 - **Delivery is POLLING, 30s, `GET /api/crm/notifications/unread-counts/`** —
   counts only, no item data. **Do not introduce Channels or a WebSocket layer**
   (no ASGI server here, owner decision). Hidden tab → no polling.
-- **The header badge is `absolute` on the avatar and MUST stay that way.** The
-  header is at capacity in the 1024–1139px band; an absolutely positioned badge
-  adds exactly 0px to the row at any count. Verified `[measured]` at 375/768/
-  1024/1140/1280/1440 with a favourite present: `scrollWidth` identical with no
-  badge, "1", "42" and "99+". Display caps at **99+**.
-- **The sound belongs to ONE place** — `lib/crmUnreadCounts.ts`, on an INCREASE
-  only, never on load (the first successful poll just sets the baseline). The
-  per-realtor switch is `User.crm_notify_sound_enabled`, server-side so it follows
-  the realtor to any browser; the toggle lives under the cabinet sidebar nav.
-  Do not add a second sound call site.
+- **The header indicator is the BELL (2026-10-18), not a badge on the avatar.**
+  The unread counts stay in the cabinet sidebar; the header shows the bell's
+  own count (see the queue section below). Its badge is `absolute` inside the
+  bell button, so the number never changes the row's width. Display caps at
+  **99+**.
+- **The sound belongs to ONE place** — `lib/crmUnreadCounts.ts`. **Replaces the
+  old "on an increase only, never on load" rule (owner decision 2026-10-18).**
+  It chimes when `latest_notification_id` (newest UNREAD bell notification,
+  24 h) is greater than the id stored in localStorage
+  `centreal_crm_last_chimed_notification:<user id>`, then stores it. So: ONE
+  chime on arrival for what came in while the realtor was away, one per new
+  notification while on the site, and silence on reload or navigation
+  `[measured]`: the stored id was unchanged across a reload. The id is
+  written even when the sound is off, so turning it on doesn't chime for old
+  ones. The per-realtor switch is `User.crm_notify_sound_enabled`; the toggle
+  lives under the cabinet sidebar nav. Do not add a second sound call site.
+
+---
+
+## ⭐ Lead queue + notification bell (2026-10-18)
+
+**⛔ ROLE RULE: the superadmin is the SITE administrator, not a lead manager.**
+Superadmin and admin are never part of the workflow: no notifications, no
+take/return (403), never auto-assigned, not counted as realtors anywhere
+(`common.crm_notify.is_workflow_realtor`, the one definition). They keep their
+previous abilities for oversight: they see every lead and sale request, can
+change status, delete, and reassign in Django admin.
+
+- **Free queue.** A lead or sale request with `assigned_realtor IS NULL` is
+  «Свободная»: every active realtor sees it, LOOK-ONLY. The phone is masked,
+  and reveal, status, notes, comments, edit, convert and delete all answer 403
+  «Сначала возьмите заявку в работу». Phone search never reaches free items.
+  Leads on a property still go straight to that property's realtor (unchanged).
+- **«Взять в работу»** = `POST …/take/`, a **conditional UPDATE** (`WHERE
+  assigned_realtor IS NULL`): the database decides the race; the loser gets
+  **409 «Заявку уже взял другой риэлтор.»** `[measured]` locally and in
+  tests. Logged (`LeadActionType.TAKEN`). Then it disappears from everyone
+  else's list. **«Вернуть в общие»** = `POST …/return/`, owner only, and only
+  for items WITHOUT a property (a lead's `property`, a sale request's
+  `converted_property`), otherwise 400.
+- **⚠ Sale requests are a QUEUE now, not a shared pool.** That replaced the
+  old decision. New fields `assigned_realtor`, `assigned_at`, `assigned_by`;
+  migration `submissions/0007` assigned already-converted requests to the
+  realtor who converted them. The rest started free. `owner_phone` is masked
+  for a realtor until it is theirs; staff see it in full.
+- **Bell = `CrmNotification`** (`common/models/crm_notification.py`): one row
+  per (recipient, lead or sale request), `read_at`. It is NOT a read receipt:
+  receipts mean "opened", notifications mean "was told". Opening an item marks
+  both; «Прочитать все» marks only notifications. Who gets one
+  (`common/crm_notify.py`, created `on_commit`; the Telegram path is unchanged):
+  - free lead → every active realtor with `perm_view_clients` (they can open it);
+  - new sale request → every active realtor;
+  - lead on a property or from a realtor's page → only that realtor;
+  - Django-admin reassignment → «Заявка назначена вам» for the new realtor;
+  - taken → other realtors' rows are **deleted** (they would 404);
+  - returned → every other realtor is notified again.
+- **API:** `GET /api/crm/notifications/` (own, last 24 h, newest 20),
+  `POST …/<id>/mark-read/`, `POST …/mark-all-read/`. The existing 30 s poll
+  `unread-counts/` also returns `notifications` and `latest_notification_id`,
+  so there is still ONE poll. Bell clicks open `/account/inquiries?lead=<id>`
+  (expands that lead) or `/account/sale-requests/<id>`.
+- **Cleanup:** celery-beat `common.purge_old_crm_notifications` at 04:15
+  deletes notifications older than 7 days. Leads are never deleted.
+- **Header fit, realtors only** (`header-account-controls.tsx`): the chip is
+  avatar-only below **1440px** (planned 1280, but `[measured]` 1280 overflowed
+  by 4px even with a short name), and the bell (40px) sits right of it. With
+  one favourite, logged in as a realtor, `scrollWidth` equals the viewport at
+  390, 1024, 1040, 1100, 1279, 1280, 1439, 1440 and 1600 `[measured]`. Below
+  `sm` the dropdown is `fixed inset-x-4`: anchored to the bell, it spilled off
+  the LEFT edge at 390px, which `scrollWidth` cannot see.
+- Tests: `backend/common/tests_crm_queue.py` (24).
 
 ---
 
@@ -678,6 +741,9 @@ is public, so a fresh server would have had a superadmin with a known password.
 walking · the ambient-`DATABASE_URL` `Remove-Item` workaround · `check_r2` (never
 existed) · `SeoLinksFooter` · Edge middleware for the `/account` gate ·
 «exclude Динская» · `max-w-screen-*` "compiles to nothing" ·
+**unassigned leads "in nobody's count"** · **sale requests as a "shared pool
+forever"** · **the unread badge on the header avatar** · **"never a sound on
+page load"** (replaced by the last-chimed-id rule) ·
 **«address search scopes to the settlement that owns the street data»** and its
 standalone-vs-subdivision split — the scope is the whole city for every row
 type; `standalone` no longer affects search, only the map centre.

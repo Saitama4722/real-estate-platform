@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
+import { returnCrmItem, takeCrmItem } from "@/lib/crmQueue";
 import { refreshCrmUnreadCounts } from "@/lib/crmUnreadCounts";
-import { isCabinetAdminRole } from "@/lib/employeeUser";
+import { isCabinetAdminRole, roleGetsUnreadIndicator } from "@/lib/employeeUser";
+import { FreeBadge } from "@/components/account/CrmQueueControls";
 import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -64,6 +66,9 @@ interface SaleRequestDetail {
   converted_property_pid: string | null;
   converted_at: string | null;
   photos: PhotoRow[];
+  /** Очередь (2026-10-18): свободная — без ответственного; телефон маскирован. */
+  is_free: boolean;
+  assigned_realtor: { id: number; name: string } | null;
   created_at: string;
 }
 
@@ -84,6 +89,9 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
   const router = useRouter();
   const user = useEmployeeUser();
   const isAdmin = isCabinetAdminRole(user.role);
+  const isRealtor = roleGetsUnreadIndicator(user.role);
+  const [queueBusy, setQueueBusy] = useState(false);
+  const [queueMsg, setQueueMsg] = useState("");
 
   const [data, setData] = useState<SaleRequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -212,6 +220,41 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
     }
   };
 
+  const take = async () => {
+    if (!data) return;
+    setQueueBusy(true);
+    setQueueMsg("");
+    const res = await takeCrmItem<SaleRequestDetail>("sale_request", data.id);
+    setQueueBusy(false);
+    if (res.ok) {
+      setData(res.data);
+      seedEditFields(res.data);
+      setQueueMsg("Заявка взята в работу.");
+      return;
+    }
+    setQueueMsg(res.message);
+    if (res.conflict) {
+      // Теперь она чужая — этому риэлтору больше не видна.
+      setNotFound(true);
+    }
+  };
+
+  const giveBack = async () => {
+    if (!data) return;
+    if (!window.confirm("Вернуть заявку в общие? Её снова увидят все риэлторы.")) return;
+    setQueueBusy(true);
+    setQueueMsg("");
+    const res = await returnCrmItem<SaleRequestDetail>("sale_request", data.id);
+    setQueueBusy(false);
+    if (res.ok) {
+      setData(res.data);
+      seedEditFields(res.data);
+      setQueueMsg("Заявка возвращена в общие.");
+      return;
+    }
+    setQueueMsg(res.message);
+  };
+
   const remove = async () => {
     if (!isAdmin) return;
     if (!window.confirm("Удалить заявку на продажу безвозвратно?")) return;
@@ -243,7 +286,9 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
   if (notFound)
     return (
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
-        <p className="text-sm text-slate-700">Заявка не найдена.</p>
+        <p className="text-sm text-slate-700">
+          {queueMsg || "Заявка не найдена."}
+        </p>
         <Link href="/account/sale-requests" className="mt-2 inline-block text-sm text-blue-600 hover:underline">
           ← К списку заявок
         </Link>
@@ -253,6 +298,9 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
   if (!data) return null;
 
   const alreadyConverted = data.status === "converted";
+  /** Свободная заявка у риэлтора — только посмотреть и взять (сервер ответил бы 403). */
+  const lookOnly = isRealtor && data.is_free;
+  const isMine = data.assigned_realtor?.id === user.id;
   const locationText = [
     data.city?.name,
     data.neighborhood?.name ?? data.district?.name,
@@ -269,6 +317,41 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
         ← К списку заявок
       </Link>
 
+      {/* Queue: who owns it, and take / return for realtors. */}
+      <section className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        {data.is_free ? (
+          <FreeBadge />
+        ) : (
+          <span className="text-sm text-slate-700">
+            Ответственный:{" "}
+            <span className="font-medium text-slate-900">
+              {isMine ? "вы" : (data.assigned_realtor?.name ?? "—")}
+            </span>
+          </span>
+        )}
+        {lookOnly ? (
+          <>
+            <Button type="button" onClick={take} disabled={queueBusy}>
+              {queueBusy ? "…" : "Взять в работу"}
+            </Button>
+            <span className="text-xs text-slate-500">
+              Телефон, редактирование и создание объекта — после «Взять в работу».
+            </span>
+          </>
+        ) : null}
+        {isRealtor && isMine && !alreadyConverted ? (
+          <button
+            type="button"
+            onClick={giveBack}
+            disabled={queueBusy}
+            className="text-sm font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline disabled:opacity-50"
+          >
+            Вернуть в общие
+          </button>
+        ) : null}
+        {queueMsg && <span className="text-sm text-slate-700">{queueMsg}</span>}
+      </section>
+
       {/* Owner contact — CRM ONLY. Never shown on the public site. */}
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-slate-900">Контакт собственника</h2>
@@ -283,9 +366,13 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
           <div>
             <dt className="text-xs text-slate-500">Телефон</dt>
             <dd className="text-sm font-medium text-slate-900">
-              <a href={`tel:${data.owner_phone}`} className="text-blue-700 hover:underline">
-                {data.owner_phone}
-              </a>
+              {lookOnly ? (
+                <span className="font-mono">{data.owner_phone}</span>
+              ) : (
+                <a href={`tel:${data.owner_phone}`} className="text-blue-700 hover:underline">
+                  {data.owner_phone}
+                </a>
+              )}
             </dd>
           </div>
           <div>
@@ -366,7 +453,8 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
         </section>
       )}
 
-      {/* Editable details */}
+      {/* Editable details — hidden while a realtor is only looking at a free one. */}
+      {!lookOnly && (
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-slate-900">Данные объекта</h2>
         <p className="mt-1 text-xs text-slate-500">
@@ -453,12 +541,17 @@ export function AccountSaleRequestDetail({ id }: { id: string }) {
           </div>
         </div>
       </section>
+      )}
 
       {/* Actions: convert + delete */}
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-slate-900">Действия</h2>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          {alreadyConverted ? (
+          {lookOnly ? (
+            <span className="text-sm text-slate-600">
+              Создать объект можно после «Взять в работу».
+            </span>
+          ) : alreadyConverted ? (
             <span className="text-sm text-emerald-700">
               Объект уже создан из этой заявки.
             </span>

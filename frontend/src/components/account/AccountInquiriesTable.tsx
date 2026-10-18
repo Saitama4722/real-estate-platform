@@ -2,11 +2,14 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
+import { returnCrmItem, takeCrmItem, type CrmQueueScope } from "@/lib/crmQueue";
 import { refreshCrmUnreadCounts } from "@/lib/crmUnreadCounts";
-import { isCabinetAdminRole } from "@/lib/employeeUser";
+import { isCabinetAdminRole, roleGetsUnreadIndicator } from "@/lib/employeeUser";
 import { cn } from "@/lib/utils";
 import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
+import { FreeBadge, QueueScopeFilter } from "@/components/account/CrmQueueControls";
 
 import { usePageLoading } from "@/components/layout/pageLoadingSignal";
 
@@ -31,6 +34,9 @@ type LeadRow = {
   /** Не открывал ЛИ ЭТОТ сотрудник эту заявку. Аннотация с сервера, личная —
       см. `common.crm_unread`. Для не-риэлтора всегда false. */
   is_unread?: boolean;
+  /** Без ответственного — «Свободная». Риэлтору видна, но только посмотреть и
+      взять: телефон маскирован, статус/заметки — после «Взять в работу». */
+  is_free?: boolean;
 };
 
 type RealtorOpt = { id: number; display_name: string };
@@ -141,9 +147,12 @@ function LeadSourceCell({ property }: { property: LeadPropertyRef | null }) {
 function LeadNotesHistoryPanel({
   leadId,
   viewer,
+  canWrite,
 }: {
   leadId: number;
   viewer: { id: number; first_name: string; last_name: string };
+  /** Свободная заявка у риэлтора — только чтение (сервер ответил бы 403). */
+  canWrite: boolean;
 }) {
   const [notes, setNotes] = useState<NoteApiRow[]>([]);
   const [history, setHistory] = useState<HistoryApiRow[]>([]);
@@ -244,23 +253,29 @@ function LeadNotesHistoryPanel({
             ))}
           </ul>
         )}
-        <div className="space-y-2">
-          <textarea
-            className="min-h-[4.5rem] w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 placeholder:text-slate-400"
-            placeholder="Текст заметки…"
-            value={noteText}
-            disabled={noteBusy}
-            onChange={(e) => setNoteText(e.target.value)}
-          />
-          <button
-            type="button"
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-            disabled={noteBusy || !noteText.trim()}
-            onClick={() => void addNote()}
-          >
-            Добавить заметку
-          </button>
-        </div>
+        {canWrite ? (
+          <div className="space-y-2">
+            <textarea
+              className="min-h-[4.5rem] w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 placeholder:text-slate-400"
+              placeholder="Текст заметки…"
+              value={noteText}
+              disabled={noteBusy}
+              onChange={(e) => setNoteText(e.target.value)}
+            />
+            <button
+              type="button"
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              disabled={noteBusy || !noteText.trim()}
+              onClick={() => void addNote()}
+            >
+              Добавить заметку
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">
+            Заметки можно добавлять после «Взять в работу».
+          </p>
+        )}
       </div>
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">История действий</h3>
@@ -313,6 +328,10 @@ function normalizeRealtorList(data: unknown): RealtorOpt[] {
 export function AccountInquiriesTable() {
   const user = useEmployeeUser();
   const isAdmin = isCabinetAdminRole(user.role);
+  /** Участник очереди: берёт и возвращает заявки. Суперадмин/админ — нет. */
+  const isRealtor = roleGetsUnreadIndicator(user.role);
+  const searchParams = useSearchParams();
+  const deepLinkLeadId = Number(searchParams.get("lead")) || null;
   const canView =
     isAdmin || (user.crm_capabilities?.view_clients ?? false);
   const canChangeStatus =
@@ -329,6 +348,12 @@ export function AccountInquiriesTable() {
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [assignedFilter, setAssignedFilter] = useState("");
+  const [scope, setScope] = useState<CrmQueueScope>("");
+  const [queueBusy, setQueueBusy] = useState<number | null>(null);
+  const [notice, setNotice] = useState("");
+  /** Какую ссылку из колокольчика уже обработали — чтобы опрос раз в 15 с не
+      раскрывал карточку заново после того, как её свернули. */
+  const handledDeepLinkRef = useRef<number | null>(null);
   const [revealed, setRevealed] = useState<Record<number, string>>({});
   const [revealBusy, setRevealBusy] = useState<number | null>(null);
   const [expandedLeadId, setExpandedLeadId] = useState<number | null>(null);
@@ -342,9 +367,10 @@ export function AccountInquiriesTable() {
     const p = new URLSearchParams();
     if (statusFilter) p.set("status", statusFilter);
     if (isAdmin && assignedFilter) p.set("assigned_to", assignedFilter);
+    if (scope) p.set("scope", scope);
     const s = p.toString();
     return s ? `?${s}` : "";
-  }, [statusFilter, assignedFilter, isAdmin]);
+  }, [statusFilter, assignedFilter, isAdmin, scope]);
 
   const newArrivalSet = useMemo(
     () => new Set(newArrivalHighlightIds),
@@ -558,6 +584,85 @@ export function AccountInquiriesTable() {
     }
   }, []);
 
+  /** «Взять в работу». Проигравший гонку получает 409 — строка уходит из его
+      списка, потому что заявка теперь чужая. */
+  const takeLead = async (id: number) => {
+    setQueueBusy(id);
+    setError("");
+    setNotice("");
+    const res = await takeCrmItem<Partial<LeadRow>>("lead", id);
+    setQueueBusy(null);
+    if (res.ok) {
+      setRows((prev) =>
+        prev === null ? prev : prev.map((r) => (r.id === id ? { ...r, ...res.data, is_free: false } : r)),
+      );
+      setNotice("Заявка взята в работу.");
+      return;
+    }
+    setError(res.message);
+    if (res.conflict) {
+      setRows((prev) => (prev === null ? prev : prev.filter((r) => r.id !== id)));
+      if (expandedLeadId === id) setExpandedLeadId(null);
+    }
+  };
+
+  const returnLead = async (id: number) => {
+    if (!window.confirm("Вернуть заявку в общие? Её снова увидят все риэлторы.")) return;
+    setQueueBusy(id);
+    setError("");
+    setNotice("");
+    const res = await returnCrmItem<Partial<LeadRow>>("lead", id);
+    setQueueBusy(null);
+    if (!res.ok) {
+      setError(res.message);
+      return;
+    }
+    setRevealed((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setRows((prev) => {
+      if (prev === null) return prev;
+      if (scope === "mine") return prev.filter((r) => r.id !== id);
+      return prev.map((r) => (r.id === id ? { ...r, ...res.data, is_free: true } : r));
+    });
+    setNotice("Заявка возвращена в общие.");
+  };
+
+  /* Ссылка из колокольчика: /account/inquiries?lead=<id>. Раскрываем карточку
+     (это и есть «открыл заявку» — ставит отметку прочтения) и прокручиваем к
+     ней. Одна ссылка обрабатывается один раз. */
+  useEffect(() => {
+    if (!deepLinkLeadId || rows === null) return;
+    if (handledDeepLinkRef.current === deepLinkLeadId) return;
+    handledDeepLinkRef.current = deepLinkLeadId;
+    const row = rows.find((r) => r.id === deepLinkLeadId);
+    if (!row) {
+      if (scope || statusFilter || assignedFilter) {
+        // Скрыта фильтром — сбрасываем фильтры и пробуем ещё раз на СВЕЖЕМ
+        // списке: rows=null заставляет эффект дождаться перезагрузки, иначе
+        // он сверился бы со старым отфильтрованным списком.
+        handledDeepLinkRef.current = null;
+        setRows(null);
+        setScope("");
+        setStatusFilter("");
+        setAssignedFilter("");
+        return;
+      }
+      setNotice("Эта заявка вам больше недоступна — возможно, её уже взял другой риэлтор.");
+      return;
+    }
+    setExpandedLeadId(deepLinkLeadId);
+    dismissNewHighlight(deepLinkLeadId);
+    void markLeadRead(deepLinkLeadId);
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`lead-row-${deepLinkLeadId}`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }, [deepLinkLeadId, rows, scope, statusFilter, assignedFilter, dismissNewHighlight, markLeadRead]);
+
   const revealPhone = async (id: number) => {
     setRevealBusy(id);
     setError("");
@@ -597,6 +702,10 @@ export function AccountInquiriesTable() {
   return (
     <div className="mt-6 space-y-4">
       <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+          Заявки
+          <QueueScopeFilter value={scope} onChange={setScope} />
+        </div>
         <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
           Статус
           <select
@@ -632,6 +741,7 @@ export function AccountInquiriesTable() {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+      {notice && !error && <p className="text-sm text-emerald-700">{notice}</p>}
 
       {rows.length === 0 ? (
         <p className="text-sm text-slate-600">Заявок по выбранным фильтрам нет.</p>
@@ -651,9 +761,14 @@ export function AccountInquiriesTable() {
               </tr>
             </thead>
             <tbody>
-                           {rows.map((r) => (
+                           {rows.map((r) => {
+                /* Свободная заявка у риэлтора — только посмотреть и взять. */
+                const lookOnly = isRealtor && Boolean(r.is_free);
+                const isMine = r.assigned_realtor?.id === user.id;
+                return (
                 <Fragment key={r.id}>
                 <tr
+                  id={`lead-row-${r.id}`}
                   className={cn(
                     "border-b border-slate-100 last:border-0 transition-colors duration-300",
                     newArrivalSet.has(r.id) &&
@@ -680,6 +795,7 @@ export function AccountInquiriesTable() {
                       {r.is_unread ? (
                         <span className="sr-only">Не просмотрено</span>
                       ) : null}
+                      {r.is_free ? <FreeBadge /> : null}
                       {newArrivalSet.has(r.id) ? (
                         <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950 ring-1 ring-amber-300/80">
                           Новая заявка
@@ -705,7 +821,7 @@ export function AccountInquiriesTable() {
                       >
                         {STATUS_LABELS[r.status] ?? r.status}
                       </span>
-                      {canChangeStatus ? (
+                      {canChangeStatus && !lookOnly ? (
                         <select
                           className="max-w-[11rem] rounded border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-900"
                           value={
@@ -734,18 +850,41 @@ export function AccountInquiriesTable() {
                     {r.created_at ? new Date(r.created_at).toLocaleString("ru-RU") : "—"}
                   </td>
                   <td className="px-3 py-2.5">
-                    {revealed[r.id] ? (
-                      <span className="text-xs text-slate-500">Номер открыт</span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-                        disabled={revealBusy === r.id}
-                        onClick={() => void revealPhone(r.id)}
-                      >
-                        {revealBusy === r.id ? "…" : "Показать телефон"}
-                      </button>
-                    )}
+                    <div className="flex flex-col items-start gap-1.5">
+                      {lookOnly ? (
+                        <button
+                          type="button"
+                          className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                          disabled={queueBusy === r.id}
+                          onClick={() => void takeLead(r.id)}
+                        >
+                          {queueBusy === r.id ? "…" : "Взять в работу"}
+                        </button>
+                      ) : revealed[r.id] ? (
+                        <span className="text-xs text-slate-500">Номер открыт</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                          disabled={revealBusy === r.id}
+                          onClick={() => void revealPhone(r.id)}
+                        >
+                          {revealBusy === r.id ? "…" : "Показать телефон"}
+                        </button>
+                      )}
+                      {/* Вернуть можно только свою заявку без объекта: заявка
+                          по объекту остаётся у риэлтора этого объекта. */}
+                      {isRealtor && isMine && !r.property ? (
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline disabled:opacity-50"
+                          disabled={queueBusy === r.id}
+                          onClick={() => void returnLead(r.id)}
+                        >
+                          Вернуть в общие
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-3 py-2.5">
                     <button
@@ -779,12 +918,14 @@ export function AccountInquiriesTable() {
                           first_name: user.first_name,
                           last_name: user.last_name,
                         }}
+                        canWrite={!lookOnly}
                       />
                     </td>
                   </tr>
                 ) : null}
                 </Fragment>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
