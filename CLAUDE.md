@@ -76,6 +76,19 @@ template is `deploy/.env.prod.example`. The real `deploy/.env.prod` and
 - Caddy appends the trailing slash to `/api/*` paths itself (the same
   contract as the Next.js rewrite), because browser `/api` calls now reach
   Django directly.
+- **The Django cache is Redis in production (resolved 2026-10-18), LocMem
+  locally.** `CACHE_REDIS_URL=redis://redis:6379/1` (compose; Celery stays on
+  DB 0) selects the built-in `RedisCache`; without it the cache is
+  `LocMemCache`. Captcha answers and every DRF throttle live there.
+  `[measured]` before the switch, a captcha issued over HTTP was invisible to
+  another process. After it, the captcha was visible across processes, 20/20
+  paced captcha→lead submissions succeeded, 12 parallel checks of one captcha
+  never said «истёк», and 20 parallel failed logins gave exactly 10×401 +
+  10×429. ⚠ It is deliberately NOT keyed on `REDIS_URL`, which `backend/.env`
+  sets for Celery. Details: `docs/claude/django-and-migrations.md`.
+- **Testing the lead form in prod sends real Telegram messages.** For bulk
+  tests, set `LEADS_NOTIFICATIONS_ENABLED=False`, `up -d celery`, test, set it
+  back, and check for real leads created in that window.
 
 #### Current server state (first deploy 2026-10-12, domain + HTTPS 2026-10-18)
 
