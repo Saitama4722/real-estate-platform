@@ -358,3 +358,105 @@ class SaleRequestQueueTests(QueueTestBase):
         row = self._rows(self.csa.get("/api/crm/sale-requests/").data)[0]
         self.assertEqual(row["owner_phone"], "+79995554433")
         self.assertEqual(self.csa.post(f"/api/crm/sale-requests/{sr.pk}/take/").status_code, 403)
+
+
+class BulkActionsAndUnifiedReadTests(QueueTestBase):
+    """Bulk mark-read / hide / unhide / delete, and one read state for bell + sidebar."""
+
+    def _counts(self, client):
+        return client.get("/api/crm/notifications/unread-counts/").data
+
+    def test_bulk_mark_read_clears_receipts_and_bell(self):
+        a, b = self._free_lead(), self._free_lead(client_name="Второй")
+        crm_notify.notify_new_lead(a)
+        crm_notify.notify_new_lead(b)
+        before = self._counts(self.c1)
+        self.assertEqual((before["inquiries"], before["notifications"]), (2, 2))
+        r = self.c1.post("/api/crm/leads/bulk-mark-read/", {"ids": [a.pk, b.pk]}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        after = self._counts(self.c1)
+        self.assertEqual((after["inquiries"], after["notifications"]), (0, 0))
+        rows = self._rows(self.c1.get("/api/crm/leads/").data)
+        self.assertFalse(any(x["is_unread"] for x in rows))
+        # r2 is untouched: read state is personal.
+        self.assertEqual(self._counts(self.c2)["inquiries"], 2)
+
+    def test_bulk_is_all_or_nothing_on_a_forbidden_id(self):
+        mine = self._free_lead()
+        foreign = self._free_lead(client_name="Чужой", assigned_realtor=self.r2)
+        r = self.c1.post("/api/crm/leads/bulk-mark-read/", {"ids": [mine.pk, foreign.pk]}, format="json")
+        self.assertEqual(r.status_code, 403, r.data)
+        self.assertEqual(self._counts(self.c1)["inquiries"], 1)  # nothing changed
+
+    def test_mark_all_in_filter(self):
+        self._free_lead()
+        self._free_lead(client_name="Мой", assigned_realtor=self.r1)
+        r = self.c1.post("/api/crm/leads/bulk-mark-read/?scope=free", {"all": True}, format="json")
+        self.assertEqual(r.data["count"], 1)
+        self.assertEqual(self._counts(self.c1)["inquiries"], 1)  # the own one is still unread
+
+    def test_hide_archive_and_restore(self):
+        lead = self._free_lead()
+        crm_notify.notify_new_lead(lead)
+        r = self.c1.post("/api/crm/leads/bulk-hide/", {"ids": [lead.pk]}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(self._rows(self.c1.get("/api/crm/leads/").data), [])
+        self.assertEqual([x["id"] for x in self._rows(self.c1.get("/api/crm/leads/?scope=archive").data)], [lead.pk])
+        self.assertEqual(self._counts(self.c1)["inquiries"], 0)
+        # Still visible to the other realtor, and not deleted.
+        self.assertEqual([x["id"] for x in self._rows(self.c2.get("/api/crm/leads/").data)], [lead.pk])
+        r = self.c1.post("/api/crm/leads/bulk-unhide/", {"ids": [lead.pk]}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual([x["id"] for x in self._rows(self.c1.get("/api/crm/leads/").data)], [lead.pk])
+
+    def test_cannot_hide_another_realtors_lead_and_staff_cannot_hide(self):
+        foreign = self._free_lead(assigned_realtor=self.r2)
+        self.assertEqual(
+            self.c1.post("/api/crm/leads/bulk-hide/", {"ids": [foreign.pk]}, format="json").status_code, 403
+        )
+        self.assertEqual(
+            self.csa.post("/api/crm/leads/bulk-hide/", {"ids": [foreign.pk]}, format="json").status_code, 403
+        )
+
+    def test_bulk_delete_staff_only_and_logged(self):
+        from users.models import EmployeeActivityLog
+
+        a, b = self._free_lead(), self._free_lead(client_name="Второй")
+        self.assertEqual(
+            self.c1.post("/api/crm/leads/bulk-delete/", {"ids": [a.pk]}, format="json").status_code, 403
+        )
+        r = self.csa.post("/api/crm/leads/bulk-delete/", {"ids": [a.pk, b.pk]}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertFalse(Lead.objects.filter(pk__in=[a.pk, b.pk]).exists())
+        log = EmployeeActivityLog.objects.get(
+            user=self.superadmin, action_type=EmployeeActivityLog.ActionType.BULK_DELETE_LEADS
+        )
+        self.assertIn(f"#{a.pk}", log.details)
+        self.assertTrue(log.details.startswith("2 "))
+        self.assertEqual(
+            self.csa.post("/api/crm/leads/bulk-delete/", {"all": True}, format="json").status_code, 400
+        )
+
+    def test_bell_mark_all_read_also_clears_the_sidebar_count(self):
+        lead = self._free_lead()
+        crm_notify.notify_new_lead(lead)
+        self.assertEqual(self._counts(self.c1)["inquiries"], 1)
+        self.c1.post("/api/crm/notifications/mark-all-read/")
+        c = self._counts(self.c1)
+        self.assertEqual((c["inquiries"], c["notifications"]), (0, 0))
+
+    def test_poll_endpoint_is_never_cached(self):
+        r = self.c1.get("/api/crm/notifications/unread-counts/")
+        self.assertIn("no-store", r["Cache-Control"])
+
+    def test_sale_request_bulk_hide_and_mark_read(self):
+        city = City.objects.create(name="Сочи", slug="sochi-q", region_name="КК")
+        sr = SaleRequest.objects.create(owner_name="С", owner_phone="+79990000000", city=city, description="x")
+        crm_notify.notify_new_sale_request(sr)
+        self.assertEqual(self._counts(self.c1)["sale_requests"], 1)
+        self.c1.post("/api/crm/sale-requests/bulk-mark-read/", {"ids": [sr.pk]}, format="json")
+        c = self._counts(self.c1)
+        self.assertEqual((c["sale_requests"], c["notifications"]), (0, 0))
+        self.c1.post("/api/crm/sale-requests/bulk-hide/", {"ids": [sr.pk]}, format="json")
+        self.assertEqual(self._rows(self.c1.get("/api/crm/sale-requests/").data), [])
+        self.assertEqual(len(self._rows(self.c1.get("/api/crm/sale-requests/?scope=archive").data)), 1)

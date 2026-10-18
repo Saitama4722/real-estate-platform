@@ -1,13 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
-import { takeCrmItem, type CrmQueueScope } from "@/lib/crmQueue";
-import { roleGetsUnreadIndicator } from "@/lib/employeeUser";
+import { crmBulk, takeCrmItem, type CrmQueueScope } from "@/lib/crmQueue";
+import { applyCrmReadOptimistic, useCrmReadStateRefresh } from "@/lib/crmUnreadCounts";
+import { isCabinetAdminRole, roleGetsUnreadIndicator } from "@/lib/employeeUser";
 import { cn } from "@/lib/utils";
 import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
-import { FreeBadge, QueueScopeFilter } from "@/components/account/CrmQueueControls";
+import {
+  CrmBulkToolbar,
+  FreeBadge,
+  QueueScopeFilter,
+  confirmBulkDelete,
+} from "@/components/account/CrmQueueControls";
 
 import { usePageLoading } from "@/components/layout/pageLoadingSignal";
 
@@ -104,20 +110,24 @@ export function AccountSaleRequestsTable() {
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  const load = useCallback(async () => {
+  const query = useMemo(() => {
+    const p = new URLSearchParams();
+    if (statusFilter) p.set("status", statusFilter);
+    if (scope) p.set("scope", scope);
+    return p.toString() ? `?${p.toString()}` : "";
+  }, [statusFilter, scope]);
+
+  /** `silent`: a live refresh (read state changed) — no «Загрузка…» flicker. */
+  const load = useCallback(async (silent = false) => {
     if (!getCrmAccessToken()) {
       setError("Требуется вход.");
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError("");
     try {
-      const p = new URLSearchParams();
-      if (statusFilter) p.set("status", statusFilter);
-      if (scope) p.set("scope", scope);
-      const qs = p.toString() ? `?${p.toString()}` : "";
-      const res = await fetchWithCrmAuthRetry(`/api/crm/sale-requests/${qs}`);
+      const res = await fetchWithCrmAuthRetry(`/api/crm/sale-requests/${query}`);
       if (!res.ok) {
         setError("Не удалось загрузить заявки.");
         return;
@@ -131,11 +141,65 @@ export function AccountSaleRequestsTable() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, scope]);
+  }, [query]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Same single read state as the bell and the sidebar badge.
+  useCrmReadStateRefresh(() => {
+    void load(true);
+  });
+
+  const isStaff = isCabinetAdminRole(user.role);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  useEffect(() => {
+    setSelected(new Set());
+  }, [query]);
+  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  const toggleOne = (id: number) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const runBulk = async (
+    action: "mark-read" | "hide" | "unhide" | "delete",
+    target: { ids: number[] } | { all: true },
+  ) => {
+    setBulkBusy(true);
+    setNotice("");
+    const affected = "ids" in target ? new Set(target.ids) : new Set(rows.map((r) => r.id));
+    const unreadAffected = rows.filter((r) => affected.has(r.id) && r.is_unread).length;
+    if (action === "mark-read" || action === "hide") {
+      setRows((prev) => prev.map((r) => (affected.has(r.id) ? { ...r, is_unread: false } : r)));
+      applyCrmReadOptimistic({ sale_requests: unreadAffected, notifications: unreadAffected });
+    }
+    const res = await crmBulk("sale_request", action, target, query);
+    setBulkBusy(false);
+    if (!res.ok) {
+      setNotice(res.message);
+      void load(true);
+      applyCrmReadOptimistic({});
+      return;
+    }
+    const done = new Set(res.ids);
+    if (action !== "mark-read") setRows((prev) => prev.filter((r) => !done.has(r.id)));
+    setSelected(new Set());
+    setNotice(
+      {
+        "mark-read": `Отмечено прочитанными: ${res.count}.`,
+        hide: `Скрыто: ${res.count}. Их можно вернуть из «Архива».`,
+        unhide: `Возвращено из архива: ${res.count}.`,
+        delete: `Удалено: ${res.count}.`,
+      }[action],
+    );
+    applyCrmReadOptimistic({});
+  };
 
   /** «Взять в работу» прямо из списка. Опоздавшему — 409, строка уходит. */
   const take = async (id: number) => {
@@ -156,7 +220,7 @@ export function AccountSaleRequestsTable() {
   return (
     <div className="mt-6">
       <div className="mb-3">
-        <QueueScopeFilter value={scope} onChange={setScope} />
+        <QueueScopeFilter value={scope} onChange={setScope} showArchive={isRealtor} />
       </div>
       {notice && <p className="mb-3 text-sm text-slate-700">{notice}</p>}
       <div className="flex flex-wrap items-center gap-2">
@@ -183,13 +247,44 @@ export function AccountSaleRequestsTable() {
         <p className="mt-6 text-sm text-red-600">{error}</p>
       ) : rows.length === 0 ? (
         <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
-          <p className="text-sm text-slate-700">Заявок на продажу пока нет.</p>
+          <p className="text-sm text-slate-700">
+            {scope === "archive" ? "В архиве пусто." : "Заявок на продажу пока нет."}
+          </p>
         </div>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <>
+        <div className="mt-4">
+          <CrmBulkToolbar
+            selectedCount={selected.size}
+            busy={bulkBusy}
+            isRealtor={isRealtor}
+            isStaff={isStaff}
+            inArchive={scope === "archive"}
+            onMarkRead={() => void runBulk("mark-read", { ids: [...selected] })}
+            onMarkAllRead={() => void runBulk("mark-read", { all: true })}
+            onHide={() => void runBulk("hide", { ids: [...selected] })}
+            onUnhide={() => void runBulk("unhide", { ids: [...selected] })}
+            onDelete={() => {
+              const ids = [...selected];
+              if (ids.length && confirmBulkDelete(ids.length)) void runBulk("delete", { ids });
+            }}
+            onClear={() => setSelected(new Set())}
+          />
+        </div>
+        <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    aria-label="Выбрать все"
+                    title="Выбрать все"
+                    checked={allSelected}
+                    onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)))}
+                    className="h-4 w-4 cursor-pointer accent-blue-600"
+                  />
+                </th>
                 <th className="px-4 py-3">Дата</th>
                 <th className="px-4 py-3">Собственник</th>
                 <th className="px-4 py-3">Локация</th>
@@ -203,6 +298,15 @@ export function AccountSaleRequestsTable() {
             <tbody className="divide-y divide-slate-100">
               {rows.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label={`Выбрать заявку ${r.owner_name}`}
+                      checked={selected.has(r.id)}
+                      onChange={() => toggleOne(r.id)}
+                      className="h-4 w-4 cursor-pointer accent-blue-600"
+                    />
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                     {formatDateTime(r.created_at)}
                   </td>
@@ -270,6 +374,18 @@ export function AccountSaleRequestsTable() {
                       >
                         Открыть
                       </Link>
+                      {isRealtor ? (
+                        <button
+                          type="button"
+                          disabled={bulkBusy}
+                          onClick={() =>
+                            void runBulk(scope === "archive" ? "unhide" : "hide", { ids: [r.id] })
+                          }
+                          className="text-xs font-medium text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline disabled:opacity-50"
+                        >
+                          {scope === "archive" ? "Вернуть из архива" : "Скрыть"}
+                        </button>
+                      ) : null}
                     </span>
                   </td>
                 </tr>
@@ -277,6 +393,7 @@ export function AccountSaleRequestsTable() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

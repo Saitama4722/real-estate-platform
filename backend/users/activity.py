@@ -25,6 +25,7 @@ def record_employee_activity(
     user: User,
     action_type: EmployeeActivityLog.ActionType | str,
     target_user: User | None = None,
+    details: str = "",
 ) -> None:
     """
     Создать запись в журнале; только для ролей CRM.
@@ -54,6 +55,7 @@ def record_employee_activity(
         action_type=action_value,
         ip_address=ip,
         user_agent=ua,
+        details=(details or "")[:500],
     )
 
 

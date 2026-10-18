@@ -19,8 +19,8 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Icons } from "@/components/ui/icon";
 import { fetchWithCrmAuthRetry } from "@/lib/crmAuth";
 import {
+  applyCrmReadOptimistic,
   formatUnreadBadge,
-  refreshCrmUnreadCounts,
   useCrmUnreadCounts,
 } from "@/lib/crmUnreadCounts";
 import { cn } from "@/lib/utils";
@@ -109,29 +109,43 @@ export function HeaderNotificationsBell() {
     setOpen(false);
     if (!item.is_read) {
       setItems((cur) => cur?.map((x) => (x.id === item.id ? { ...x, is_read: true } : x)) ?? cur);
+      applyCrmReadOptimistic({
+        notifications: 1,
+        inquiries: item.target.kind === "lead" ? 1 : 0,
+        sale_requests: item.target.kind === "sale_request" ? 1 : 0,
+      });
       try {
+        // Server-side this also writes the item's read receipt (one read state).
         await fetchWithCrmAuthRetry(`/api/crm/notifications/${item.id}/mark-read/`, {
           method: "POST",
         });
       } catch {
         /* открытие заявки само отметит её уведомления прочитанными */
       }
-      refreshCrmUnreadCounts();
+      applyCrmReadOptimistic({}); // confirm
     }
     router.push(crmNotificationHref(item.target));
   };
 
+  /** «Прочитать все» гасит И колокольчик, И сами заявки (квитанции на
+      сервере) — бейдж в боковом меню и точки в строках гаснут сразу. */
   const markAll = async () => {
+    const unreadItems = (items ?? []).filter((x) => !x.is_read);
+    const leads = new Set(unreadItems.filter((x) => x.target.kind === "lead").map((x) => x.target.id));
+    const srs = new Set(
+      unreadItems.filter((x) => x.target.kind === "sale_request").map((x) => x.target.id),
+    );
+    setItems((cur) => cur?.map((x) => ({ ...x, is_read: true })) ?? cur);
+    applyCrmReadOptimistic({ allNotifications: true, inquiries: leads.size, sale_requests: srs.size });
     try {
       const res = await fetchWithCrmAuthRetry("/api/crm/notifications/mark-all-read/", {
         method: "POST",
       });
       if (!res.ok) throw new Error(String(res.status));
-      setItems((cur) => cur?.map((x) => ({ ...x, is_read: true })) ?? cur);
     } catch {
       setFailed(true);
     }
-    refreshCrmUnreadCounts();
+    applyCrmReadOptimistic({});
   };
 
   const hasUnread = unread > 0;

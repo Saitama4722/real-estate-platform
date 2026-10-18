@@ -16,6 +16,7 @@ from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
 
 from common import crm_notify
+from common.crm_bulk import CrmBulkActionsMixin, hidden_ids
 from common.crm_unread import annotate_lead_unread, mark_lead_read
 from leads.choices import LeadActionType, LeadStatus
 from leads.models import (
@@ -201,6 +202,7 @@ class PublicLeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
 
 
 class CrmLeadViewSet(
+    CrmBulkActionsMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
@@ -275,11 +277,42 @@ class CrmLeadViewSet(
         # «Свободные / Мои / Все доступные». Для сотрудника «mine» = назначенные
         # на него (обычно пусто — суперадмин в процессе не участвует).
         scope = self.request.query_params.get("scope")
+        # Личный архив («Скрыть»): только в списке. Карточка, действия и
+        # bulk-* видят скрытые как обычно — иначе из архива нечего вернуть.
+        if self.action == "list" or (self.action or "").startswith("bulk_"):
+            hidden = hidden_ids(self.request.user, "lead")
+            qs = qs.filter(pk__in=hidden) if scope == "archive" else qs.exclude(pk__in=hidden)
         if scope == "free":
             qs = qs.filter(assigned_realtor__isnull=True)
         elif scope == "mine":
             qs = qs.filter(assigned_realtor=self.request.user)
         return qs
+
+    # --- bulk actions (common.crm_bulk) -----------------------------------
+    bulk_kind = "lead"
+    bulk_label = "заявок"
+
+    def bulk_access_queryset(self):
+        return crm_lead_queryset_for_user(self.request.user)
+
+    @action(detail=False, methods=["post"], url_path="bulk-mark-read")
+    def bulk_mark_read_action(self, request):
+        require_crm_capability(request, "view_clients")
+        return self.bulk_mark_read(request)
+
+    @action(detail=False, methods=["post"], url_path="bulk-hide")
+    def bulk_hide_action(self, request):
+        require_crm_capability(request, "view_clients")
+        return self.bulk_hide(request)
+
+    @action(detail=False, methods=["post"], url_path="bulk-unhide")
+    def bulk_unhide_action(self, request):
+        require_crm_capability(request, "view_clients")
+        return self.bulk_unhide(request)
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete_action(self, request):
+        return self.bulk_delete(request)
 
     def _require_owned(self, lead):
         """

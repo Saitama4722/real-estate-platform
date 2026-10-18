@@ -48,9 +48,13 @@ def unread_lead_count(user) -> int:
     from leads.models import LeadReadReceipt
     from users.permissions import crm_lead_queryset_for_user
 
+    from common.crm_bulk import hidden_ids
+
     read = LeadReadReceipt.objects.filter(user=user, lead=OuterRef("pk"))
+    # Убранное в личный архив («Скрыть») не зажигает бейдж: его нет в списке.
     return (
         crm_lead_queryset_for_user(user)
+        .exclude(pk__in=hidden_ids(user, "lead"))
         .filter(~Exists(read))
         .count()
     )
@@ -68,10 +72,17 @@ def unread_sale_request_count(user) -> int:
     from submissions.models import SaleRequestReadReceipt
     from users.permissions import crm_sale_request_queryset_for_user
 
+    from common.crm_bulk import hidden_ids
+
     read = SaleRequestReadReceipt.objects.filter(
         user=user, sale_request=OuterRef("pk")
     )
-    return crm_sale_request_queryset_for_user(user).filter(~Exists(read)).count()
+    return (
+        crm_sale_request_queryset_for_user(user)
+        .exclude(pk__in=hidden_ids(user, "sale_request"))
+        .filter(~Exists(read))
+        .count()
+    )
 
 
 def unread_counts_for_user(user) -> dict:

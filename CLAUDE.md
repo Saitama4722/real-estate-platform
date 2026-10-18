@@ -422,9 +422,41 @@ deliberately no `is_read` boolean anywhere, so "read" cannot be expressed halfwa
 - **Realtors only** (`role=realtor`). `user_gets_unread_indicator()` is the ONE
   definition, mirrored in `lib/employeeUser.ts: roleGetsUnreadIndicator`. Staff
   roles get honest zeros, not a 403.
-- **Delivery is POLLING, 30s, `GET /api/crm/notifications/unread-counts/`** —
-  counts only, no item data. **Do not introduce Channels or a WebSocket layer**
-  (no ASGI server here, owner decision). Hidden tab → no polling.
+- **Delivery is POLLING, 15s (was 30s until 2026-10-18),
+  `GET /api/crm/notifications/unread-counts/`** — counts only, no item data,
+  `Cache-Control: no-store` (it sent no cache header at all before). Plus an
+  immediate poll on tab return, on window focus and after every action.
+  **Do not introduce Channels or a WebSocket layer** (no ASGI server here,
+  owner decision). Hidden tab → no polling.
+- **ONE read state for the bell, the sidebar badge and the row dots
+  (2026-10-18).** «Прочитано» anywhere (opening an item, a bell click, «Прочитать
+  все», bulk «Отметить прочитанными») writes the READ RECEIPT and marks the
+  item's bell notifications read, server-side (`common.crm_bulk.mark_items_read`).
+  Before this, «Прочитать все» cleared only the bell, and the sidebar badge
+  and dots never went out: that was the «бейдж не гаснет» bug. Client side,
+  `lib/crmUnreadCounts.ts` applies the change optimistically, then confirms;
+  every counts change fires `CRM_READ_STATE_EVENT`, and the tables re-read
+  their rows on it (`useCrmReadStateRefresh`). ⚠ A poll that started BEFORE an
+  optimistic change is discarded (`generation`): `[measured]` without it the
+  sidebar badge bounced back after a bulk mark-read.
+  `[measured]` locally: a new lead lit up the bell, the badge and the dots in
+  11.6 s without a reload; bulk mark-read dropped all three in 217 ms.
+- ⚠ **`AccountSidebar` and the header BOTH call `configureCrmUnread` — both
+  must pass `userId`.** The sidebar used not to, and the store flipped between
+  the user and `null`, resetting counts and firing two polls in the same
+  second `[measured]`. `userId: undefined` now means "keep the current one".
+- **Bulk actions** (`common/crm_bulk.py`, both lists): `POST …/bulk-mark-read/`,
+  `…/bulk-hide/`, `…/bulk-unhide/` and `…/bulk-delete/`, with `{"ids": [...]}`
+  or `{"all": true}`. `all` uses the list's own query params, which is how
+  «Отметить все прочитанными» works. Every id is checked against the user's
+  own list queryset, all-or-nothing in one transaction (one forbidden id →
+  403, nothing changes). **«Скрыть» = a PER-USER archive** (`CrmHiddenItem`,
+  realtors only, own or free items). Nothing is deleted, hidden items leave
+  that realtor's list and counts, and the «Архив» filter (`?scope=archive`)
+  shows and restores them. **Bulk delete = superadmin/admin only**, with a
+  confirmation («Удалить N заявок без возможности восстановления?») and an
+  `EmployeeActivityLog` entry (`bulk_delete_leads` /
+  `bulk_delete_sale_requests`, `details` = count + ids, no client data).
 - **The header indicator is the BELL (2026-10-18), not a badge on the avatar.**
   The unread counts stay in the cabinet sidebar; the header shows the bell's
   own count (see the queue section below). Its badge is `absolute` inside the
@@ -482,9 +514,10 @@ change status, delete, and reassign in Django admin.
   - taken → other realtors' rows are **deleted** (they would 404);
   - returned → every other realtor is notified again.
 - **API:** `GET /api/crm/notifications/` (own, last 24 h, newest 20),
-  `POST …/<id>/mark-read/`, `POST …/mark-all-read/`. The existing 30 s poll
-  `unread-counts/` also returns `notifications` and `latest_notification_id`,
-  so there is still ONE poll. Bell clicks open `/account/inquiries?lead=<id>`
+  `POST …/<id>/mark-read/`, `POST …/mark-all-read/`. Both mark-read calls
+  also write the items' read receipts (one read state, see above). The 15 s
+  poll `unread-counts/` also returns `notifications` and
+  `latest_notification_id`, so there is still ONE poll. Bell clicks open `/account/inquiries?lead=<id>`
   (expands that lead) or `/account/sale-requests/<id>`.
 - **Cleanup:** celery-beat `common.purge_old_crm_notifications` at 04:15
   deletes notifications older than 7 days. Leads are never deleted.
@@ -495,7 +528,8 @@ change status, delete, and reassign in Django admin.
   390, 1024, 1040, 1100, 1279, 1280, 1439, 1440 and 1600 `[measured]`. Below
   `sm` the dropdown is `fixed inset-x-4`: anchored to the bell, it spilled off
   the LEFT edge at 390px, which `scrollWidth` cannot see.
-- Tests: `backend/common/tests_crm_queue.py` (24).
+- Tests: `backend/common/tests_crm_queue.py` (33: queue, bell, bulk, unified
+  read state, no-store).
 
 ---
 

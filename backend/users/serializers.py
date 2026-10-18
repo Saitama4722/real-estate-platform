@@ -405,6 +405,7 @@ class EmployeeActivityLogSerializer(serializers.ModelSerializer):
             "user_display_name",
             "action_type",
             "action_label",
+            "details",
             "created_at",
             "ip_address",
             "user_agent",

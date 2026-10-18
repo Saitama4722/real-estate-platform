@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 
 from common import crm_notify
+from common.crm_bulk import CrmBulkActionsMixin, hidden_ids
 from common.crm_unread import annotate_sale_request_unread, mark_sale_request_read
 from users.permissions import IsCrmUser, crm_sale_request_queryset_for_user
 
@@ -108,6 +109,7 @@ class PublicSaleRequestViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet)
 
 
 class CrmSaleRequestViewSet(
+    CrmBulkActionsMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
@@ -151,11 +153,39 @@ class CrmSaleRequestViewSet(
         if st:
             qs = qs.filter(status=st)
         scope = self.request.query_params.get("scope")
+        # Personal archive («Скрыть»): list and bulk only; the detail page and
+        # actions still see hidden ones, otherwise nothing could be restored.
+        if self.action == "list" or (self.action or "").startswith("bulk_"):
+            hidden = hidden_ids(self.request.user, "sale_request")
+            qs = qs.filter(pk__in=hidden) if scope == "archive" else qs.exclude(pk__in=hidden)
         if scope == "free":
             qs = qs.filter(assigned_realtor__isnull=True)
         elif scope == "mine":
             qs = qs.filter(assigned_realtor=self.request.user)
         return qs
+
+    # --- bulk actions (common.crm_bulk) -----------------------------------
+    bulk_kind = "sale_request"
+    bulk_label = "заявок на продажу"
+
+    def bulk_access_queryset(self):
+        return crm_sale_request_queryset_for_user(self.request.user)
+
+    @action(detail=False, methods=["post"], url_path="bulk-mark-read")
+    def bulk_mark_read_action(self, request):
+        return self.bulk_mark_read(request)
+
+    @action(detail=False, methods=["post"], url_path="bulk-hide")
+    def bulk_hide_action(self, request):
+        return self.bulk_hide(request)
+
+    @action(detail=False, methods=["post"], url_path="bulk-unhide")
+    def bulk_unhide_action(self, request):
+        return self.bulk_unhide(request)
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete_action(self, request):
+        return self.bulk_delete(request)
 
     def _require_owned(self, sale_request):
         user = self.request.user

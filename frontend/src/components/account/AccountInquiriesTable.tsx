@@ -4,12 +4,21 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { fetchWithCrmAuthRetry, getCrmAccessToken } from "@/lib/crmAuth";
-import { returnCrmItem, takeCrmItem, type CrmQueueScope } from "@/lib/crmQueue";
-import { refreshCrmUnreadCounts } from "@/lib/crmUnreadCounts";
+import { crmBulk, returnCrmItem, takeCrmItem, type CrmQueueScope } from "@/lib/crmQueue";
+import {
+  applyCrmReadOptimistic,
+  refreshCrmUnreadCounts,
+  useCrmReadStateRefresh,
+} from "@/lib/crmUnreadCounts";
 import { isCabinetAdminRole, roleGetsUnreadIndicator } from "@/lib/employeeUser";
 import { cn } from "@/lib/utils";
 import { useEmployeeUser } from "@/components/account/EmployeeAuthContext";
-import { FreeBadge, QueueScopeFilter } from "@/components/account/CrmQueueControls";
+import {
+  CrmBulkToolbar,
+  FreeBadge,
+  QueueScopeFilter,
+  confirmBulkDelete,
+} from "@/components/account/CrmQueueControls";
 
 import { usePageLoading } from "@/components/layout/pageLoadingSignal";
 
@@ -338,6 +347,9 @@ export function AccountInquiriesTable() {
     isAdmin || (user.crm_capabilities?.change_status ?? false);
 
   const [rows, setRows] = useState<LeadRow[] | null>(null);
+  /** Current rows for callbacks that must read them synchronously. */
+  const rowsRef = useRef<LeadRow[] | null>(null);
+  rowsRef.current = rows;
 
   /* Holds the global navigation indicator until the content the user
      navigated for is really on screen. A skeleton is not a loaded page.
@@ -511,6 +523,13 @@ export function AccountInquiriesTable() {
     return () => clearInterval(id);
   }, [canView, pollLeads]);
 
+  /* The bell / sidebar store changed (new notification found by the 15 s
+     poll, «Прочитать все», a bulk action) → re-read the rows so the unread
+     dots follow the same single source. */
+  useCrmReadStateRefresh(() => {
+    void pollLeads();
+  });
+
   useEffect(() => {
     if (!isAdmin) return;
     let cancelled = false;
@@ -572,17 +591,87 @@ export function AccountInquiriesTable() {
           ? prev
           : prev.map((r) => (r.id === id_ ? { ...r, is_unread: value } : r)),
       );
+    const wasUnread = Boolean(rowsRef.current?.find((r) => r.id === id)?.is_unread);
     setUnread(id, false);
+    // The sidebar badge and the bell drop immediately, then the poll confirms.
+    if (wasUnread) applyCrmReadOptimistic({ inquiries: 1 });
     try {
       const res = await fetchWithCrmAuthRetry(`/api/crm/leads/${id}/mark-read/`, {
         method: "POST",
       });
       if (!res.ok) throw new Error("mark-read failed");
-      refreshCrmUnreadCounts();
     } catch {
       setUnread(id, true);
     }
+    applyCrmReadOptimistic({}); // confirm with the server either way
   }, []);
+
+  /* ---------------- Bulk selection and actions (common/crm_bulk.py) ---------- */
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  useEffect(() => {
+    setSelected(new Set());
+  }, [query]);
+
+  const toggleOne = (id: number) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const allOnPageSelected = (rows ?? []).length > 0 && (rows ?? []).every((r) => selected.has(r.id));
+  const toggleAll = () =>
+    setSelected(allOnPageSelected ? new Set() : new Set((rows ?? []).map((r) => r.id)));
+
+  const runBulk = async (
+    action: "mark-read" | "hide" | "unhide" | "delete",
+    target: { ids: number[] } | { all: true },
+  ) => {
+    setBulkBusy(true);
+    setError("");
+    setNotice("");
+    const affected = "ids" in target ? new Set(target.ids) : new Set((rows ?? []).map((r) => r.id));
+    const unreadAffected = (rows ?? []).filter((r) => affected.has(r.id) && r.is_unread).length;
+    // Optimistic: dots, sidebar badge and bell change before the network answers.
+    if (action === "mark-read" || action === "hide") {
+      setRows((prev) =>
+        prev === null ? prev : prev.map((r) => (affected.has(r.id) ? { ...r, is_unread: false } : r)),
+      );
+      applyCrmReadOptimistic({ inquiries: unreadAffected, notifications: unreadAffected });
+    }
+    const res = await crmBulk("lead", action, target, query);
+    setBulkBusy(false);
+    if (!res.ok) {
+      setError(res.message);
+      void pollLeads();
+      applyCrmReadOptimistic({}); // undo the optimistic drop with the server's truth
+      return;
+    }
+    const done = new Set(res.ids);
+    if (action === "hide" || action === "unhide" || action === "delete") {
+      setRows((prev) => (prev === null ? prev : prev.filter((r) => !done.has(r.id))));
+    }
+    setSelected(new Set());
+    setNotice(
+      {
+        "mark-read": `Отмечено прочитанными: ${res.count}.`,
+        hide: `Скрыто: ${res.count}. Их можно вернуть из «Архива».`,
+        unhide: `Возвращено из архива: ${res.count}.`,
+        delete: `Удалено: ${res.count}.`,
+      }[action],
+    );
+    applyCrmReadOptimistic({});
+  };
+
+  const selectedIds = () => [...selected];
+  const onBulkDelete = () => {
+    const ids = selectedIds();
+    if (!ids.length || !confirmBulkDelete(ids.length)) return;
+    void runBulk("delete", { ids });
+  };
 
   /** «Взять в работу». Проигравший гонку получает 409 — строка уходит из его
       списка, потому что заявка теперь чужая. */
@@ -704,7 +793,7 @@ export function AccountInquiriesTable() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1 text-xs font-medium text-slate-600">
           Заявки
-          <QueueScopeFilter value={scope} onChange={setScope} />
+          <QueueScopeFilter value={scope} onChange={setScope} showArchive={isRealtor} />
         </div>
         <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
           Статус
@@ -743,13 +832,41 @@ export function AccountInquiriesTable() {
       {error && <p className="text-sm text-red-600">{error}</p>}
       {notice && !error && <p className="text-sm text-emerald-700">{notice}</p>}
 
+      {rows.length > 0 ? (
+        <CrmBulkToolbar
+          selectedCount={selected.size}
+          busy={bulkBusy}
+          isRealtor={isRealtor}
+          isStaff={isAdmin}
+          inArchive={scope === "archive"}
+          onMarkRead={() => void runBulk("mark-read", { ids: selectedIds() })}
+          onMarkAllRead={() => void runBulk("mark-read", { all: true })}
+          onHide={() => void runBulk("hide", { ids: selectedIds() })}
+          onUnhide={() => void runBulk("unhide", { ids: selectedIds() })}
+          onDelete={onBulkDelete}
+          onClear={() => setSelected(new Set())}
+        />
+      ) : null}
+
       {rows.length === 0 ? (
-        <p className="text-sm text-slate-600">Заявок по выбранным фильтрам нет.</p>
+        <p className="text-sm text-slate-600">
+          {scope === "archive" ? "В архиве пусто." : "Заявок по выбранным фильтрам нет."}
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
           <table className="min-w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="w-10 px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    aria-label="Выбрать все"
+                    title="Выбрать все"
+                    checked={allOnPageSelected}
+                    onChange={toggleAll}
+                    className="h-4 w-4 cursor-pointer accent-blue-600"
+                  />
+                </th>
                 <th className="px-3 py-2.5">Имя</th>
                 <th className="px-3 py-2.5">Телефон</th>
                 <th className="px-3 py-2.5">Сообщение</th>
@@ -775,6 +892,15 @@ export function AccountInquiriesTable() {
                       "bg-amber-50/90 shadow-[inset_3px_0_0_0] shadow-amber-400",
                   )}
                 >
+                  <td className="px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      aria-label={`Выбрать заявку ${r.client_name}`}
+                      checked={selected.has(r.id)}
+                      onChange={() => toggleOne(r.id)}
+                      className="h-4 w-4 cursor-pointer accent-blue-600"
+                    />
+                  </td>
                   <td className="px-3 py-2.5 font-medium text-slate-900">
                     <div className="flex flex-wrap items-center gap-2">
                       {/* Маркер НЕПРОЧИТАННОГО: точка цвета внимания + жирное
@@ -884,6 +1010,19 @@ export function AccountInquiriesTable() {
                           Вернуть в общие
                         </button>
                       ) : null}
+                      {/* Личный архив: свою или свободную можно скрыть у себя. */}
+                      {isRealtor ? (
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline disabled:opacity-50"
+                          disabled={bulkBusy}
+                          onClick={() =>
+                            void runBulk(scope === "archive" ? "unhide" : "hide", { ids: [r.id] })
+                          }
+                        >
+                          {scope === "archive" ? "Вернуть из архива" : "Скрыть"}
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                   <td className="px-3 py-2.5">
@@ -910,7 +1049,7 @@ export function AccountInquiriesTable() {
                 </tr>
                 {expandedLeadId === r.id ? (
                   <tr className="border-b border-slate-100 bg-slate-50/50">
-                    <td colSpan={8} className="p-0">
+                    <td colSpan={9} className="p-0">
                       <LeadNotesHistoryPanel
                         leadId={r.id}
                         viewer={{

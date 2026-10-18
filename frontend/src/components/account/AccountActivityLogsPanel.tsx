@@ -19,6 +19,8 @@ type ActivityRow = {
   user_display_name: string;
   action_type: string;
   action_label: string;
+  /** Пояснение к действию, например «3 заявки: #4, #7, #9» (массовое удаление). */
+  details?: string;
   created_at: string;
   ip_address: string | null;
   user_agent: string;
@@ -180,7 +182,12 @@ export function AccountActivityLogsPanel() {
                     <div className="font-medium text-slate-900">{r.user_display_name}</div>
                     <div className="text-xs text-slate-500">{r.user_email}</div>
                   </td>
-                  <td className="px-4 py-3 text-slate-800">{r.action_label}</td>
+                  <td className="px-4 py-3 text-slate-800">
+                    {r.action_label}
+                    {r.details ? (
+                      <span className="block text-xs text-slate-500">{r.details}</span>
+                    ) : null}
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatWhen(r.created_at)}</td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.ip_address ?? "—"}</td>
                 </tr>

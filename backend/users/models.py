@@ -225,6 +225,13 @@ class EmployeeActivityLog(models.Model):
         UNLOCK = "unlock", "Снятие блокировки"
         #: Суперадмин принудительно завершил все сессии сотрудника.
         SESSIONS_TERMINATED = "sessions_terminated", "Завершение сессий"
+        #: Массовое удаление заявок (только суперадмин/админ). Что именно
+        #: удалено — в `details` (количество и id).
+        BULK_DELETE_LEADS = "bulk_delete_leads", "Массовое удаление заявок"
+        BULK_DELETE_SALE_REQUESTS = (
+            "bulk_delete_sale_requests",
+            "Массовое удаление заявок на продажу",
+        )
 
     class FailureReason(models.TextChoices):
         BAD_CREDENTIALS = "bad_credentials", "Неверные данные"
@@ -273,6 +280,9 @@ class EmployeeActivityLog(models.Model):
         choices=FailureReason.choices,
         blank=True,
     )
+    #: Короткое пояснение к действию, например «3 заявки: #4, #7, #9» для
+    #: массового удаления. Никаких персональных данных клиентов.
+    details = models.CharField("Подробности", max_length=500, blank=True)
     created_at = models.DateTimeField("Дата и время", auto_now_add=True, db_index=True)
     ip_address = models.GenericIPAddressField(
         "IP-адрес",

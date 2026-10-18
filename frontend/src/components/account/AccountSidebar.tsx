@@ -96,8 +96,11 @@ export function AccountSidebar() {
     configureCrmUnread({
       isRealtor: showUnread,
       soundEnabled: user.crm_notify_sound_enabled,
+      // Always the real id: without it the store flipped between this user and
+      // null on every render pair, resetting counts and doubling the poll.
+      userId: user.id,
     });
-  }, [showUnread, user.crm_notify_sound_enabled]);
+  }, [showUnread, user.crm_notify_sound_enabled, user.id]);
 
   const visible = NAV_ITEMS.filter((item) => !item.adminOnly || showAdminNav);
 
