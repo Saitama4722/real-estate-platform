@@ -6,9 +6,9 @@ import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Политика обработки персональных данных — Centreal",
+    title: "Политика обработки персональных данных — ЦЕНТРЕАЛЪ",
     description:
-      "Какие персональные данные собирает сайт Centreal, цели обработки, сроки хранения и права пользователей.",
+      "Какие персональные данные собирает сайт ЦЕНТРЕАЛЪ, цели обработки, сроки хранения и права пользователей.",
     alternates: { canonical: `${siteOrigin()}/privacy` },
   };
 }
@@ -32,7 +32,7 @@ export default function PrivacyPage() {
             </h2>
             <p className="text-sm md:text-base leading-relaxed">
               Настоящая Политика обработки персональных данных (далее — Политика) определяет порядок
-              обработки персональных данных пользователей сайта Centreal (далее — Сайт).
+              обработки персональных данных пользователей сайта ЦЕНТРЕАЛЪ (далее — Сайт).
               Оператором персональных данных является владелец Сайта.
             </p>
             <p className="text-sm md:text-base leading-relaxed mt-2">
