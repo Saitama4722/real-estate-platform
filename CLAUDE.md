@@ -99,7 +99,19 @@ template is `deploy/.env.prod.example`. The real `deploy/.env.prod` and
   not by us: `A @` → 217.114.1.193, `www` is a CNAME to it, no AAAA, no CAA.
   Yandex mail records exist there too, and so do old district CNAME subdomains.
   Don't touch either. Ask the owner for any DNS change.
-- `MEDIA_STORAGE_BACKEND=local`, `LEADS_NOTIFICATIONS_ENABLED=False`. All 7 services are up and backend is
+- **Telegram lead notifications are ON in prod since 2026-10-18**
+  (`LEADS_NOTIFICATIONS_ENABLED=True`). `TELEGRAM_BOT_TOKEN` and
+  `TELEGRAM_CHAT_ID` were copied from the laptop's local `backend/.env`
+  (same bot, same supergroup), piped over ssh stdin and never printed. The
+  previous env is at `/root/env.prod.before-telegram.2026-10-18-101423`.
+  `[measured]` end to end: a public `POST /api/leads/` (lead #2, «Тест
+  Пидтест», then deleted; counts back to baseline, real lead #1 untouched) →
+  celery `send_lead_telegram_notification` received → «Telegram lead
+  notification sent» in 1.1 s; `getChat` → `ok=True`, type supergroup.
+  ⚠ Copying env values from Windows: Python's text-mode stdout turns `\n`
+  into `\r\n`, so strip `\r` on the server (`settings.py` `.strip()`s these
+  vars anyway).
+- `MEDIA_STORAGE_BACKEND=local`. All 7 services are up and backend is
   healthy `[measured]`. One superadmin (pk 1) was created by
   `create_initial_admin`; `INITIAL_ADMIN_PASSWORD` was then removed from the env.
 - **Data:** only the public content is loaded, from **fixtures `01_locations` +
