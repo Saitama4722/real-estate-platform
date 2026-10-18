@@ -146,6 +146,25 @@ template is `deploy/.env.prod.example`. The real `deploy/.env.prod` and
   interface (`198.18.0.1`) accepts every TCP connection, so even random ports
   look "open". Check exposure ON the server (`ss -tln`, Docker port mappings,
   connecting to the public IP from the host).
+- **⛔ NEVER prune or remove Docker VOLUMES on the server.** The database
+  (`centreal_pgdata`) and media (`centreal_media`) are volumes; Redis's
+  `/data` is an anonymous one. Forbidden: `docker system prune -a`,
+  `docker volume prune`, `docker volume rm`, `dc down -v`. Allowed: only
+  `docker image prune -f` (dangling) and `docker builder prune -f --filter
+  until=…`. Record the volume sizes before any cleanup and compare after.
+- **Disk hygiene (2026-10-18), `deploy/README.md` §8.** A weekly cron
+  `/etc/cron.d/centreal-docker-hygiene` (Sunday 02:00 UTC = 05:00 Moscow;
+  the server clock is UTC) runs `/usr/local/sbin/centreal-docker-hygiene.sh`:
+  dangling images plus build cache older than 7 days, logged to
+  `/var/log/centreal-docker-hygiene.log` (the last 200 lines). Container logs
+  are capped in `docker-compose.prod.yml` (`x-logging`: json-file, 10m × 3,
+  every service). journald is capped at `SystemMaxUse=200M`. `[measured]` the
+  one-time cleanup: `/` 11G → 8.8G used of 38G; build cache 4.18 → 2.97 GB
+  (the last 24 h kept); apt cache 345M → 28K; volumes byte-identical. Build
+  cache is what grows: about 1–1.5 GB per full rebuild.
+- **Kernel:** running 6.8.0-146, while 6.8.0-147 is installed and boots on
+  the next reboot. There was no old kernel to remove (`autoremove` would
+  remove nothing). Don't remove 147.
 - **⚠ Remote scripts:** in `ssh … 'bash -s' <<EOF`, give every
   `docker compose exec -T` a `</dev/null`. Otherwise it swallows the rest of
   the script from stdin and the remaining commands silently never run.

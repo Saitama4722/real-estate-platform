@@ -1,0 +1,6 @@
+# Installed as /etc/cron.d/centreal-docker-hygiene (see deploy/README.md).
+# Sunday 05:00 Europe/Moscow = Sunday 02:00 UTC. The server clock is UTC, and
+# Ubuntu's cron does not support a per-job time zone, hence the shift.
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 2 * * 0 root /usr/local/sbin/centreal-docker-hygiene.sh

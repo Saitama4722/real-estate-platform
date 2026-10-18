@@ -14,6 +14,16 @@
 
 name: centreal
 
+# Container log rotation for EVERY service (2026-10-18): json-file, at most
+# 3 files of 10 MB each per container. Before this, logs were unbounded
+# (caddy's had reached 19 MB in 12 days). Changing only `logging` needs
+# `up -d` (container recreate), not a rebuild.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 x-django-env: &django-env
   # ⚠ Marks the process as DEPLOYED (config/settings.py → IS_DEPLOYED): makes
   # DJANGO_SECRET_KEY mandatory, refuses DJANGO_DEBUG=True, and makes
@@ -56,6 +66,7 @@ x-django-service: &django-service
     dockerfile: Dockerfile
   image: centreal-backend:latest
   restart: unless-stopped
+  logging: *default-logging
   environment: *django-env
   volumes:
     # Used only when MEDIA_STORAGE_BACKEND=local (Caddy serves it read-only).
@@ -71,6 +82,7 @@ services:
   db:
     image: postgres:18
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
@@ -92,6 +104,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *default-logging
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     networks: [data]
     healthcheck:
@@ -148,6 +161,7 @@ services:
         BACKEND_URL: http://backend:8000
     image: centreal-frontend:latest
     restart: unless-stopped
+    logging: *default-logging
     environment:
       # Server-side fetches read it at RUNTIME too (lib/publicProperty.ts).
       BACKEND_URL: http://backend:8000
@@ -163,6 +177,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *default-logging
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
       # Empty = the Caddyfile's inert defaults (IP-only mode).

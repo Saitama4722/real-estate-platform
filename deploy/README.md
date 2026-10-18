@@ -215,3 +215,41 @@ dc down                                             # остановить вс�
 ```
 
 > ⛔ Никогда не выполнять `dc down -v` — флаг `-v` удаляет тома, то есть **базу данных**.
+
+## 8. Место на диске и автоматическая очистка
+
+База (`centreal_pgdata`) и медиа (`centreal_media`) лежат в **томах Docker**.
+
+> ⛔ Никогда не выполнять `docker system prune -a`, `docker volume prune`,
+> `docker volume rm` и `dc down -v`: они удаляют тома, то есть базу и файлы.
+> Удалять можно только то, чем ничего не пользуется: висячие образы и старый
+> кэш сборки.
+
+Ручная очистка (безопасная):
+
+```bash
+df -h / && docker system df                       # что занимает место
+docker image prune -f                             # висячие образы старых сборок
+docker builder prune -f --filter until=24h        # кэш сборки старше суток
+journalctl --vacuum-size=200M
+apt-get clean
+```
+
+Автоматика (уже установлена 2026-10-18; повторить на новом сервере):
+
+```bash
+cd /opt/centreal
+install -m 755 deploy/docker-hygiene.sh /usr/local/sbin/centreal-docker-hygiene.sh
+install -m 644 deploy/centreal-docker-hygiene.cron /etc/cron.d/centreal-docker-hygiene
+mkdir -p /etc/systemd/journald.conf.d
+install -m 644 deploy/journald-centreal.conf /etc/systemd/journald.conf.d/99-centreal.conf
+systemctl restart systemd-journald
+```
+
+- **Каждое воскресенье в 05:00 по Москве** (02:00 UTC) скрипт удаляет висячие
+  образы и кэш сборки старше 7 дней. Журнал: `/var/log/centreal-docker-hygiene.log`
+  (последние 200 строк).
+- **Логи контейнеров** ограничены в `docker-compose.prod.yml` (`x-logging`):
+  3 файла по 10 МБ на контейнер. Изменение только `logging` применяется
+  командой `dc up -d`, пересборка не нужна.
+- **Журнал systemd** ограничен 200 МБ.
