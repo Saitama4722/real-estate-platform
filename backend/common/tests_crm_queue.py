@@ -460,3 +460,43 @@ class BulkActionsAndUnifiedReadTests(QueueTestBase):
         self.c1.post("/api/crm/sale-requests/bulk-hide/", {"ids": [sr.pk]}, format="json")
         self.assertEqual(self._rows(self.c1.get("/api/crm/sale-requests/").data), [])
         self.assertEqual(len(self._rows(self.c1.get("/api/crm/sale-requests/?scope=archive").data)), 1)
+
+
+class ActivityLogSurvivesAccountDeletionTests(QueueTestBase):
+    """EmployeeActivityLog.user is SET_NULL: audit rows outlive the account."""
+
+    def test_bulk_delete_audit_survives_and_shows_deleted_user(self):
+        from users.models import EmployeeActivityLog
+
+        admin = _make_user("adm-audit@test.local", User.Role.ADMIN)
+        ca = APIClient()
+        ca.force_authenticate(admin)
+        lead = self._free_lead()
+        self.assertEqual(
+            ca.post("/api/crm/leads/bulk-delete/", {"ids": [lead.pk]}, format="json").status_code, 200
+        )
+        log = EmployeeActivityLog.objects.get(
+            action_type=EmployeeActivityLog.ActionType.BULK_DELETE_LEADS
+        )
+        admin.delete()
+        log.refresh_from_db()  # still there
+        self.assertIsNone(log.user_id)
+        self.assertIn(f"#{lead.pk}", log.details)
+        rows = self.csa.get("/api/crm/activity-logs/").data
+        rows = rows if isinstance(rows, list) else rows.get("results", [])
+        row = next(r for r in rows if r["id"] == log.pk)
+        self.assertEqual(row["user_display_name"], "удалённый пользователь")
+        self.assertEqual(row["user_email"], "")
+        self.assertIsNone(row["user"])
+
+    def test_failed_login_by_unknown_email_still_shows_the_typed_address(self):
+        from users.models import EmployeeActivityLog
+
+        EmployeeActivityLog.objects.create(
+            user=None, action_type=EmployeeActivityLog.ActionType.LOGIN_FAILED,
+            attempted_email="nobody@example.invalid", reason="bad_credentials",
+        )
+        rows = self.csa.get("/api/crm/activity-logs/").data
+        rows = rows if isinstance(rows, list) else rows.get("results", [])
+        row = next(r for r in rows if r["user_email"] == "nobody@example.invalid")
+        self.assertEqual(row["user_display_name"], "nobody@example.invalid")

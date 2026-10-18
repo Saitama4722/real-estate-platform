@@ -380,6 +380,10 @@ class ChangeOwnEmailSerializer(serializers.Serializer):
         return value
 
 
+#: Label for an activity-log row whose account has been deleted.
+DELETED_USER_LABEL = "удалённый пользователь"
+
+
 class EmployeeActivityLogSerializer(serializers.ModelSerializer):
     """Список журнала активности для CRM (только чтение администратором).
 
@@ -424,7 +428,9 @@ class EmployeeActivityLogSerializer(serializers.ModelSerializer):
     def get_user_display_name(self, obj):
         user = obj.user if obj.user_id is not None else None
         if user is None:
-            return obj.attempted_email or "Неизвестный пользователь"
+            # No user and no typed address = the account was deleted after the
+            # fact (the FK is SET_NULL so audit rows survive it).
+            return obj.attempted_email or DELETED_USER_LABEL
         name = f"{user.first_name} {user.last_name}".strip()
         return name or user.email
 

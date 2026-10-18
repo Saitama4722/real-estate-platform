@@ -179,7 +179,17 @@ export function AccountActivityLogsPanel() {
               rows.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50/80">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{r.user_display_name}</div>
+                    {/* user === null and no typed email = a deleted account; the
+                        audit row survives (FK is SET_NULL) and says so. */}
+                    <div
+                      className={
+                        r.user === null && !r.user_email
+                          ? "font-medium italic text-slate-500"
+                          : "font-medium text-slate-900"
+                      }
+                    >
+                      {r.user_display_name}
+                    </div>
                     <div className="text-xs text-slate-500">{r.user_email}</div>
                   </td>
                   <td className="px-4 py-3 text-slate-800">

@@ -457,6 +457,11 @@ deliberately no `is_read` boolean anywhere, so "read" cannot be expressed halfwa
   confirmation («Удалить N заявок без возможности восстановления?») and an
   `EmployeeActivityLog` entry (`bulk_delete_leads` /
   `bulk_delete_sale_requests`, `details` = count + ids, no client data).
+  **`EmployeeActivityLog.user` is `SET_NULL` (2026-10-18, was CASCADE)**, so
+  audit rows survive the account's deletion. The log UI then says «удалённый
+  пользователь» (a null user with an `attempted_email` is still a failed login
+  for an unknown address). Migration `users/0012` is SQL no-op: Django
+  enforces `on_delete` itself.
 - **The header indicator is the BELL (2026-10-18), not a badge on the avatar.**
   The unread counts stay in the cabinet sidebar; the header shows the bell's
   own count (see the queue section below). Its badge is `absolute` inside the
