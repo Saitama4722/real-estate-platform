@@ -162,6 +162,27 @@ template is `deploy/.env.prod.example`. The real `deploy/.env.prod` and
   one-time cleanup: `/` 11G → 8.8G used of 38G; build cache 4.18 → 2.97 GB
   (the last 24 h kept); apt cache 345M → 28K; volumes byte-identical. Build
   cache is what grows: about 1–1.5 GB per full rebuild.
+- **Database backups (2026-10-18), `deploy/README.md` §9.** A daily cron
+  `/etc/cron.d/centreal-db-backup` (00:30 UTC = 03:30 Moscow) runs
+  `/usr/local/sbin/centreal-db-backup.sh` (source `deploy/db-backup.sh`). It
+  writes `pg_dump -Fc` to `/root/backups/real_estate_db-YYYY-MM-DD.dump`
+  (dir 700, files 600; the date is Moscow's), verifies it with `pg_restore
+  --list`, keeps the newest 14 daily + 8 Sunday dumps (only that exact name
+  pattern is ever deleted), logs to `/var/log/centreal-db-backup.log`, and on
+  failure alerts the Telegram group. The token goes to curl via `-K -` on
+  stdin, never on argv. `[measured]` first run: 264 934 B, 507 TOC entries,
+  0.7 s. The rotation was tested on 60 fake files: 20 kept (14 newest + 8
+  Sundays), 40 removed, 4 non-matching decoys untouched. The alert transport
+  was checked with a read-only `getChat` (ok, supergroup); no fake alert was
+  sent to the group.
+  - **Restore test:** `bash deploy/db-restore-test.sh [dump]` restores into the
+    TEMPORARY `real_estate_db_restoretest`, compares 7 tables' row counts with
+    production and drops only that database (guarded against the production
+    name). `[measured]` 2026-10-18: leads 3, sale requests 0, users 2,
+    properties 0, cities 2, districts 89, articles 15, all equal. Databases
+    before and after: `postgres, real_estate_db`.
+  - **⚠ Off-site copy: NOT set up yet.** The dumps live on the same VPS, so
+    losing the server loses them too. See the proposal in the 2026-10-18 report.
 - **Kernel:** running 6.8.0-146, while 6.8.0-147 is installed and boots on
   the next reboot. There was no old kernel to remove (`autoremove` would
   remove nothing). Don't remove 147.

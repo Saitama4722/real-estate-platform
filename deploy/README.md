@@ -253,3 +253,54 @@ systemctl restart systemd-journald
   3 файла по 10 МБ на контейнер. Изменение только `logging` применяется
   командой `dc up -d`, пересборка не нужна.
 - **Журнал systemd** ограничен 200 МБ.
+
+## 9. Резервные копии базы (автоматически, каждый день)
+
+**Что делается:** каждый день в **03:30 по Москве** (00:30 UTC) скрипт
+`/usr/local/sbin/centreal-db-backup.sh` (исходник: `deploy/db-backup.sh`)
+снимает `pg_dump -Fc` базы `real_estate_db` в
+`/root/backups/real_estate_db-ГГГГ-ММ-ДД.dump` (папка 700, файлы 600),
+проверяет его `pg_restore --list` и хранит **14 последних дневных + 8 последних
+воскресных** копий. Удаляются только файлы с именем ровно такого вида. Журнал:
+`/var/log/centreal-db-backup.log`. Если копия не создалась или не прошла
+проверку, в Telegram-группу (бот из `deploy/.env.prod`) уходит короткое
+сообщение.
+
+Установка (уже сделано 2026-10-18; повторить на новом сервере):
+
+```bash
+cd /opt/centreal
+install -m 700 deploy/db-backup.sh /usr/local/sbin/centreal-db-backup.sh
+install -m 644 deploy/centreal-db-backup.cron /etc/cron.d/centreal-db-backup
+/usr/local/sbin/centreal-db-backup.sh && tail -3 /var/log/centreal-db-backup.log
+```
+
+**Проверка копии (безопасно, раз в месяц):** восстанавливает свежую копию во
+**временную** базу `real_estate_db_restoretest`, сравнивает число строк
+ключевых таблиц с рабочей базой и удаляет только временную:
+
+```bash
+bash /opt/centreal/deploy/db-restore-test.sh                 # самая свежая копия
+bash /opt/centreal/deploy/db-restore-test.sh /root/backups/real_estate_db-2026-10-18.dump
+```
+
+**Восстановление рабочей базы из копии (авария).** ⚠ Заменяет ВСЕ данные в
+`real_estate_db` состоянием на момент копии. Сначала проверьте копию командой
+выше.
+
+```bash
+cd /opt/centreal
+dc stop backend celery celery-beat frontend                 # никто не пишет в базу
+/usr/local/sbin/centreal-db-backup.sh                        # копия ТЕКУЩЕГО состояния на всякий случай
+dc exec -T db pg_restore -U postgres -d real_estate_db --clean --if-exists --no-owner \
+  < /root/backups/real_estate_db-ГГГГ-ММ-ДД.dump
+dc up -d                                                     # миграции применятся при старте backend
+```
+
+Проверить после: `curl -sI https://centreal.ru/` → 200, число заявок/объектов
+в кабинете. ⛔ После восстановления копии с другого компьютера (дампа рабочего
+стола) — сразу смените пароли суперадминов (см. «Вариант А»).
+
+> Копии лежат на том же сервере, что и база: если пропадёт сервер, пропадут и
+> они. Регулярно забирайте копию куда-нибудь ещё (см. CLAUDE.md → «Резервные
+> копии»).
