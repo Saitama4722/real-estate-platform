@@ -130,7 +130,7 @@ export function AuthBrandPanel() {
       <div className="relative z-[1] flex h-full flex-col justify-between px-5 max-[1024px]:flex-row max-[1024px]:items-center min-[1025px]:px-20 min-[1025px]:py-14 md:max-[1024px]:px-8">
         <div className="flex items-center gap-3 max-[1024px]:gap-2.5">
           {/* Brand mark, WHITE version: the primary-blue mark has too little
-              contrast on this navy panel. alt="" — the "Centreal" text beside
+              contrast on this navy panel. alt="" — the "ЦЕНТРЕАЛЪ" text beside
               it already names the brand. */}
           <Image
             src="/brand/centreal-mark-white.svg"
@@ -142,8 +142,8 @@ export function AuthBrandPanel() {
             className="h-7 w-7 shrink-0 md:h-8 md:w-8 min-[1025px]:h-9 min-[1025px]:w-9"
           />
           <div>
-            <div className="text-[17px] leading-none font-bold tracking-[-0.02em] text-white md:text-[18px] min-[1025px]:text-[22px]">
-              Centreal
+            <div className="text-[17px] leading-none font-bold tracking-[0.04em] text-white md:text-[18px] min-[1025px]:text-[22px]">
+              ЦЕНТРЕАЛЪ
             </div>
             {/* Band-only subline; the desktop panel has the full headline below. */}
             <div className="mt-0.5 text-[12px] leading-[1.3] text-blue-200 md:text-[13px] min-[1025px]:hidden">

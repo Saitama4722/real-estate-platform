@@ -13,7 +13,7 @@ import {
 import { fetchPublicPropertiesListWithMeta } from "@/lib/publicPropertyList";
 
 const catalogSeoText =
-  "Каталог Centreal собрал предложения по продаже недвижимости в Краснодаре и Геленджике. В одном месте можно просматривать квартиры, дома, участки и коммерческие помещения, сравнивать стоимость и выбирать локацию под ваши задачи.";
+  "Каталог ЦЕНТРЕАЛЪ собрал предложения по продаже недвижимости в Краснодаре и Геленджике. В одном месте можно просматривать квартиры, дома, участки и коммерческие помещения, сравнивать стоимость и выбирать локацию под ваши задачи.";
 
 const catalogSeoLinks = [
   { label: "Купить квартиру в Краснодаре", href: "/krasnodar/kupit-kvartiru" },
@@ -27,7 +27,7 @@ const catalogSeoLinks = [
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Каталог недвижимости — Centreal",
+    title: "Каталог недвижимости — ЦЕНТРЕАЛЪ",
     description: catalogSeoText.slice(0, 160),
     alternates: { canonical: `${siteOrigin()}/catalog` },
   };

@@ -286,6 +286,24 @@ These are not suggestions. Each one has already caused damage.
 
 ## Brand assets (logo, icons, OG image)
 
+- **⭐ The brand name is «ЦЕНТРЕАЛЪ»** (since 2026-10-18): Cyrillic, all caps,
+  with the hard sign Ъ (U+042A, capital) at the end. It is used everywhere a
+  user sees the name: the logo, titles (`… — ЦЕНТРЕАЛЪ`), `openGraph.siteName`,
+  `applicationName`, the manifest, the footer ©, the login panel and SEO copy.
+  **The domain stays `centreal.ru`**, and so do emails, URLs, code identifiers,
+  `CENTREAL_*` env vars, `[Centreal]` log lines, repo/service names, the
+  Nominatim User-Agent (`Centreal/1.0`) and the C+R mark itself. Don't
+  "correct" any of those to Cyrillic, and don't write the brand in Latin in
+  new user-visible text.
+- **The lockups and the OG image are GENERATED**, not copied from the package:
+  `scripts/brand/build_wordmark.py` (Golos Text 600, cap height 27 of the
+  mark's 88, tracking +0.04em, fill `#0B1B3D` / white, viewBox 359.63×88) and
+  `scripts/brand/build_og.py` (SVG source `scripts/brand/og-image.svg`,
+  rendered with resvg). Both take `--font` = the Cyrillic Golos Text woff2
+  next/font self-hosts in `frontend/.next/static/media/` (the one whose cmap
+  has U+0426). Needs fonttools, brotli, uharfbuzz and resvg-py in a scratch
+  venv, not the project venv. Edit the scripts and re-run them; never
+  hand-edit the outputs.
 - **Source package:** `centreal-logo-package` (svg masters, png, web icons,
   social, brand sheet). It is meant to live OUTSIDE the repo and is read-only.
   ⚠ As of 2026-10-12 it actually sits UNTRACKED at
@@ -310,10 +328,13 @@ These are not suggestions. Each one has already caused damage.
   and `viewport.themeColor`). No raw `<link>` tags, and **no `app/favicon.ico`
   or `app/icon.*`**: the App Router auto-serves those and would emit a second,
   competing icon set. One set in `<head>` on `/` `[measured]`.
-- **Header logo size is constrained by the header fit:** 28px tall (99px wide,
-  the old wordmark's width) below 1280px, 32px from 1280. The 1024–1040
-  overflow with a favourite is pre-existing and unchanged by the logo
-  (`scrollWidth` 1047 logged out / 1038 logged in at 1024 `[measured]`).
+- **Header logo size is constrained by the header fit** (`SiteLogo` in
+  `components/layout/header.tsx`): 26px tall (106px wide) below 1280, 27px
+  (110px) at 1280–1439, 32px (131px) from 1440. With one favourite, logged
+  out `[measured 2026-10-18]`: `scrollWidth` 1054 at 1024 and 1040 (it was
+  1047 with the old 99px «Centreal» logo; 28px would give 1063), and clean at
+  390, 1100, 1279, 1280, 1439, 1440 and 1600. 28px at 1280 overflowed by 1px
+  and 32px by 17px. The 1024–1046 overflow itself is pre-existing.
 
 ---
 

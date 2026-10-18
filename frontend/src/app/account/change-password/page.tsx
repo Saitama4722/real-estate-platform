@@ -3,7 +3,7 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { ForcedPasswordChangeForm } from "@/components/auth/ForcedPasswordChangeForm";
 
 export const metadata: Metadata = {
-  title: "Смена пароля — Centreal",
+  title: "Смена пароля — ЦЕНТРЕАЛЪ",
   robots: { index: false, follow: false },
 };
 

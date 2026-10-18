@@ -17,14 +17,16 @@ const navLinks = [
 ];
 
 /**
- * The horizontal logo (mark + outlined wordmark, viewBox 311×88), from
- * public/brand/. `inverse` = the all-white version for the dark footer.
+ * The horizontal logo (mark + outlined ЦЕНТРЕАЛЪ wordmark, viewBox 359.63×88,
+ * built by scripts/brand/build_wordmark.py), from public/brand/. `inverse` =
+ * the all-white version for the dark footer.
  *
- * Height is set by the caller's className, width follows the 311:88 ratio.
- * ⚠ In the header it is 28px tall = 99px wide below 1280px, EXACTLY the old
- * text wordmark's width — the 1024–1139 band has no spare pixel (see the HEADER
- * FIT BAND in globals.css), so the logo must not grow there. Re-measure with a
- * favourite present before changing either size.
+ * Height is set by the caller's className, width follows the 360:88 ratio.
+ * ⚠ The header has no spare pixel (see the HEADER FIT BAND in globals.css).
+ * With one favourite [measured 2026-10-18]: 26px tall (106px wide) below 1280
+ * → scrollWidth 1054 at 1024/1040 (the old 99px logo gave 1047); 27px (110px)
+ * at 1280–1439, because 28px overflowed 1280 by 1px; 32px (131px) from 1440.
+ * Re-measure with a favourite present before changing any of these sizes.
  * `unoptimized`: an SVG gains nothing from the image optimizer, and the default
  * loader refuses SVG without `dangerouslyAllowSVG` anyway.
  */
@@ -40,8 +42,8 @@ export function SiteLogo({
   return (
     <Image
       src={inverse ? "/brand/logo-footer-reversed.svg" : "/brand/logo-header.svg"}
-      alt="Centreal"
-      width={311}
+      alt="ЦЕНТРЕАЛЪ"
+      width={360}
       height={88}
       unoptimized
       priority={priority}
@@ -79,7 +81,7 @@ export async function Header() {
           <Link href="/" className="shrink-0">
             {/* 28px (99px wide) below 1280 — the 1024–1279 rows have no slack;
                 32px (113px) from 1280, where the row has room to spare. */}
-            <SiteLogo priority className="h-7 min-[1280px]:h-8" />
+            <SiteLogo priority className="h-6.5 min-[1280px]:h-6.75 min-[1440px]:h-8" />
           </Link>
           <div className="flex min-w-0 items-center gap-2 lg:gap-4">
             {/* Desktop nav row. Hidden in favour of the hamburger (MobileNav)

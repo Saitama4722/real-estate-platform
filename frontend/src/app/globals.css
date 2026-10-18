@@ -1172,6 +1172,9 @@
    `cn()` trap documented in button-classes.ts). Unlayered rules win over any
    layer, deterministically.
 
+   ⚠ 2026-10-18: the ЦЕНТРЕАЛЪ logo is 106px here (was 99), so with one
+   favourite scrollWidth is 1054 at 1024/1040, not 1047 `[measured]`
+   (see SiteLogo in components/layout/header.tsx).
    ⚠ If a nav label is added or renamed, the 1047px intrinsic width moves.
    Re-measure: load /catalog at 1024–1100 and assert
    `document.documentElement.scrollWidth === innerWidth` (the exact sweep lives

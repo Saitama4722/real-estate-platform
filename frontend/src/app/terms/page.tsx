@@ -7,9 +7,9 @@ import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Пользовательское соглашение — Centreal",
+    title: "Пользовательское соглашение — ЦЕНТРЕАЛЪ",
     description:
-      "Условия использования сайта Centreal: информационный характер материалов, формы обратной связи и ограничение ответственности.",
+      "Условия использования сайта ЦЕНТРЕАЛЪ: информационный характер материалов, формы обратной связи и ограничение ответственности.",
     alternates: { canonical: `${siteOrigin()}/terms` },
   };
 }
@@ -33,7 +33,7 @@ export default function TermsPage() {
             </h2>
             <p className="text-sm md:text-base leading-relaxed">
               Настоящее Пользовательское соглашение (далее — Соглашение) регулирует условия
-              использования сайта Centreal (далее — Сайт). Используя Сайт, вы соглашаетесь
+              использования сайта ЦЕНТРЕАЛЪ (далее — Сайт). Используя Сайт, вы соглашаетесь
               с условиями настоящего Соглашения.
             </p>
             <p className="text-sm md:text-base leading-relaxed mt-2">

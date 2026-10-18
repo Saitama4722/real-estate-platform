@@ -22,7 +22,7 @@ import {
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Районы Краснодара и Геленджика — гид по районам | Centreal",
+    title: "Районы Краснодара и Геленджика — гид по районам | ЦЕНТРЕАЛЪ",
     description:
       "Гиды по районам и микрорайонам Краснодара и Геленджика: чем живёт каждый район, кому подойдёт и где посмотреть объекты. Помогаем выбрать место для покупки.",
     alternates: { canonical: districtsIndexCanonicalUrl() },

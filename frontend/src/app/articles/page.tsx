@@ -20,9 +20,9 @@ import {
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Статьи о недвижимости — Centreal",
+    title: "Статьи о недвижимости — ЦЕНТРЕАЛЪ",
     description:
-      "Материалы Centreal о покупке квартир, домов и участков в Краснодаре и Геленджике: советы покупателю и обзор рынка.",
+      "Материалы ЦЕНТРЕАЛЪ о покупке квартир, домов и участков в Краснодаре и Геленджике: советы покупателю и обзор рынка.",
     alternates: { canonical: articlesIndexCanonicalUrl() },
   };
 }
@@ -71,7 +71,7 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
         <Container>
           <p className="inline-flex items-center gap-2 text-caption font-bold tracking-[0.1em] uppercase text-brand">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-sm bg-accent" />
-            Блог Centreal
+            Блог ЦЕНТРЕАЛЪ
           </p>
           <h1 className="mt-3.5 text-[clamp(36px,5vw,54px)] leading-[1.05] font-extrabold tracking-[-0.03em] text-fg">
             Статьи

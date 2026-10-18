@@ -19,7 +19,7 @@ export const HOMEPAGE_TEXT_FALLBACKS = {
   articles_section_title: "Статьи",
   seo_section_title: "Недвижимость в Краснодарском крае",
   seo_section_body:
-    "Centreal помогает купить недвижимость в Краснодаре и Геленджике: квартиры, дома, участки и коммерческие помещения. На сайте — актуальный каталог опубликованных объектов, статьи для покупателей и форма заявки по выбранному объекту.",
+    "ЦЕНТРЕАЛЪ помогает купить недвижимость в Краснодаре и Геленджике: квартиры, дома, участки и коммерческие помещения. На сайте — актуальный каталог опубликованных объектов, статьи для покупателей и форма заявки по выбранному объекту.",
   /**
    * Site-wide agency phone shown in the header. THE fallback is deliberately
    * EMPTY: if the API is unreachable the header renders no phone at all rather

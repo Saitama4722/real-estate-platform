@@ -122,7 +122,7 @@ export function Footer() {
               narrow screens instead of stacking into a labelled column — there
               is no «Разделы» heading in the design. */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-6 text-[13px] leading-[18px] text-white/55">
-            <span>© {year} Centreal. Краснодарский край.</span>
+            <span>© {year} ЦЕНТРЕАЛЪ. Краснодарский край.</span>
             <nav aria-label="Правовая информация">
               <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
                 {legalLinks.map((link) => (

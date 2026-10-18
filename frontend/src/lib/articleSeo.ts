@@ -1,6 +1,6 @@
 import type { PublicArticle } from "@/lib/publicArticles";
 
-const TITLE_SUFFIX = " — Centreal";
+const TITLE_SUFFIX = " — ЦЕНТРЕАЛЪ";
 const MAX_DOC_TITLE_LEN = 70;
 
 function clipSentence(s: string, minLen: number, maxLen: number): string {
@@ -38,7 +38,7 @@ export function buildArticleDocumentTitle(article: PublicArticle): string {
 export function buildArticleMetaDescription(article: PublicArticle): string {
   const ex = article.excerpt.trim();
   if (ex.length >= 120 && ex.length <= 160) return ex;
-  const prefix = "Материал Centreal. ";
+  const prefix = "Материал ЦЕНТРЕАЛЪ. ";
   let s = `${prefix}${ex}`;
   if (s.length > 160) return clipSentence(s, 120, 160);
   const pad = " Полезно при выборе недвижимости в Краснодаре и Геленджике.";
@@ -75,7 +75,7 @@ export function buildArticleJsonLd(article: PublicArticle): Record<string, unkno
     inLanguage: "ru-RU",
     publisher: {
       "@type": "Organization",
-      name: "Centreal",
+      name: "ЦЕНТРЕАЛЪ",
     },
   };
 }

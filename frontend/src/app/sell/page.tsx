@@ -6,9 +6,9 @@ import { SellPropertyForm } from "@/components/sell/SellPropertyForm";
 import { fetchSellCities } from "@/lib/saleRequest";
 
 export const metadata: Metadata = {
-  title: "Продать недвижимость — Centreal",
+  title: "Продать недвижимость — ЦЕНТРЕАЛЪ",
   description:
-    "Продайте квартиру, дом или участок с агентством Centreal. Оставьте заявку — риэлтор оценит объект и поможет с продажей. Ваш телефон видят только сотрудники агентства.",
+    "Продайте квартиру, дом или участок с агентством ЦЕНТРЕАЛЪ. Оставьте заявку — риэлтор оценит объект и поможет с продажей. Ваш телефон видят только сотрудники агентства.",
 };
 
 export default async function SellPage() {

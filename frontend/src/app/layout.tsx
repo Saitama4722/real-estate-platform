@@ -28,7 +28,7 @@ const OG_IMAGE = {
   url: "/og-image.png",
   width: 1200,
   height: 630,
-  alt: "Centreal — недвижимость Краснодара и Геленджика",
+  alt: "ЦЕНТРЕАЛЪ — недвижимость Краснодара и Геленджика",
 };
 
 /**
@@ -44,8 +44,9 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3001",
   ),
-  title: "Centreal — Недвижимость",
+  title: "ЦЕНТРЕАЛЪ — Недвижимость",
   description: "Платформа недвижимости Краснодарского края",
+  applicationName: "ЦЕНТРЕАЛЪ",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "48x48" },
@@ -55,6 +56,7 @@ export const metadata: Metadata = {
   },
   manifest: "/site.webmanifest",
   openGraph: {
+    siteName: "ЦЕНТРЕАЛЪ",
     images: [OG_IMAGE],
   },
   twitter: {

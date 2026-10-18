@@ -4,7 +4,7 @@ import type {
 } from "@/lib/publicDistrictGuides";
 import { siteOrigin } from "@/lib/articleSeo";
 
-const TITLE_SUFFIX = " — Centreal";
+const TITLE_SUFFIX = " — ЦЕНТРЕАЛЪ";
 const MAX_DOC_TITLE_LEN = 70;
 
 function clipSentence(s: string, minLen: number, maxLen: number): string {
@@ -33,10 +33,10 @@ export function buildGuideDocumentTitle(guide: PublicDistrictGuide): string {
 export function buildGuideMetaDescription(guide: PublicDistrictGuide): string {
   const ex = guide.excerpt.trim();
   if (ex.length >= 120 && ex.length <= 160) return ex;
-  const prefix = "Гид Centreal по району. ";
+  const prefix = "Гид ЦЕНТРЕАЛЪ по району. ";
   let s = `${prefix}${ex}`;
   if (s.length > 160) return clipSentence(s, 120, 160);
-  const pad = " Смотрите объекты в этом районе на Centreal.";
+  const pad = " Смотрите объекты в этом районе на ЦЕНТРЕАЛЪ.";
   if (s.length + pad.length <= 160) s += pad;
   return clipSentence(s, 100, 160);
 }
@@ -69,6 +69,6 @@ export function buildGuideJsonLd(
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
     url,
     inLanguage: "ru-RU",
-    publisher: { "@type": "Organization", name: "Centreal" },
+    publisher: { "@type": "Organization", name: "ЦЕНТРЕАЛЪ" },
   };
 }

@@ -18,7 +18,7 @@ import { fetchPublicPropertiesList } from "@/lib/publicPropertyList";
 import { fetchPublicRealtorByCrmId } from "@/lib/publicRealtor";
 import type { LucideIcon } from "lucide-react";
 
-const TITLE_SUFFIX = " — Centreal";
+const TITLE_SUFFIX = " — ЦЕНТРЕАЛЪ";
 
 /* ---------------------------------------------------------------------------
  * PLATFORM CONSTANTS — the numbers in the stat tiles.
@@ -63,7 +63,7 @@ export async function generateMetadata({
   const path = `/realtors/${encodeURIComponent(realtor.crm_id)}`;
   const description =
     (realtor.short_bio || "").trim() ||
-    `${realtor.display_name} — риэлтор Centreal. Объектов в продаже: ${realtor.published_properties_count}.`;
+    `${realtor.display_name} — риэлтор ЦЕНТРЕАЛЪ. Объектов в продаже: ${realtor.published_properties_count}.`;
 
   return {
     title: `${realtor.display_name}${TITLE_SUFFIX}`,

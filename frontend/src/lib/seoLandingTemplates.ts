@@ -1,7 +1,7 @@
 import type { LandingResolved } from "./catalogSeoLanding";
 
 /** Единый суффикс заголовка окна для всех посадочных SEO-страниц каталога */
-const DOCUMENT_TITLE_SUFFIX = " — Centreal";
+const DOCUMENT_TITLE_SUFFIX = " — ЦЕНТРЕАЛЪ";
 const DOCUMENT_TITLE_MAX = 70;
 const META_DESCRIPTION_MAX = 160;
 const META_DESCRIPTION_TARGET_MIN = 120;
@@ -75,22 +75,22 @@ export function buildSeoLandingMetaDescription(
   let core: string;
   switch (resolved.kind) {
     case "property_type":
-      core = `Подборка объявлений о продаже в ${where}: актуальные цены и описания на Centreal.`;
+      core = `Подборка объявлений о продаже в ${where}: актуальные цены и описания на ЦЕНТРЕАЛЪ.`;
       break;
     case "rooms":
-      core = `${h1}. Подборка квартир с указанным числом комнат в ${where} на Centreal.`;
+      core = `${h1}. Подборка квартир с указанным числом комнат в ${where} на ЦЕНТРЕАЛЪ.`;
       break;
     case "district":
-      core = `Квартиры в районе «${resolved.labelRu}» (${where}): объявления о продаже на Centreal.`;
+      core = `Квартиры в районе «${resolved.labelRu}» (${where}): объявления о продаже на ЦЕНТРЕАЛЪ.`;
       break;
     case "neighborhood":
-      core = `Квартиры, ${resolved.labelRu}, ${where}: продажа на Centreal.`;
+      core = `Квартиры, ${resolved.labelRu}, ${where}: продажа на ЦЕНТРЕАЛЪ.`;
       break;
     case "zhk":
-      core = `Жилой комплекс «${resolved.labelRu}» в ${where}: объявления о продаже на Centreal.`;
+      core = `Жилой комплекс «${resolved.labelRu}» в ${where}: объявления о продаже на ЦЕНТРЕАЛЪ.`;
       break;
     default:
-      core = `Каталог недвижимости в ${where} на Centreal.`;
+      core = `Каталог недвижимости в ${where} на ЦЕНТРЕАЛЪ.`;
   }
   if (core.length >= META_DESCRIPTION_TARGET_MIN && core.length <= META_DESCRIPTION_MAX) return core;
   if (core.length > META_DESCRIPTION_MAX) return clip(core, META_DESCRIPTION_MAX);

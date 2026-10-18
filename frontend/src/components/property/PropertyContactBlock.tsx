@@ -58,7 +58,7 @@ export function PropertyContactBlock({
   const [requestOpen, setRequestOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
 
-  const displayName = realtorName ?? "Агент Centreal";
+  const displayName = realtorName ?? "Агент ЦЕНТРЕАЛЪ";
 
   const handleRevealPhone = async () => {
     setPhoneState({ status: "loading" });
