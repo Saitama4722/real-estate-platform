@@ -30,6 +30,9 @@ x-django-env: &django-env
   DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
   CONN_MAX_AGE: ${CONN_MAX_AGE:-600}
   REDIS_URL: redis://redis:6379/0
+  # Django cache (captcha, throttles) shared by all gunicorn workers; DB 1 so
+  # it never mixes with Celery's broker/results in DB 0.
+  CACHE_REDIS_URL: redis://redis:6379/1
   CELERY_BROKER_URL: redis://redis:6379/0
   CELERY_RESULT_BACKEND: redis://redis:6379/0
   MEDIA_STORAGE_BACKEND: ${MEDIA_STORAGE_BACKEND:-r2}

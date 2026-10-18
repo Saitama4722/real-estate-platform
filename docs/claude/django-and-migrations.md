@@ -242,18 +242,25 @@ not "fix" this by distinguishing them server-side.
   (`bad_credentials` / `locked` / `throttled`), IP and User-Agent — **never the
   password**, verified by grepping every log row for the test password.
 
-### ⚠ LocMemCache is PER PROCESS — no shared counter may live in the cache
+### The cache is Redis in production, LocMem locally (resolved 2026-10-18)
 
-`CACHES` is `LocMemCache`. Under more than one Gunicorn worker each keeps its own
-copy, so the effective IP throttle is `rate × worker_count`. **This is a known
-limitation**, acceptable only because the per-account lockout is the real defence
-and does not use the cache.
+`CACHE_REDIS_URL` selects Django's built-in `RedisCache`. Production sets it
+in `docker-compose.prod.yml` to `redis://redis:6379/1` (DB 1; Celery uses DB 0),
+so captcha answers and every DRF throttle (login, leads, captcha, phone reveal,
+sale requests) are shared by all Gunicorn workers and the limits are exact.
+Without it (local dev) the cache is the per-process `LocMemCache`.
+`[measured]` before the switch, a captcha issued over HTTP was invisible to a
+second process, so with 3 workers a visitor could get «Срок действия проверки
+истёк» for a correct answer.
 
-- **RULE: any counter that must be shared or survive a restart goes in the
-  DATABASE.** That is why `failed_login_count` / `locked_until` are columns on
-  `User`. Do not "optimise" them into the cache.
-- Redis is already running for Celery; pointing `CACHES` at it is the one-line fix
-  if exact rate limiting ever matters.
+- ⚠ The variable is deliberately NOT `REDIS_URL`: `backend/.env` sets that
+  for Celery, and local dev must not silently move its cache to Memurai.
+- ⚠ The cache now depends on Redis: if the `redis` service is down, captcha
+  and throttled endpoints fail (so does Celery).
+- **RULE, still: any counter that must survive a restart goes in the
+  DATABASE.** Redis runs with persistence off (`--save "" --appendonly no`).
+  That is why `failed_login_count` / `locked_until` are columns on `User`. Do
+  not "optimise" them into the cache.
 
 ### Session invalidation is by `User.token_version`
 
@@ -370,8 +377,8 @@ exists.
      `manage.py changepassword <email>`, or re-enable pk 1 via
      `manage.py shell -c "...filter(pk=1).update(is_active=True)"`, or
      `manage.py createsuperuser`.
-4. **Re-check the security posture:** point `CACHES` at Redis (the throttle
-   multiplies by worker count on locmem), confirm `DEBUG=False`, real
+4. **Re-check the security posture:** confirm `CACHE_REDIS_URL` is set (without
+   it the throttle multiplies by worker count on locmem), `DEBUG=False`, real
    `ALLOWED_HOSTS`, and HTTPS — the access cookie only gets `Secure` over https.
 
 ---

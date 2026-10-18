@@ -358,13 +358,29 @@ LEADS_NOTIFICATIONS_ENABLED = os.environ.get(
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 
-# Кэш по умолчанию (локальная память процесса; для публичных справочников и cache_page)
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "real_estate_platform",
+# Кэш: captcha answers, every DRF throttle (login, leads, phone reveal, sale
+# requests) and cache_page all live here, so it must be SHARED between gunicorn
+# workers. CACHE_REDIS_URL (production: redis://redis:6379/1, a different DB
+# from Celery's /0) selects Django's built-in RedisCache. Without it, the
+# per-process LocMemCache is used, which is fine for local dev with one
+# runserver process. A dedicated variable, not REDIS_URL: backend/.env sets
+# REDIS_URL for Celery, and local dev must not silently move to Redis.
+CACHE_REDIS_URL = os.environ.get("CACHE_REDIS_URL", "").strip()
+if CACHE_REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": CACHE_REDIS_URL,
+            "KEY_PREFIX": "centreal",
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "real_estate_platform",
+        }
+    }
 
 # Custom user model (email as login)
 AUTH_USER_MODEL = "users.User"

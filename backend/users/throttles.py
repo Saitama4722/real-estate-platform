@@ -5,10 +5,10 @@ Follows the hand-rolled pattern already used by PublicLeadThrottle and
 PhoneRevealThrottle: a SimpleRateThrottle subclass with the rate hardcoded in
 get_rate(), so no DEFAULT_THROTTLE_RATES entry is needed in settings.
 
-⚠ CACHES is locmem (config/settings.py), which is PER PROCESS. Under several
-Gunicorn workers each worker keeps its own counter, so the effective limit is
-roughly rate × worker_count. Point Django's cache at the Redis that already
-runs for Celery if the limit ever needs to be exact.
+The counters live in Django's cache. In production that is Redis
+(CACHE_REDIS_URL, config/settings.py), shared by every Gunicorn worker, so the
+limit is exact. Without CACHE_REDIS_URL (local dev) it is the per-process
+LocMemCache, where each worker would keep its own counter.
 """
 import math
 
