@@ -281,6 +281,20 @@ natively allows `e`/`E`/`+`/`-`/`.` and silently empties invalid values. Since
 `type="text"` loses native `min` enforcement, `min` is enforced **on blur** (not
 every keystroke, which would disrupt multi-digit typing).
 
+### Drop zone pattern (`components/crm/PhotoDropZone.tsx`, 2026-10-25)
+
+A real `<button>` with a `sr-only` (not `display:none`) file input; `pointer-events-none`
+on its children so dragging over them does not fire `dragleave` (flicker);
+`preventDefault` on dragenter/dragover/drop; a window-level guard so a file dropped
+beside the zone does not navigate away from an unsaved form. Use
+`bg-[var(--field-bg)]`, never `bg-[--field-bg]` (v3 shorthand, invalid in v4).
+
+### ⚠ `justify-center` + `overflow-x-auto` hides the overflowing start
+
+A centred flex row that overflows scrolls only to the right; the left items are
+unreachable. Use `ml-auto` on the first and `mr-auto` on the last child (centres a
+short row, scrolls a long one from 0). Hit in the lightbox thumbnail row at 50 photos.
+
 ### `cn()` is a naive join, NOT tailwind-merge
 
 Passing `items-start` alongside a hardcoded `items-center` emits **both** and lets

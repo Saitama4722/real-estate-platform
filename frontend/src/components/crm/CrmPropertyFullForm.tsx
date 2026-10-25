@@ -11,12 +11,8 @@ import { Select } from "@/components/ui/select";
 import { DuplicateWarningModal } from "@/components/crm/DuplicateWarningModal";
 import { OwnerModal, type OwnerData } from "@/components/crm/OwnerModal";
 import { LocationAutocomplete } from "@/components/crm/LocationAutocomplete";
-import { CrmPropertyPhotosManager } from "@/components/crm/CrmPropertyPhotosManager";
-import {
-  CrmStagedPhotosPicker,
-  type StagedPhoto,
-} from "@/components/crm/CrmStagedPhotosPicker";
-import { xhrUpload } from "@/lib/xhrUpload";
+import { CrmPropertyPhotos } from "@/components/crm/CrmPropertyPhotos";
+import { uploadPropertyPhotos, type StagedPhoto } from "@/lib/crmPropertyPhotos";
 import {
   authBearerHeaders,
   fetchWithCrmAuthRetry,
@@ -306,8 +302,10 @@ export function CrmPropertyFullForm({
   const [ownerModalOpen, setOwnerModalOpen] = useState(false);
   const [crmPropertyId, setCrmPropertyId] = useState("");
   // Create mode only: photos picked before the property exists. Uploaded right
-  // after the property is created (see uploadStagedPhotos).
+  // after the property is created (see finishCreate).
   const [stagedPhotos, setStagedPhotos] = useState<StagedPhoto[]>([]);
+  // «Загрузка фотографий: 3 из 8…» while finishCreate uploads them.
+  const [photoProgress, setPhotoProgress] = useState("");
 
   const title = mode === "create" ? "Создать объект недвижимости" : "Редактировать объект";
 
@@ -739,29 +737,61 @@ export function CrmPropertyFullForm({
     return !errs.city && !errs.district;
   };
 
-  // Upload the create-mode staged photos to a freshly created property.
-  // Sequential so the first file lands first and is flagged as the main photo.
-  // Returns the number of photos that failed to upload.
-  const uploadStagedPhotos = async (newPropertyId: number): Promise<number> => {
-    let failed = 0;
-    for (let i = 0; i < stagedPhotos.length; i++) {
-      const photo = stagedPhotos[i];
-      const fd = new FormData();
-      fd.append("original_file", photo.file);
-      if (i === 0) fd.append("is_main", "true");
+  /**
+   * Everything that follows a successful `POST /api/crm/properties/`, shared by
+   * the normal create path AND the one behind the duplicate warning (the latter
+   * used to skip step 1 entirely, so such a property never got its sale
+   * request marked converted or its owner photos copied).
+   *
+   *  1. `mark-converted` (convert flow only): the server copies the owner's
+   *     photos, the first becomes main.
+   *  2. Upload the staged photos.
+   *
+   * ⚠ ORDER MATTERS. The server copies the owner's photos only while the new
+   * property has NO photo at all (`_copy_photos_to_property`, idempotence guard).
+   * Uploading the realtor's own photos first made that copy silently skip, so
+   * the owner's photos were lost whenever the realtor added even one of theirs.
+   *
+   * A mark-converted failure must not block the property that was just created.
+   * Returns how many staged photos failed to upload.
+   */
+  const finishCreate = async (
+    newPropertyId: number,
+  ): Promise<{ photoCount: number; failed: number }> => {
+    if (fromSubmissionId) {
       try {
-        const res = await xhrUpload({
-          url: `/api/crm/properties/${newPropertyId}/photos/`,
-          method: "POST",
-          body: fd,
-        });
-        if (!res.ok) failed += 1;
-      } catch {
-        failed += 1;
+        const res = await fetchWithCrmAuthRetry(
+          `/api/crm/sale-requests/${encodeURIComponent(fromSubmissionId)}/mark-converted/`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ property_id: newPropertyId }),
+          },
+        );
+        if (!res.ok) console.error("[CrmPropertyFullForm] mark-converted", res.status);
+      } catch (e) {
+        console.error("[CrmPropertyFullForm] mark-converted", e);
       }
-      URL.revokeObjectURL(photo.previewUrl);
     }
-    return failed;
+    const files = stagedPhotos.map((p) => p.file);
+    let failed = 0;
+    if (files.length > 0) {
+      let done = 0;
+      setPhotoProgress(`Загрузка фотографий: 0 из ${files.length}…`);
+      const results = await uploadPropertyPhotos(newPropertyId, files, {
+        // The owner's copies (if any) are already there and the first is main.
+        firstIsMain: submissionPhotoCount === 0,
+        sortOrderBase: submissionPhotoCount,
+        onResult: () => {
+          done += 1;
+          setPhotoProgress(`Загрузка фотографий: ${done} из ${files.length}…`);
+        },
+      });
+      failed = results.filter((r) => !r.ok).length;
+      setPhotoProgress("");
+    }
+    stagedPhotos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+    return { photoCount: files.length, failed };
   };
 
   /**
@@ -842,25 +872,8 @@ export function CrmPropertyFullForm({
         throw new Error(msg);
       }
       const created = (await createRes.json()) as { id: number; title_generated?: string };
-      const photoCount = stagedPhotos.length;
-      const failed = photoCount > 0 ? await uploadStagedPhotos(created.id) : 0;
-      // If this property was created from a sell-your-property submission, mark
-      // that submission converted and link it to the new Property (traceability).
-      // A failure here must not block the successful property creation.
-      if (fromSubmissionId) {
-        try {
-          await fetchWithCrmAuthRetry(
-            `/api/crm/sale-requests/${encodeURIComponent(fromSubmissionId)}/mark-converted/`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ property_id: created.id }),
-            },
-          );
-        } catch (e) {
-          console.error("[CrmPropertyFullForm] mark-converted", e);
-        }
-      }
+      // mark-converted (convert flow) then the staged photos — see finishCreate.
+      const { photoCount, failed } = await finishCreate(created.id);
       // Property created — leave the create page and return to the list. The
       // form unmounts on navigation, so no in-place reset is needed. If some
       // photos failed to upload, pass the counts so the list can warn the user.
@@ -963,8 +976,19 @@ export function CrmPropertyFullForm({
         throw new Error(msg);
       }
       const created = (await createRes.json()) as { id: number; title_generated?: string };
-      const photoCount = stagedPhotos.length;
-      const failed = photoCount > 0 ? await uploadStagedPhotos(created.id) : 0;
+      // Same follow-up as the normal path, including mark-converted: this path
+      // (after the duplicate warning) used to skip it entirely.
+      const { photoCount, failed } = await finishCreate(created.id);
+      if (fromSubmissionId) {
+        // The sale request is converted now — leave, as the normal path does,
+        // instead of resetting the form on top of an already-used request.
+        router.push(
+          failed > 0
+            ? `/account/properties?photoWarn=1&failed=${failed}&total=${photoCount}`
+            : "/account/properties",
+        );
+        return;
+      }
       const photoNote =
         photoCount === 0
           ? ""
@@ -1706,6 +1730,12 @@ export function CrmPropertyFullForm({
             </div>
           )}
 
+          {photoProgress && (
+            <p role="status" className="text-sm text-slate-600">
+              {photoProgress}
+            </p>
+          )}
+
           <div>
             <Button type="submit" disabled={saving}>
               {saving
@@ -1717,24 +1747,25 @@ export function CrmPropertyFullForm({
           </div>
         </form>
 
-        {/* Photos. In edit mode they attach directly (property id exists). In
-            create mode they are staged in memory and uploaded right after the
-            property is created (see uploadStagedPhotos). */}
+        {/* Photos. ONE component for both modes (CrmPropertyPhotos): in edit mode
+            they upload straight to the existing property; in create mode they
+            are staged in memory and uploaded right after the property is
+            created (see finishCreate). */}
         <section className="mt-8 border-t border-slate-200 pt-6">
           <h2 className="text-base font-semibold text-slate-900">Фотографии</h2>
-          {mode === "edit" && propertyId ? (
-            <div className="mt-4">
-              <CrmPropertyPhotosManager propertyId={propertyId} />
-            </div>
-          ) : (
-            <div className="mt-4">
-              <CrmStagedPhotosPicker
+          <div className="mt-4">
+            {mode === "edit" && propertyId ? (
+              <CrmPropertyPhotos mode="live" propertyId={propertyId} />
+            ) : (
+              <CrmPropertyPhotos
+                mode="staged"
                 items={stagedPhotos}
                 onChange={setStagedPhotos}
+                reservedCount={submissionPhotoCount}
                 disabled={saving}
               />
-            </div>
-          )}
+            )}
+          </div>
         </section>
       </div>
 

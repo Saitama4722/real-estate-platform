@@ -96,6 +96,13 @@ export function PropertyGallery({
   const [isOpen, setIsOpen] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const activeThumbRef = useRef<HTMLButtonElement>(null);
+
+  // Keep the active lightbox thumbnail in view when keys/swipes change it.
+  useEffect(() => {
+    if (!isOpen) return;
+    activeThumbRef.current?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [isOpen, activeIndex]);
 
   const step = useCallback(
     (delta: number) => {
@@ -328,15 +335,21 @@ export function PropertyGallery({
 
           <div className="flex-none pt-4 pb-3.5">
             {many && (
-              <div className="flex justify-center gap-2 overflow-x-auto px-6">
+              // Not justify-center: with many thumbs the overflowing left side
+              // of a centred row is unreachable. Auto margins on the first and
+              // last child centre a short row and let a long one scroll from 0.
+              <div className="flex gap-2 overflow-x-auto px-6">
                 {photos.map((src, index) => (
                   <button
                     key={index}
                     type="button"
+                    ref={index === activeIndex ? activeThumbRef : undefined}
                     onClick={() => setActiveIndex(index)}
                     aria-label={`Фото ${index + 1}`}
                     className={cn(
                       "h-[62px] w-[92px] flex-none overflow-hidden rounded-lg transition-opacity duration-150 ease-out",
+                      index === 0 && "ml-auto",
+                      index === count - 1 && "mr-auto",
                       index === activeIndex
                         ? "opacity-100 outline outline-2 outline-offset-2 outline-white"
                         : "opacity-45 hover:opacity-75",

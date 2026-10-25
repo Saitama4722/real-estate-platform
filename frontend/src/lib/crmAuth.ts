@@ -74,8 +74,27 @@ function withAuthHeaders(init?: RequestInit): RequestInit {
   return { ...init, headers };
 }
 
+/**
+ * ⚠ SINGLE-FLIGHT (2026-10-25). Refresh tokens ROTATE and the old one is
+ * blacklisted, so two refreshes running at once with the same token cannot both
+ * succeed: the first wins, the second gets 401 and the user is treated as logged
+ * out. Parallel requests (the photo uploader runs several; the 15 s poll runs
+ * alongside) hit exactly that once the 15-minute access token expires, because
+ * each one gets a 401 and each one called this function. Every caller that
+ * arrives while a refresh is in flight now awaits the SAME promise.
+ */
+let refreshInFlight: Promise<boolean> | null = null;
+
 /** Обновить access (и refresh при ротации) по refresh-токену из localStorage. */
-export async function refreshCrmAccessToken(): Promise<boolean> {
+export function refreshCrmAccessToken(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = doRefreshCrmAccessToken().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+async function doRefreshCrmAccessToken(): Promise<boolean> {
   if (typeof window === "undefined") return false;
   const refresh = window.localStorage.getItem(CRM_REFRESH_LS_KEY)?.trim();
   if (!refresh) return false;

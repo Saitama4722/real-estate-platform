@@ -37,7 +37,7 @@ interface PhotoRow {
  * photo viewed in the seconds before that runs — or one uploaded while the
  * worker was down — still has only the original. Falling back keeps the panel
  * working instead of rendering a broken image, and mirrors what
- * CrmPropertyPhotosManager already does for property photos.
+ * CrmPropertyPhotos (the CRM property photo grid) already does for property photos.
  */
 function photoFullUrl(p: PhotoRow): string {
   return p.image_large || p.image_medium || p.image;

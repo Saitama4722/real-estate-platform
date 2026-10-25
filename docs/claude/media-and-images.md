@@ -71,6 +71,47 @@ CLAUDE.md). A new file field MUST use it. The class path is frozen into
 migrations, so do not move or rename it. Rows stored before the change keep
 their old names (`photo_18_large.jpg`, `IMG_0042.jpg`, …); nothing was renamed.
 
+### ⭐ Property photos: 50 per property, server-enforced (2026-10-25)
+
+- **The limit lives in ONE constant per side:** `MAX_PHOTOS_PER_PROPERTY = 50` in
+  `backend/properties/property_photo_images.py` (with `PHOTO_LIMIT_MESSAGE` /
+  `PHOTO_LIMIT_CODE = "photo_limit"`) and `MAX_PROPERTY_PHOTOS = 50` in
+  `frontend/src/lib/crmPropertyPhotos.ts`. Change both together. The public
+  sale-request form keeps its own limit of 10.
+- `POST /api/crm/properties/<id>/photos/` (one file per request) counts the
+  property's existing photos inside `transaction.atomic()` under
+  `select_for_update()` on the Property row, and answers 400 `{"detail": "Можно
+  загрузить не более 50 фотографий для одного объекта", "code": "photo_limit"}`.
+  The same lock makes `sort_order = max+1` exact. `[inferred]` The race itself
+  is NOT testable locally: SQLite ignores `select_for_update`, so the 24 tests in
+  `properties/tests_photos.py` prove the counting, not the concurrency.
+- **Main photo is assigned by the server:** the first photo of a property is main
+  without the client saying so; an explicit `is_main=true` moves it; deleting the
+  main promotes the next by `sort_order, id`. The client never sends `is_main`.
+  ⚠ Public pages never read `is_main` (they take the first photo by `sort_order`),
+  pre-existing and not changed.
+- **Upload concurrency is 2** (`UPLOAD_CONCURRENCY`). Prod gunicorn has 3 sync
+  workers and `--timeout 60`; three or four slow parallel uploads could occupy
+  every worker and stall the site. No Django upload setting, gunicorn flag or
+  Caddy change was needed: one file per request keeps the defaults irrelevant and
+  `deploy/Caddyfile` sets no body limit `[inferred from the files]`.
+- **Admin:** `PropertyPhotoInline.max_num` is the same constant (a soft guard; the
+  API is the real one).
+- **Not done (follow-up):** the catalog list prefetches ALL photos per card for a
+  `[:1]` preview (`properties/views.py`, `serializers.py`); at 50 photos that is
+  50x the rows per card. Left on purpose by the owner's decision.
+
+### ⛔ ONE shared uploader — and the FileList trap that broke "add photos" in edit mode
+
+`components/crm/CrmPropertyPhotos.tsx` (`StagedPhotos` for create, `LivePhotos`
+for edit) over `PhotoDropZone.tsx`, with the logic in `lib/crmPropertyPhotos.ts`.
+Do not build a second picker. **Root cause of the 2026-10-25 bug:** the old edit
+component did `input.value = ""` BEFORE `Array.from(input.files)`. `files` is a
+LIVE FileList, clearing the value empties it, so every pick after the first batch
+was silently an empty list. Always snapshot first, then reset the input.
+Also: `refreshCrmAccessToken` is single-flight now (rotating refresh tokens +
+blacklist make parallel refreshes race and log the realtor out).
+
 ### Which models have a ladder, and which deliberately do not
 
 - **Ladder** (original + `image_large`/`image_medium`/`image_thumb`):

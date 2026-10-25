@@ -669,8 +669,8 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
         </label>
         {/* Styled picker: the native control is kept in the DOM (sr-only, NOT
             display:none, so it stays reachable by assistive tech and keyboard)
-            and a styled button opens it — the same idiom CrmStagedPhotosPicker
-            already uses. The onChange handler below is byte-identical to the
+            and a styled button opens it — the same idiom the CRM PhotoDropZone
+            uses. The onChange handler below is byte-identical to the
             one the bare input had, so photo handling is unchanged. */}
         <input
           ref={fileInputRef}

@@ -499,6 +499,13 @@ BROWSER download every photo and re-upload it:
   `stagedPhotos.length > 0 || submissionPhotoCount > 0` — otherwise the realtor is
   made to re-upload exactly the photos this work removed.
 - Idempotent: copies nothing if the property already has photos.
+- **⛔ ORDER MATTERS (fixed 2026-10-25):** `mark-converted` must run BEFORE the
+  realtor's own staged photos are uploaded, because of the idempotency guard above.
+  `finishCreate` in `CrmPropertyFullForm.tsx` does it in that order for both create
+  paths (it used to upload first, which silently dropped the owner's photos, and
+  one path never called `mark-converted`). Copies are capped at
+  `MAX_PHOTOS_PER_PROPERTY` and the first one becomes main. A property holds at
+  most 50 photos in total; the form reserves room for the owner's photos.
 
 ---
 

@@ -21,6 +21,7 @@ import {
   EyeOff,
   Heart,
   House,
+  ImageUp,
   Inbox,
   Info,
   KeyRound,
@@ -199,6 +200,10 @@ export const Icons = {
   Owners: Users,
   /** «Выйти» — the cabinet sign-out control. */
   Logout: LogOut,
+
+  // Photo upload
+  /** Drop-zone glyph for photo uploads (`PhotoDropZone`). */
+  PhotoUpload: ImageUp,
 } as const;
 
 export type IconName = keyof typeof Icons;

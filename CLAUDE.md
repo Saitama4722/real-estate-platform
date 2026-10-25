@@ -675,6 +675,21 @@ Details: `docs/claude/address-and-geo.md`.
 
 ---
 
+## ⭐ Property photos: 50 max, ONE uploader, snapshot the FileList (2026-10-25)
+
+- **Limit 50 per property**, one constant per side: `MAX_PHOTOS_PER_PROPERTY`
+  (`backend/properties/property_photo_images.py`, enforced under a row lock, Russian
+  400 + `code: photo_limit`) and `MAX_PROPERTY_PHOTOS`
+  (`frontend/src/lib/crmPropertyPhotos.ts`). Change both together.
+- **Create and edit share ONE component:** `components/crm/CrmPropertyPhotos.tsx` +
+  `PhotoDropZone.tsx`. Never add a second picker.
+- **⛔ Root cause of "can't add photos in edit mode":** `input.value = ""` before
+  `Array.from(input.files)` empties the LIVE FileList. Snapshot first, then reset.
+- Sale-request convert: `mark-converted` BEFORE uploading the realtor's photos.
+- Details: `docs/claude/media-and-images.md`, `product-and-domain.md`.
+
+---
+
 ## ⛔ HOSTING-MIGRATION BLOCKERS — resolve BEFORE enabling cloud anything
 
 The project is local-only today, and each of these is **dormant only because of

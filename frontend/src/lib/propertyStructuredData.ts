@@ -22,7 +22,9 @@ export function buildPropertyJsonLd(
   const images = p.photos
     .filter((x) => x.url && isAbsoluteHttpUrl(x.url as string))
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map((x) => x.url as string);
+    .map((x) => x.url as string)
+    // A property may carry up to 50 photos; search engines need only a few.
+    .slice(0, 10);
 
   const priceNum = Number(p.price);
   const currency = CURRENCY_CODE[p.currency] ?? p.currency.toUpperCase();
