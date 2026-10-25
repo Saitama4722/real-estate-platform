@@ -12,7 +12,7 @@
 
 import { xhrUpload, extractUploadError, type XhrUploadResult } from "@/lib/xhrUpload";
 
-export const MAX_PROPERTY_PHOTOS = 50;
+export const MAX_PROPERTY_PHOTOS = 10;
 
 /**
  * Parallel uploads. 2, not more: production runs 3 SYNC gunicorn workers

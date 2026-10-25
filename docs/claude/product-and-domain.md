@@ -505,7 +505,7 @@ BROWSER download every photo and re-upload it:
   paths (it used to upload first, which silently dropped the owner's photos, and
   one path never called `mark-converted`). Copies are capped at
   `MAX_PHOTOS_PER_PROPERTY` and the first one becomes main. A property holds at
-  most 50 photos in total; the form reserves room for the owner's photos.
+  most 10 photos in total; the form reserves room for the owner's photos.
 
 ---
 

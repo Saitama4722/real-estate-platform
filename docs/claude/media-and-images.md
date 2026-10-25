@@ -73,15 +73,15 @@ their old names (`photo_18_large.jpg`, `IMG_0042.jpg`, …); nothing was renamed
 
 ### ⭐ Property photos: 50 per property, server-enforced (2026-10-25)
 
-- **The limit lives in ONE constant per side:** `MAX_PHOTOS_PER_PROPERTY = 50` in
+- **The limit lives in ONE constant per side:** `MAX_PHOTOS_PER_PROPERTY = 10` in
   `backend/properties/property_photo_images.py` (with `PHOTO_LIMIT_MESSAGE` /
-  `PHOTO_LIMIT_CODE = "photo_limit"`) and `MAX_PROPERTY_PHOTOS = 50` in
+  `PHOTO_LIMIT_CODE = "photo_limit"`) and `MAX_PROPERTY_PHOTOS = 10` in
   `frontend/src/lib/crmPropertyPhotos.ts`. Change both together. The public
   sale-request form keeps its own limit of 10.
 - `POST /api/crm/properties/<id>/photos/` (one file per request) counts the
   property's existing photos inside `transaction.atomic()` under
   `select_for_update()` on the Property row, and answers 400 `{"detail": "Можно
-  загрузить не более 50 фотографий для одного объекта", "code": "photo_limit"}`.
+  загрузить не более 10 фотографий для одного объекта", "code": "photo_limit"}`.
   The same lock makes `sort_order = max+1` exact. `[inferred]` The race itself
   is NOT testable locally: SQLite ignores `select_for_update`, so the 24 tests in
   `properties/tests_photos.py` prove the counting, not the concurrency.
@@ -98,7 +98,7 @@ their old names (`photo_18_large.jpg`, `IMG_0042.jpg`, …); nothing was renamed
 - **Admin:** `PropertyPhotoInline.max_num` is the same constant (a soft guard; the
   API is the real one).
 - **Not done (follow-up):** the catalog list prefetches ALL photos per card for a
-  `[:1]` preview (`properties/views.py`, `serializers.py`); at 50 photos that is
+  `[:1]` preview (`properties/views.py`, `serializers.py`); at the 10-photo cap that is
   50x the rows per card. Left on purpose by the owner's decision.
 
 ### ⛔ ONE shared uploader — and the FileList trap that broke "add photos" in edit mode

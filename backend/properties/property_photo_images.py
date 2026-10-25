@@ -39,10 +39,13 @@ MAX_ORIGINAL_FILE_BYTES = MAX_IMAGE_UPLOAD_BYTES
 #: ⭐ THE ONE backend definition of "how many photos a property may have".
 #: Enforced in `CrmPropertyPhotoViewSet.perform_create` under a row lock on the
 #: property, counting the photos that already exist. The frontend mirrors it in
-#: `frontend/src/lib/crm/propertyPhotos.ts` (MAX_PROPERTY_PHOTOS) — change both.
+#: `frontend/src/lib/crmPropertyPhotos.ts` (MAX_PROPERTY_PHOTOS) — change both.
 #: A module constant, not a setting: it is a product rule, not per-environment.
-MAX_PHOTOS_PER_PROPERTY = 50
-PHOTO_LIMIT_MESSAGE = "Можно загрузить не более 50 фотографий для одного объекта"
+#: 50 until 2026-10-26, then lowered to 10 by the owner (stability first).
+MAX_PHOTOS_PER_PROPERTY = 10
+PHOTO_LIMIT_MESSAGE = (
+    f"Можно загрузить не более {MAX_PHOTOS_PER_PROPERTY} фотографий для одного объекта"
+)
 #: Machine-readable `code` in the 400 body, so the client can stop its queue.
 PHOTO_LIMIT_CODE = "photo_limit"
 

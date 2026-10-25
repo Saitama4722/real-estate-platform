@@ -1,5 +1,5 @@
 """
-CRM property photos: upload to an EXISTING property, the 50-photo limit, the
+CRM property photos: upload to an EXISTING property, the photo limit, the
 main-photo rules, permissions, and the sale-request conversion order
 (2026-10-25).
 
@@ -146,37 +146,42 @@ class PropertyPhotoUploadTests(TestCase):
         PropertyPhoto.objects.filter(property=self.prop, sort_order=1).update(sort_order=9)
         self.assertEqual(self._post(self.owner).data["sort_order"], 10)
 
-    # --- the 50-photo limit ----------------------------------------------
+    # --- the photo limit (10) ---------------------------------------------
 
-    def test_limit_constant_is_fifty(self):
-        self.assertEqual(MAX_PHOTOS_PER_PROPERTY, 50)
-        self.assertIn("50", PHOTO_LIMIT_MESSAGE)
+    def test_limit_constant_is_ten(self):
+        self.assertEqual(MAX_PHOTOS_PER_PROPERTY, 10)
+        self.assertEqual(
+            PHOTO_LIMIT_MESSAGE, "Можно загрузить не более 10 фотографий для одного объекта"
+        )
 
-    def test_exactly_fifty_is_allowed_and_the_next_is_rejected(self):
-        self._fill(49)
+    def test_exactly_the_limit_is_allowed_and_the_next_is_rejected(self):
+        limit = MAX_PHOTOS_PER_PROPERTY
+        self._fill(limit - 1)
         ok = self._post(self.owner)
         self.assertEqual(ok.status_code, 201, ok.data)
-        self.assertEqual(PropertyPhoto.objects.filter(property=self.prop).count(), 50)
+        self.assertEqual(PropertyPhoto.objects.filter(property=self.prop).count(), limit)
         bad = self._post(self.owner)
         self.assertEqual(bad.status_code, 400, bad.data)
         self.assertEqual(bad.data["detail"], PHOTO_LIMIT_MESSAGE)
         self.assertEqual(bad.data["code"], PHOTO_LIMIT_CODE)
-        self.assertEqual(PropertyPhoto.objects.filter(property=self.prop).count(), 50)
+        self.assertEqual(PropertyPhoto.objects.filter(property=self.prop).count(), limit)
 
-    def test_fifty_existing_rejects_and_keeps_the_count(self):
-        self._fill(50)
+    def test_full_property_rejects_and_keeps_the_count(self):
+        self._fill(MAX_PHOTOS_PER_PROPERTY)
         r = self._post(self.owner)
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(r.data["detail"], "Можно загрузить не более 50 фотографий для одного объекта")
-        self.assertEqual(PropertyPhoto.objects.filter(property=self.prop).count(), 50)
+        self.assertEqual(r.data["detail"], "Можно загрузить не более 10 фотографий для одного объекта")
+        self.assertEqual(
+            PropertyPhoto.objects.filter(property=self.prop).count(), MAX_PHOTOS_PER_PROPERTY
+        )
 
     def test_limit_is_per_property(self):
-        self._fill(50)
+        self._fill(MAX_PHOTOS_PER_PROPERTY)
         other_prop = self._property(self.owner)
         self.assertEqual(self._post(self.owner, prop=other_prop).status_code, 201)
 
     def test_admin_is_limited_too(self):
-        self._fill(50)
+        self._fill(MAX_PHOTOS_PER_PROPERTY)
         self.assertEqual(self._post(self.admin).status_code, 400)
 
     # --- main photo on delete --------------------------------------------

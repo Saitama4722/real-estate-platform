@@ -675,9 +675,9 @@ Details: `docs/claude/address-and-geo.md`.
 
 ---
 
-## ⭐ Property photos: 50 max, ONE uploader, snapshot the FileList (2026-10-25)
+## ⭐ Property photos: 10 max, ONE uploader, snapshot the FileList (2026-10-25)
 
-- **Limit 50 per property**, one constant per side: `MAX_PHOTOS_PER_PROPERTY`
+- **Limit 10 per property (was 50 until 2026-10-26)**, one constant per side: `MAX_PHOTOS_PER_PROPERTY`
   (`backend/properties/property_photo_images.py`, enforced under a row lock, Russian
   400 + `code: photo_limit`) and `MAX_PROPERTY_PHOTOS`
   (`frontend/src/lib/crmPropertyPhotos.ts`). Change both together.

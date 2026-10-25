@@ -293,7 +293,7 @@ beside the zone does not navigate away from an unsaved form. Use
 
 A centred flex row that overflows scrolls only to the right; the left items are
 unreachable. Use `ml-auto` on the first and `mr-auto` on the last child (centres a
-short row, scrolls a long one from 0). Hit in the lightbox thumbnail row at 50 photos.
+short row, scrolls a long one from 0). Hit in the lightbox thumbnail row with many photos.
 
 ### `cn()` is a naive join, NOT tailwind-merge
 
