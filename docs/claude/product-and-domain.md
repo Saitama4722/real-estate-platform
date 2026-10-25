@@ -480,6 +480,12 @@ validation correctly insists: `land_area` and `floors_total` for a house,
 - **No migration was needed** — `Property` already has `public_address_text` and both
   coordinate pairs.
 
+### Cover photo = the MAIN photo (2026-10-26)
+
+Cards, the catalog and the first gallery image all use `COVER_PHOTO_ORDER` (main first).
+Marking a photo «Главное» in the CRM now really changes what the public sees. Details:
+`media-and-images.md`.
+
 ### Photos are COPIED SERVER-SIDE by `mark-converted`
 
 `_copy_photos_to_property` reads each `SaleRequestPhoto` through the storage API and

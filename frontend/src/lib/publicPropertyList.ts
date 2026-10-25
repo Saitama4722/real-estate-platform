@@ -49,6 +49,8 @@ export interface PublicPropertyListItemRaw {
     floors_total: number | null;
   } | null;
   preview_image: string | null;
+  /** All photos of the property; the list itself only ever loads the cover. */
+  photos_count?: number;
   is_price_reduced?: boolean;
   is_new?: boolean;
 }

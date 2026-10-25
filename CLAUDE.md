@@ -681,6 +681,10 @@ Details: `docs/claude/address-and-geo.md`.
   (`backend/properties/property_photo_images.py`, enforced under a row lock, Russian
   400 + `code: photo_limit`) and `MAX_PROPERTY_PHOTOS`
   (`frontend/src/lib/crmPropertyPhotos.ts`). Change both together.
+- **The catalog list loads ONE cover per card** (annotations, no photo rows; `photos_count`
+  for the total); the cover is the MAIN photo (`COVER_PHOTO_ORDER`); the detail page loads
+  hero medium, strip `thumb`, lightbox `large`, +-1 preload only. Details and numbers:
+  `docs/claude/media-and-images.md`.
 - **Create and edit share ONE component:** `components/crm/CrmPropertyPhotos.tsx` +
   `PhotoDropZone.tsx`. Never add a second picker.
 - **⛔ Root cause of "can't add photos in edit mode":** `input.value = ""` before

@@ -105,6 +105,8 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
           <div className="order-1 min-w-0 lg:col-start-1 lg:row-start-1">
             <PropertyGallery
               gallery={property.gallery}
+              thumbs={property.galleryThumbs}
+              large={property.galleryLarge}
               videoUrl={property.videoUrl}
               mainImage={property.image}
               isPriceReduced={property.isPriceReduced}

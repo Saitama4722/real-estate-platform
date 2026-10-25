@@ -49,7 +49,14 @@ export interface PublicPropertyDetail {
     floor: number | null;
     floors_total: number | null;
   } | null;
-  photos: { url: string | null; sort_order: number; is_main: boolean }[];
+  /** Server order: the main photo first, then sort_order. */
+  photos: {
+    url: string | null;
+    thumb?: string | null;
+    large?: string | null;
+    sort_order: number;
+    is_main: boolean;
+  }[];
   videos: { video_url: string }[];
   /** Chronological (ascending) price points; each price is a decimal string. */
   price_history?: { price: string; changed_at: string }[];
@@ -169,10 +176,12 @@ export function mapPublicDetailToCatalogItem(
   p: PublicPropertyDetail,
   slug: string,
 ): CatalogPropertyItem {
-  const photoUrls = p.photos
-    .filter((x) => x.url)
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .map((x) => x.url as string);
+  // ⚠ Keep the SERVER order (main photo first). Re-sorting by sort_order here
+  // used to make the cover ignore `is_main`.
+  const withUrl = p.photos.filter((x) => x.url);
+  const photoUrls = withUrl.map((x) => x.url as string);
+  const photoThumbs = withUrl.map((x) => (x.thumb || x.url) as string);
+  const photoLarge = withUrl.map((x) => (x.large || x.url) as string);
   const main = photoUrls[0] ?? "Фото объекта";
   const gallery = photoUrls.length > 1 ? photoUrls : undefined;
 
@@ -217,6 +226,8 @@ export function mapPublicDetailToCatalogItem(
     longitude: Number.isFinite(lng) ? lng : 0,
     updatedAt: p.updated_at,
     gallery: gallery ?? (photoUrls.length > 1 ? photoUrls : undefined),
+    galleryThumbs: photoThumbs.length > 0 ? photoThumbs : undefined,
+    galleryLarge: photoLarge.length > 0 ? photoLarge : undefined,
     videoUrl,
     propertyType: p.property_type,
     rooms: p.apartment_details?.rooms,

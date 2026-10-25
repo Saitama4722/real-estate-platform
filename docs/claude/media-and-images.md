@@ -97,9 +97,31 @@ their old names (`photo_18_large.jpg`, `IMG_0042.jpg`, …); nothing was renamed
   `deploy/Caddyfile` sets no body limit `[inferred from the files]`.
 - **Admin:** `PropertyPhotoInline.max_num` is the same constant (a soft guard; the
   API is the real one).
-- **Not done (follow-up):** the catalog list prefetches ALL photos per card for a
-  `[:1]` preview (`properties/views.py`, `serializers.py`); at the 10-photo cap that is
-  50x the rows per card. Left on purpose by the owner's decision.
+- **Catalog loads ONE cover per card (2026-10-26).** The list used to prefetch EVERY
+  photo row of every card to read `[:1]`. Now `PropertyViewSet` (list) annotates the
+  cover with correlated subqueries (`views._cover_annotations`: `cover_medium`,
+  `cover_thumb`, `cover_original`, `photos_count`), no photo rows are loaded, and
+  `preview_image` + `photos_count` come from them. `[measured]` locally, 20 cards x 10
+  photos: 1 query (was 2) and 0 photo rows hydrated (was 200; 20 with one photo each);
+  the count is the same for 1 or 10 photos per card (`properties/tests_catalog_photos.py`).
+  `photos_count` is a SUBQUERY on purpose: `Count("photos")` would join-multiply with the
+  `Max(price_history__price)` join.
+- **ONE cover rule:** `COVER_PHOTO_ORDER = ("-is_main", "sort_order", "id")`
+  (`property_photo_images.py`) drives the list annotations and the detail prefetch.
+  ⚠ Behaviour change: the public cover is now the MAIN photo; before, public pages took
+  the first by `sort_order` and ignored `is_main`. The frontend mapper keeps the server
+  order instead of re-sorting.
+- **Detail returns all photos, main first, in three sizes:** `url` (medium, the old
+  contract), `thumb`, `large`, each falling back down the ladder.
+- **Gallery loading rules (`PropertyGallery.tsx`):** hero = medium, `fetchPriority="high"`
+  only for the first one; strip and lightbox thumbs = `thumb`, lazy; lightbox main =
+  `large`; only the +-1 neighbours are preloaded, and only after the visitor opened the
+  lightbox or left the first photo; the hero image is unmounted while the lightbox is
+  open (otherwise paging also downloaded each medium behind the overlay).
+  `[measured]` Playwright, 10-photo property, dev server: page load = 1 medium + 7 thumbs
+  (before: 7 medium); opening the lightbox = 2 large + 3 thumbs; 3 arrow presses = 3
+  large, one per step (before: 3 medium on open, nothing on paging). The catalog loaded the
+  same 9 cover images before and after: cards never used more than the cover.
 
 ### ⛔ ONE shared uploader — and the FileList trap that broke "add photos" in edit mode
 

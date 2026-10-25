@@ -33,6 +33,10 @@ export interface CatalogPropertyItem {
    */
   publishedAt?: string;
   gallery?: string[];
+  /** Same length/order as `gallery`: small images for the strips. */
+  galleryThumbs?: string[];
+  /** Same length/order as `gallery`: big images, used only in the lightbox. */
+  galleryLarge?: string[];
   videoUrl?: string;
   propertyType?: "apartment" | "house" | "land" | "commercial";
   /**

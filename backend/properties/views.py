@@ -2,7 +2,8 @@ import logging
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
-from django.db.models import F, Max, Prefetch, Q
+from django.db.models import Count, F, IntegerField, Max, OuterRef, Prefetch, Q, Subquery
+from django.db.models.functions import Coalesce
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -25,6 +26,7 @@ from properties.crm_publication import (
 from properties.duplicate_detection import run_duplicate_check
 from properties.models import PhoneRevealLog, Property, PropertyContact, PropertyPhoto, PropertyVideo
 from properties.property_photo_images import (
+    COVER_PHOTO_ORDER,
     MAX_PHOTOS_PER_PROPERTY,
     PHOTO_LIMIT_CODE,
     PHOTO_LIMIT_MESSAGE,
@@ -82,6 +84,26 @@ FLOOR_PRESETS = {"not_first", "not_last", "not_first_not_last"}
 #: `floors_total`. A header rather than a JSON envelope: the list response is a
 #: bare array that every consumer already depends on.
 HIDDEN_UNKNOWN_FLOORS_HEADER = "X-Hidden-Unknown-Floors"
+
+
+def _cover_annotations() -> dict:
+    """Correlated subqueries: the cover photo's three URLs and the photo count."""
+    cover = PropertyPhoto.objects.filter(property=OuterRef("pk")).order_by(
+        *COVER_PHOTO_ORDER
+    )
+    count = (
+        PropertyPhoto.objects.filter(property=OuterRef("pk"))
+        .order_by()
+        .values("property")
+        .annotate(c=Count("id"))
+        .values("c")
+    )
+    return {
+        "cover_medium": Subquery(cover.values("image_medium")[:1]),
+        "cover_thumb": Subquery(cover.values("image_thumb")[:1]),
+        "cover_original": Subquery(cover.values("original_file")[:1]),
+        "photos_count": Coalesce(Subquery(count, output_field=IntegerField()), 0),
+    }
 
 
 class PropertyViewSet(ReadOnlyModelViewSet):
@@ -262,11 +284,13 @@ class PropertyViewSet(ReadOnlyModelViewSet):
                 # Peak historical price per row via a single aggregate join (no
                 # N+1) — the list serializer's is_price_reduced reads this.
                 peak_price=Max("price_history__price"),
-            ).prefetch_related(
-                Prefetch(
-                    "photos",
-                    queryset=PropertyPhoto.objects.order_by("sort_order", "pk"),
-                )
+            ).annotate(
+                # ⭐ A card needs ONE photo, not all of them. The old
+                # `Prefetch("photos")` hydrated every photo row of every card
+                # just to read `[:1]`. These correlated subqueries pick the
+                # cover (COVER_PHOTO_ORDER) inside the SAME query and add no
+                # joins, so they cannot multiply the `Max(price_history)` join.
+                **_cover_annotations(),
             )
         elif self.action == "retrieve":
             qs = qs.select_related(
@@ -274,7 +298,15 @@ class PropertyViewSet(ReadOnlyModelViewSet):
                 "house_details",
                 "land_plot_details",
                 "commercial_details",
-            ).prefetch_related("photos", "videos", "price_history")
+            ).prefetch_related(
+                # Detail returns ALL photos, cover (main) first.
+                Prefetch(
+                    "photos",
+                    queryset=PropertyPhoto.objects.order_by(*COVER_PHOTO_ORDER),
+                ),
+                "videos",
+                "price_history",
+            )
 
         return qs
 

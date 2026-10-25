@@ -36,6 +36,10 @@ const SWIPE_THRESHOLD_PX = 40;
 
 interface PropertyGalleryProps {
   gallery?: string[];
+  /** Small images for the strips; same length/order as `gallery`, else ignored. */
+  thumbs?: string[];
+  /** Big images, loaded only in the lightbox; same length/order as `gallery`. */
+  large?: string[];
   videoUrl?: string;
   mainImage: string;
   /** Drives the «Цена снижена» badge. Derived upstream from price history. */
@@ -49,11 +53,14 @@ function MediaImage({
   className,
   loading,
   contain,
+  priority,
 }: {
   value: string;
   className?: string;
   loading?: "lazy" | "eager";
   contain?: boolean;
+  /** LCP image: fetchPriority="high". Only the first hero image gets it. */
+  priority?: boolean;
 }) {
   const blockContextMenu = (e: React.MouseEvent) => e.preventDefault();
   return (
@@ -66,6 +73,7 @@ function MediaImage({
         className,
       )}
       loading={loading ?? "lazy"}
+      fetchPriority={priority ? "high" : undefined}
       decoding="async"
       draggable={false}
       onContextMenu={blockContextMenu}
@@ -79,6 +87,8 @@ function MediaImage({
 
 export function PropertyGallery({
   gallery,
+  thumbs,
+  large,
   videoUrl,
   mainImage,
   isPriceReduced = false,
@@ -87,9 +97,21 @@ export function PropertyGallery({
   // Only real image URLs count as photos. The upstream mapper substitutes a
   // placeholder LABEL when a listing has none, and rendering that as a photo is
   // what used to make the empty state look like a broken image.
-  const photos = (gallery && gallery.length > 0 ? gallery : [mainImage]).filter(
-    isPropertyImageUrl,
-  );
+  //
+  // Three sizes per photo, index-aligned: medium for the hero, thumb for the
+  // strips (so ten photos never mean ten medium downloads), large only in the
+  // lightbox. A missing/mismatched thumbs/large array falls back to medium.
+  const base = gallery && gallery.length > 0 ? gallery : [mainImage];
+  const entries = base
+    .map((src, i) => ({
+      src,
+      thumb: thumbs && thumbs.length === base.length ? thumbs[i] : src,
+      big: large && large.length === base.length ? large[i] : src,
+    }))
+    .filter((e) => isPropertyImageUrl(e.src));
+  const photos = entries.map((e) => e.src);
+  const thumbPhotos = entries.map((e) => e.thumb);
+  const bigPhotos = entries.map((e) => e.big);
   const count = photos.length;
 
   const [activeIndex, setActiveIndex] = useState(0);
@@ -125,6 +147,20 @@ export function PropertyGallery({
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, step]);
 
+  // Load only the ±1 neighbours of the photo being looked at, and only once the
+  // visitor has started browsing (opened the lightbox or moved off the first
+  // photo). Nothing is downloaded ahead of that, so opening the page costs the
+  // first image plus the small strip thumbnails.
+  useEffect(() => {
+    if (!isOpen && activeIndex === 0) return;
+    const pool = isOpen ? bigPhotos : photos;
+    for (const i of [activeIndex - 1, activeIndex + 1]) {
+      const src = pool[i];
+      if (src) new Image().src = src;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, activeIndex, count]);
+
   // Freeze the page behind the overlay, and restore exactly what was there
   // before (not a hardcoded ""), so we cannot clobber another lock.
   useEffect(() => {
@@ -147,8 +183,10 @@ export function PropertyGallery({
   }
 
   const many = count > 1;
-  const active = photos[Math.min(activeIndex, count - 1)];
-  const stripPhotos = photos.slice(0, MAX_STRIP_THUMBS);
+  const activeAt = Math.min(activeIndex, count - 1);
+  const active = photos[activeAt];
+  const activeBig = bigPhotos[activeAt];
+  const stripPhotos = thumbPhotos.slice(0, MAX_STRIP_THUMBS);
   const hiddenCount = count - MAX_STRIP_THUMBS + 1;
 
   const onTouchStart = (e: React.TouchEvent) => {
@@ -175,7 +213,11 @@ export function PropertyGallery({
           className="absolute inset-0 cursor-zoom-in"
           aria-label="Открыть фотографии во весь экран"
         >
-          <MediaImage value={active} loading="eager" />
+          {/* Unmounted while the lightbox is open: otherwise paging in the
+              lightbox also downloaded each photo's medium behind the overlay. */}
+          {!isOpen && (
+            <MediaImage value={active} loading="eager" priority={activeIndex === 0} />
+          )}
           <span
             aria-hidden="true"
             className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/40"
@@ -310,7 +352,7 @@ export function PropertyGallery({
             onTouchStart={onTouchStart}
             onTouchEnd={onTouchEnd}
           >
-            <MediaImage value={active} loading="eager" contain />
+            <MediaImage value={activeBig} loading="eager" contain />
             {many && (
               <>
                 <button
@@ -339,7 +381,7 @@ export function PropertyGallery({
               // of a centred row is unreachable. Auto margins on the first and
               // last child centre a short row and let a long one scroll from 0.
               <div className="flex gap-2 overflow-x-auto px-6">
-                {photos.map((src, index) => (
+                {thumbPhotos.map((_, index) => (
                   <button
                     key={index}
                     type="button"
@@ -355,7 +397,7 @@ export function PropertyGallery({
                         : "opacity-45 hover:opacity-75",
                     )}
                   >
-                    <MediaImage value={src} />
+                    <MediaImage value={thumbPhotos[index]} />
                   </button>
                 ))}
               </div>

@@ -26,7 +26,10 @@ from properties.models import (
     PropertyPhoto,
     PropertyVideo,
 )
-from properties.property_photo_images import validate_property_photo_original_size
+from properties.property_photo_images import (
+    COVER_PHOTO_ORDER,
+    validate_property_photo_original_size,
+)
 from users.permissions import (
     crm_user_has_capability,
     user_can_access_crm_property,
@@ -123,15 +126,38 @@ def is_new_listing(obj) -> bool:
     return (timezone.now() - published) <= timedelta(days=NEW_LISTING_DAYS)
 
 
+def _photo_field_url(field_name: str, stored_name: str | None) -> str | None:
+    """URL for a bare stored name (what the list annotations return)."""
+    if not stored_name:
+        return None
+    storage = PropertyPhoto._meta.get_field(field_name).storage
+    try:
+        return storage.url(stored_name)
+    except (ValueError, AttributeError):
+        return None
+
+
 class PropertyPhotoPublicSerializer(serializers.ModelSerializer):
+    """One gallery photo. `url` (medium) is the original contract; `thumb` and
+    `large` are additive, so the gallery can load a small image for the strip and
+    the big one only in the lightbox. Each falls back down the ladder."""
+
     url = serializers.SerializerMethodField()
+    thumb = serializers.SerializerMethodField()
+    large = serializers.SerializerMethodField()
 
     class Meta:
         model = PropertyPhoto
-        fields = ["url", "sort_order", "is_main"]
+        fields = ["url", "thumb", "large", "sort_order", "is_main"]
 
     def get_url(self, obj):
         return media_url(obj.image_medium or obj.image_thumb or obj.original_file)
+
+    def get_thumb(self, obj):
+        return media_url(obj.image_thumb or obj.image_medium or obj.original_file)
+
+    def get_large(self, obj):
+        return media_url(obj.image_large or obj.image_medium or obj.original_file)
 
 
 class PropertyVideoPublicSerializer(serializers.ModelSerializer):
@@ -158,6 +184,9 @@ class PropertyListSerializer(serializers.ModelSerializer):
         read_only=True, allow_null=True
     )
     preview_image = serializers.SerializerMethodField()
+    # Total photos of the property (the card only ever loads the cover; this is
+    # for "1 / N"-style hints). Annotated by the list queryset.
+    photos_count = serializers.SerializerMethodField()
     is_price_reduced = serializers.SerializerMethodField()
     is_new = serializers.SerializerMethodField()
 
@@ -199,6 +228,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
             "land_plot_details",
             "commercial_details",
             "preview_image",
+            "photos_count",
             "is_price_reduced",
             "is_new",
             # Publication timestamp — what «Сначала новые» sorts by. Public-safe:
@@ -224,11 +254,30 @@ class PropertyListSerializer(serializers.ModelSerializer):
         return obj.price < peak
 
     def get_preview_image(self, obj):
-        for photo in obj.photos.all()[:1]:
-            url = media_url(photo.image_medium or photo.image_thumb or photo.original_file)
-            if url:
-                return url
-        return None
+        """The COVER photo (main first, COVER_PHOTO_ORDER) at card size.
+
+        Reads the `cover_*` annotations of the list queryset: no photo rows are
+        loaded. Off a non-annotated queryset it falls back to one query rather
+        than silently returning nothing.
+        """
+        if hasattr(obj, "cover_original"):
+            for field, name in (
+                ("image_medium", obj.cover_medium),
+                ("image_thumb", obj.cover_thumb),
+                ("original_file", obj.cover_original),
+            ):
+                url = _photo_field_url(field, name)
+                if url:
+                    return url
+            return None
+        photo = obj.photos.order_by(*COVER_PHOTO_ORDER).first()
+        if photo is None:
+            return None
+        return media_url(photo.image_medium or photo.image_thumb or photo.original_file)
+
+    def get_photos_count(self, obj) -> int:
+        count = getattr(obj, "photos_count", None)
+        return count if count is not None else obj.photos.count()
 
 
 class PriceHistoryPublicSerializer(serializers.ModelSerializer):

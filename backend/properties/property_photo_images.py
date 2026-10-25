@@ -49,12 +49,18 @@ PHOTO_LIMIT_MESSAGE = (
 #: Machine-readable `code` in the 400 body, so the client can stop its queue.
 PHOTO_LIMIT_CODE = "photo_limit"
 
+#: ⭐ THE ONE definition of a property's COVER photo (card / catalog / first in
+#: the gallery): the main photo first, then manual order, then id. Used by the
+#: list annotations, the detail prefetch and the CRM, so they can never disagree.
+COVER_PHOTO_ORDER = ("-is_main", "sort_order", "id")
+
 # --- Web-friendly output for derivatives (original_file kept as uploaded) ---
 DERIVATIVE_IMAGE_FORMAT = "JPEG"
 DERIVATIVE_JPEG_QUALITY = JPEG_QUALITY
 
 __all__ = [
     "MAX_ORIGINAL_FILE_BYTES",
+    "COVER_PHOTO_ORDER",
     "MAX_PHOTOS_PER_PROPERTY",
     "PHOTO_LIMIT_MESSAGE",
     "PHOTO_LIMIT_CODE",
