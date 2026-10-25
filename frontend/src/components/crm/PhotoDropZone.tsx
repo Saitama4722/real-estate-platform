@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Icon, Icons } from "@/components/ui/icon";
-import { ACCEPTED_PHOTO_ATTR, MAX_PHOTO_BYTES } from "@/lib/crmPropertyPhotos";
+import { ACCEPTED_PHOTO_ATTR } from "@/lib/crmPropertyPhotos";
 import { cn } from "@/lib/utils";
 
 /**
@@ -113,8 +113,6 @@ export function PhotoDropZone({
     };
   }, [dragActive]);
 
-  const maxMb = Math.round(MAX_PHOTO_BYTES / (1024 * 1024));
-
   return (
     <div>
       <input
@@ -170,8 +168,8 @@ export function PhotoDropZone({
       </button>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <p id={hintId} className="text-xs text-fg-muted">
-          До {max} фотографий. JPG, PNG, WEBP, до {maxMb} МБ каждая. Большие изображения
-          сжимаются автоматически.
+          До {max} фотографий. JPG, PNG, WEBP. Фото больше 1 МБ сжимаются автоматически без
+          заметной потери качества.
         </p>
         <span
           className={cn(

@@ -11,37 +11,40 @@
  */
 
 import { xhrUpload, extractUploadError, type XhrUploadResult } from "@/lib/xhrUpload";
+import { MAX_ORIGINAL_PHOTO_BYTES, isHeicLike, photoTooLargeMessage } from "@/lib/photoCompression";
+
+/*
+ * ⛔ Two SEPARATE constants live in this feature: the photo COUNT limit below
+ * (MAX_PROPERTY_PHOTOS) and the SIZE policy in `photoCompression.ts` (1 MiB target,
+ * 2560/1920 px, 40 MiB cap). Changing one must never touch the other.
+ */
 
 export const MAX_PROPERTY_PHOTOS = 10;
 
 /**
  * Parallel uploads. 2, not more: production runs 3 SYNC gunicorn workers
- * (`docker-compose.prod.yml`, `--workers 3 --timeout 60`) and a slow 12 MiB body
- * holds a worker for the whole transfer, so 3-4 parallel uploads from one
+ * (`docker-compose.prod.yml`, `--workers 3 --timeout 60`) and a slow upload body
+ * (about 1 MB after the browser's compression) holds a worker for the whole transfer, so 3-4 parallel uploads from one
  * realtor could occupy every worker and stall the site for everybody. The
  * endpoint takes one file per request. Raising this needs gthread/async workers.
  */
 export const UPLOAD_CONCURRENCY = 2;
 
-/** Server limit per original (`MAX_IMAGE_UPLOAD_BYTES`, 12 MiB). */
-export const MAX_PHOTO_BYTES = 12 * 1024 * 1024;
-
-/** `accept` for the file input. HEIC is NOT here: the server has no pillow-heif. */
+/**
+ * `accept` for the file input. HEIC is not listed (iOS then converts to JPEG itself),
+ * but a HEIC that arrives anyway (drag-and-drop) is sent through the compressor,
+ * which re-encodes it where the browser can decode it and reports it otherwise.
+ */
 export const ACCEPTED_PHOTO_ATTR = "image/jpeg,image/png,image/webp";
 
 export const PHOTO_LIMIT_MESSAGE = `Можно загрузить не более ${MAX_PROPERTY_PHOTOS} фотографий для одного объекта`;
 
 const OK_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const OK_EXT = new Set(["jpg", "jpeg", "png", "webp"]);
-const HEIC_EXT = new Set(["heic", "heif"]);
 
 function extOf(name: string): string {
   const i = name.lastIndexOf(".");
   return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
-}
-
-function isHeic(f: File): boolean {
-  return /hei[cf]/i.test(f.type) || HEIC_EXT.has(extOf(f.name));
 }
 
 /** Server CrmPropertyPhoto JSON (`CrmPropertyPhotoSerializer`). */
@@ -83,14 +86,12 @@ export function makeStagedPhoto(file: File): StagedPhoto {
 export interface ClassifiedFiles {
   /** Within the room left, valid — safe to upload / stage. */
   accepted: File[];
-  /** Not a photo, or a format the server cannot read. */
+  /** Not a photo. */
   rejectedType: File[];
-  /** Over MAX_PHOTO_BYTES. */
+  /** Over MAX_ORIGINAL_PHOTO_BYTES (40 MiB), the cap on the ORIGINAL. */
   rejectedSize: File[];
   /** Valid, but there is no room left (the first `room` files are kept). */
   overflow: File[];
-  /** Subset of rejectedType that is HEIC/HEIF (gets its own hint). */
-  heic: File[];
 }
 
 /**
@@ -103,20 +104,15 @@ export function classifyFiles(files: File[], room: number): ClassifiedFiles {
     rejectedType: [],
     rejectedSize: [],
     overflow: [],
-    heic: [],
   };
   for (const f of files) {
-    if (isHeic(f)) {
-      out.rejectedType.push(f);
-      out.heic.push(f);
-      continue;
-    }
-    const typeOk = OK_TYPES.has(f.type) || (f.type === "" && OK_EXT.has(extOf(f.name)));
+    const typeOk =
+      OK_TYPES.has(f.type) || isHeicLike(f) || (f.type === "" && OK_EXT.has(extOf(f.name)));
     if (!typeOk) {
       out.rejectedType.push(f);
       continue;
     }
-    if (f.size > MAX_PHOTO_BYTES) {
+    if (f.size > MAX_ORIGINAL_PHOTO_BYTES) {
       out.rejectedSize.push(f);
       continue;
     }
@@ -135,13 +131,9 @@ function names(files: File[], max = 3): string {
 /** Russian, human messages for everything `classifyFiles` turned away. */
 export function describeRejections(c: ClassifiedFiles): string[] {
   const msgs: string[] = [];
-  const plainType = c.rejectedType.filter((f) => !c.heic.includes(f));
-  if (plainType.length)
-    msgs.push(`Не фотографии, пропущены: ${names(plainType)}. Подходят JPG, PNG и WEBP.`);
-  if (c.heic.length)
-    msgs.push(`Формат HEIC не поддерживается, сохраните фото как JPG: ${names(c.heic)}.`);
-  if (c.rejectedSize.length)
-    msgs.push(`Больше 12 МБ, пропущены: ${names(c.rejectedSize)}.`);
+  if (c.rejectedType.length)
+    msgs.push(`Не фотографии, пропущены: ${names(c.rejectedType)}. Подходят JPG, PNG и WEBP.`);
+  for (const f of c.rejectedSize) msgs.push(`${photoTooLargeMessage(f.name)}.`);
   if (c.overflow.length)
     msgs.push(
       `Лимит ${MAX_PROPERTY_PHOTOS} фотографий: не добавлено ${c.overflow.length} (${names(c.overflow)}).`,

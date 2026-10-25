@@ -21,6 +21,13 @@ import {
   CONSENT_REQUIRED_ERROR,
 } from "@/components/legal/ConsentCheckbox";
 import type { SellCity } from "@/lib/saleRequest";
+import {
+  MAX_ORIGINAL_PHOTO_BYTES,
+  PhotoProcessingError,
+  isHeicLike,
+  photoTooLargeMessage,
+  preparePhotoForUpload,
+} from "@/lib/photoCompression";
 
 const PHONE_EMPTY = "+7 ";
 const PHONE_MIN_DIGITS = 10;
@@ -120,6 +127,12 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
   const [rooms, setRooms] = useState("");
   const [askingPrice, setAskingPrice] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
+  const [photoNotice, setPhotoNotice] = useState("");
+  // Photos being compressed right now. They count against the limit, and the form
+  // cannot be sent until they are done (the compressed files are what is sent).
+  const [preparingPhotos, setPreparingPhotos] = useState(0);
+  const preparingRef = useRef(0);
+  const photoChainRef = useRef<Promise<void>>(Promise.resolve());
 
   // Opens the sr-only file input from the styled picker button.
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -259,12 +272,40 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
 
   const onPickPhotos = (files: FileList | null) => {
     if (!files) return;
-    const picked = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    setPhotos((prev) => [...prev, ...picked].slice(0, MAX_PHOTOS));
+    // Snapshot first: `files` is a LIVE FileList and the input is reset right after.
+    const all = Array.from(files);
+    const picked = all.filter((f) => f.type.startsWith("image/") || isHeicLike(f));
     setErrors((e) => {
       const n = { ...e };
       delete n.photos;
       return n;
+    });
+    const problems: string[] = [];
+    const tooBig = picked.filter((f) => f.size > MAX_ORIGINAL_PHOTO_BYTES);
+    tooBig.forEach((f) => problems.push(`${photoTooLargeMessage(f.name)}.`));
+    const room = Math.max(0, MAX_PHOTOS - photos.length - preparingRef.current);
+    const accepted = picked.filter((f) => f.size <= MAX_ORIGINAL_PHOTO_BYTES).slice(0, room);
+    if (all.length > 0 && picked.length === 0) problems.push("Подходят только фотографии: JPG, PNG или WEBP.");
+    setPhotoNotice(problems.join(" "));
+    if (accepted.length === 0) return;
+
+    preparingRef.current += accepted.length;
+    setPreparingPhotos(preparingRef.current);
+    // One file at a time, so decoded bitmaps are never held together.
+    photoChainRef.current = photoChainRef.current.then(async () => {
+      for (const file of accepted) {
+        try {
+          const prepared = await preparePhotoForUpload(file);
+          setPhotos((prev) => [...prev, prepared.file].slice(0, MAX_PHOTOS));
+        } catch (e) {
+          const msg =
+            e instanceof PhotoProcessingError ? e.message : `Не удалось обработать файл ${file.name}.`;
+          setPhotoNotice((prev) => (prev ? `${prev} ${msg}` : msg));
+        } finally {
+          preparingRef.current -= 1;
+          setPreparingPhotos(preparingRef.current);
+        }
+      }
     });
   };
   const removePhoto = (idx: number) => {
@@ -277,7 +318,7 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
    * filters to image/* and caps at MAX_PHOTOS. No upload logic is duplicated or
    * changed here; only `dragActive` (a visual flag) is new.
    */
-  const photosDisabled = submitting || photos.length >= MAX_PHOTOS;
+  const photosDisabled = submitting || photos.length + preparingPhotos >= MAX_PHOTOS;
 
   const onZoneDragOver = (e: React.DragEvent<HTMLButtonElement>) => {
     if (photosDisabled) return;
@@ -677,7 +718,7 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
           type="file"
           accept="image/*"
           multiple
-          disabled={submitting || photos.length >= MAX_PHOTOS}
+          disabled={photosDisabled}
           onChange={(e) => {
             onPickPhotos(e.target.files);
             e.target.value = "";
@@ -716,14 +757,14 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
           </span>
           <span className="pointer-events-none min-w-0">
             <span className="block text-[14.5px] font-semibold text-fg">
-              {photos.length >= MAX_PHOTOS
+              {photos.length + preparingPhotos >= MAX_PHOTOS
                 ? "Достигнут лимит фотографий"
                 : dragActive
                   ? "Отпустите, чтобы добавить"
                   : "Перетащите фото сюда"}
             </span>
             <span className="mt-0.5 block text-[13px] text-fg-muted">
-              {photos.length >= MAX_PHOTOS ? (
+              {photos.length + preparingPhotos >= MAX_PHOTOS ? (
                 "Удалите лишние, чтобы добавить другие"
               ) : (
                 <>
@@ -735,8 +776,19 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
           </span>
         </button>
         <p className="mt-2 text-xs text-fg-muted">
-          До {MAX_PHOTOS} фото. Первое станет главным при публикации.
+          До {MAX_PHOTOS} фото. JPG, PNG, WEBP. Фото больше 1 МБ сжимаются автоматически без
+          заметной потери качества. Первое станет главным при публикации.
         </p>
+        {preparingPhotos > 0 && (
+          <p role="status" className="mt-1 text-xs text-fg-secondary">
+            Сжатие фото… осталось {preparingPhotos}
+          </p>
+        )}
+        {photoNotice && (
+          <p role="alert" className="mt-1 text-xs text-danger">
+            {photoNotice}
+          </p>
+        )}
         {errors.photos && <p className="mt-1 text-xs text-danger">{errors.photos}</p>}
         {photos.length > 0 && (
           <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -860,7 +912,11 @@ export function SellPropertyForm({ cities }: { cities: SellCity[] }) {
           // field gates the button too; the pre-existing fields are left as they
           // were rather than silently changing their behaviour.
           disabled={
-            submitting || captchaLoading || !consent || address.trim().length < 5
+            submitting ||
+            captchaLoading ||
+            !consent ||
+            address.trim().length < 5 ||
+            preparingPhotos > 0
           }
         >
           {submitting ? "Отправка…" : "Отправить заявку"}

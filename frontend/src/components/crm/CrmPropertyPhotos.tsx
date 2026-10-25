@@ -4,6 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PhotoDropZone } from "@/components/crm/PhotoDropZone";
 import { fetchWithCrmAuthRetry } from "@/lib/crmAuth";
 import {
+  PhotoProcessingError,
+  photoNeedsCompression,
+  preparePhotoForUpload,
+} from "@/lib/photoCompression";
+import {
   MAX_PROPERTY_PHOTOS,
   UPLOAD_CONCURRENCY,
   classifyFiles,
@@ -47,7 +52,7 @@ export type CrmPropertyPhotosProps =
     }
   | { mode: "live"; propertyId: string };
 
-type QueueStatus = "queued" | "uploading" | "error";
+type QueueStatus = "queued" | "compressing" | "uploading" | "error";
 
 interface QueueItem {
   key: string;
@@ -140,6 +145,18 @@ function StagedPhotos({
   disabled = false,
 }: Extract<CrmPropertyPhotosProps, { mode: "staged" }>) {
   const [warnings, setWarnings] = useState<string[]>([]);
+  // Files still being compressed: they already count against the limit, and are
+  // processed ONE AT A TIME so decoded bitmaps are never held together.
+  const [preparing, setPreparing] = useState(0);
+  const preparingRef = useRef(0);
+  const chainRef = useRef<Promise<void>>(Promise.resolve());
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
 
   // Latest items for the unmount cleanup, without re-subscribing the effect on
   // every change (which would revoke still-displayed previews).
@@ -149,14 +166,43 @@ function StagedPhotos({
     return () => itemsRef.current.forEach((i) => URL.revokeObjectURL(i.previewUrl));
   }, []);
 
-  const count = reservedCount + items.length;
+  const count = reservedCount + items.length + preparing;
+
+  const addPreparing = (delta: number) => {
+    preparingRef.current += delta;
+    if (aliveRef.current) setPreparing(preparingRef.current);
+  };
 
   const onFiles = (files: File[]) => {
-    const classified = classifyFiles(files, MAX_PROPERTY_PHOTOS - count);
+    const room = MAX_PROPERTY_PHOTOS - (reservedCount + itemsRef.current.length + preparingRef.current);
+    const classified = classifyFiles(files, room);
     setWarnings(describeRejections(classified));
-    if (classified.accepted.length > 0) {
-      onChange([...itemsRef.current, ...classified.accepted.map(makeStagedPhoto)]);
-    }
+    const accepted = classified.accepted;
+    if (accepted.length === 0) return;
+    addPreparing(accepted.length);
+    chainRef.current = chainRef.current.then(async () => {
+      for (const file of accepted) {
+        try {
+          // Compressed NOW (not after the property is created), so a file the
+          // browser cannot read is reported straight away and only ~1 MB is held.
+          const prepared = await preparePhotoForUpload(file);
+          if (aliveRef.current) {
+            // ⚠ Update the ref NOW, not on the next render: a small file right
+            // after a big one resolves before React re-renders, and would append
+            // to the stale list and silently replace the photo that came first.
+            const next = [...itemsRef.current, makeStagedPhoto(prepared.file)];
+            itemsRef.current = next;
+            onChange(next);
+          }
+        } catch (e) {
+          const msg =
+            e instanceof PhotoProcessingError ? e.message : `Не удалось обработать файл ${file.name}.`;
+          if (aliveRef.current) setWarnings((w) => [...w, msg]);
+        } finally {
+          addPreparing(-1);
+        }
+      }
+    });
   };
 
   const removeItem = (key: string) => {
@@ -185,9 +231,16 @@ function StagedPhotos({
         }
       />
       <Notices warnings={warnings} summary={null} error={null} onDismiss={() => setWarnings([])} />
+      {preparing > 0 ? (
+        <p role="status" className="text-sm text-fg-secondary">
+          Сжатие фото… осталось {preparing}
+        </p>
+      ) : null}
 
       {items.length === 0 ? (
-        <p className="text-sm text-fg-muted">Фотографии пока не выбраны.</p>
+        <p className="text-sm text-fg-muted">
+          {preparing > 0 ? "Подготовка фотографий…" : "Фотографии пока не выбраны."}
+        </p>
       ) : (
         <ul className={GRID}>
           {items.map((item, idx) => (
@@ -306,7 +359,8 @@ function LivePhotos({ propertyId }: { propertyId: string }) {
 
   const finishBatchIfIdle = useCallback(() => {
     const q = queueRef.current;
-    if (q.some((x) => x.status === "queued" || x.status === "uploading")) return;
+    if (q.some((x) => x.status === "queued" || x.status === "compressing" || x.status === "uploading"))
+      return;
     const results = batchRef.current;
     batchRef.current = [];
     if (results.length === 0) return;
@@ -321,11 +375,35 @@ function LivePhotos({ propertyId }: { propertyId: string }) {
       const item = queueRef.current.find((q) => q.status === "queued");
       if (!item) break;
       activeRef.current += 1;
+      const needsCompression = photoNeedsCompression(item.file);
       updateQueue((q) =>
-        q.map((x) => (x.key === item.key ? { ...x, status: "uploading", percent: 0 } : x)),
+        q.map((x) =>
+          x.key === item.key
+            ? { ...x, status: needsCompression ? "compressing" : "uploading", percent: 0 }
+            : x,
+        ),
       );
       void (async () => {
-        const result = await uploadOnePropertyPhoto(propertyId, item.file, {
+        let toSend = item.file;
+        let prepError: string | null = null;
+        if (needsCompression) {
+          try {
+            toSend = (await preparePhotoForUpload(item.file)).file;
+          } catch (e) {
+            prepError =
+              e instanceof PhotoProcessingError
+                ? e.message
+                : `Не удалось обработать файл ${item.file.name}.`;
+          }
+          if (!prepError) {
+            updateQueue((q) =>
+              q.map((x) => (x.key === item.key ? { ...x, status: "uploading", percent: 0 } : x)),
+            );
+          }
+        }
+        const result: PhotoUploadResult = prepError
+          ? { file: item.file, ok: false, message: prepError }
+          : await uploadOnePropertyPhoto(propertyId, toSend, {
           // The server decides who is main (the first photo of an empty property);
           // the client never sends is_main from here.
           sortOrder: item.sortOrder,
@@ -562,17 +640,23 @@ function LivePhotos({ propertyId }: { propertyId: string }) {
                     <p className="text-[11px] text-fg-secondary">
                       {item.status === "queued"
                         ? "В очереди…"
-                        : item.percent >= 100
-                          ? "Обработка на сервере…"
-                          : `Загрузка… ${item.percent}%`}
+                        : item.status === "compressing"
+                          ? "Сжатие…"
+                          : item.percent >= 100
+                            ? "Обработка на сервере…"
+                            : `Загрузка… ${item.percent}%`}
                     </p>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-inset">
                       <div
                         className={cn(
                           "h-full rounded-full bg-brand transition-[width] duration-200 ease-out",
-                          item.status === "uploading" && item.percent >= 100 && "motion-safe:animate-pulse",
+                          (item.status === "compressing" ||
+                            (item.status === "uploading" && item.percent >= 100)) &&
+                            "motion-safe:animate-pulse",
                         )}
-                        style={{ width: `${item.status === "queued" ? 0 : item.percent}%` }}
+                        style={{
+                          width: `${item.status === "queued" || item.status === "compressing" ? 0 : item.percent}%`,
+                        }}
                       />
                     </div>
                   </>

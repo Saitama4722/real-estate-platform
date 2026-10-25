@@ -58,7 +58,35 @@ DERIVATIVE_SIZES: dict[str, int] = {
 }
 
 # --- Upload guards (shared; the public owner form is the strictest consumer) ---
-MAX_IMAGE_UPLOAD_BYTES = 12 * 1024 * 1024  # 12 MiB — same budget as CRM photos
+# 12 MiB: the server cap of the PUBLIC «Продать недвижимость» form (its client compresses
+# to about 1 MB first). CRM property photos have their own cap, 40 MiB:
+# MAX_PROPERTY_PHOTO_UPLOAD_BYTES below.
+MAX_IMAGE_UPLOAD_BYTES = 12 * 1024 * 1024
+
+# --- CRM property photos: size policy (2026-10-26) --------------------------
+# SEPARATE from the photo COUNT limit (properties.property_photo_images
+# .MAX_PHOTOS_PER_PROPERTY). The browser compresses big photos before upload
+# (frontend/src/lib/photoCompression.ts); everything here is the SAFETY NET for
+# clients that did not (API use, an old cached bundle) plus the hard caps.
+#: Hard cap on the uploaded ORIGINAL; the client enforces the same number.
+MAX_PROPERTY_PHOTO_UPLOAD_BYTES = 40 * 1024 * 1024
+#: Decompression-bomb guard, checked from the HEADER before anything is decoded.
+#: 100 MP is ~300 MB as RGB, the most one gunicorn worker on the 4 GB VPS should
+#: decode.
+MAX_PHOTO_PIXELS = 100_000_000
+#: Pillow warns above this many pixels and raises above twice as many; set it
+#: explicitly instead of relying on the library default.
+Image.MAX_IMAGE_PIXELS = MAX_PHOTO_PIXELS
+#: A stored property original is at most this long on its longer side...
+PROPERTY_ORIGINAL_MAX_EDGE = 2560
+#: ...and is only shrunk below that (never below this) to fit the byte target.
+PROPERTY_ORIGINAL_MIN_EDGE = 1920
+#: An upload this small AND within PROPERTY_ORIGINAL_MAX_EDGE is stored byte for
+#: byte unchanged; it is also the byte target of a server-side re-encode.
+PROPERTY_ORIGINAL_SKIP_BYTES = 1536 * 1024
+PROPERTY_ORIGINAL_START_QUALITY = 90
+PROPERTY_ORIGINAL_MIN_QUALITY = 85
+_EDGE_SHRINK = 0.9
 
 #: Whitelist checked against the DECODED Pillow format, never the filename
 #: extension or the client-supplied Content-Type — both are trivially forged.
@@ -66,6 +94,10 @@ ALLOWED_UPLOAD_FORMATS = frozenset({"JPEG", "PNG", "WEBP"})
 
 _TOO_LARGE_MSG = "Размер файла не должен превышать 12 МБ."
 _NOT_AN_IMAGE_MSG = "Файл повреждён или не является изображением."
+_TOO_MANY_PIXELS_MSG = (
+    "Изображение слишком большое по размерам (больше 100 мегапикселей). "
+    "Уменьшите фото и загрузите его снова."
+)
 _BAD_FORMAT_MSG = "Поддерживаются только JPEG, PNG и WebP."
 
 
@@ -118,6 +150,89 @@ def _open(raw: bytes) -> tuple[Image.Image, str]:
     img = ImageOps.exif_transpose(img)  # honor phone-photo rotation
     img.load()
     return img, original_format
+
+
+def validate_photo_dimensions(uploaded_file) -> None:
+    """Reject absurd pixel counts from the HEADER, before anything is decoded."""
+    try:
+        with Image.open(BytesIO(_read_bytes(uploaded_file))) as probe:
+            w, h = probe.size
+    except Image.DecompressionBombError as exc:
+        raise ValidationError(_TOO_MANY_PIXELS_MSG, code="too_many_pixels") from exc
+    except Exception:  # noqa: BLE001 - not decodable: the image field reports it
+        return
+    if w * h > MAX_PHOTO_PIXELS:
+        raise ValidationError(_TOO_MANY_PIXELS_MSG, code="too_many_pixels")
+
+
+def compress_property_original(uploaded_file) -> ContentFile | None:
+    """
+    Server-side safety net for a CRM property photo's ORIGINAL.
+
+    * <= PROPERTY_ORIGINAL_SKIP_BYTES and <= PROPERTY_ORIGINAL_MAX_EDGE px: returns
+      None, the upload is stored UNCHANGED (never re-encode what is already small,
+      or what the browser already compressed).
+    * Otherwise re-encoded to JPEG: EXIF orientation applied, long side <= 2560
+      (LANCZOS), quality 90 then 85, then shrinking x0.9 down to 1920 px at q85 to
+      reach the byte target; a still-bigger result is accepted, not made worse.
+    * EXIF: orientation is baked in and ALL metadata (GPS, camera, embedded
+      thumbnail) is dropped; only the ICC colour profile is kept so wide-gamut
+      phone photos do not turn dull. An UNCHANGED small file keeps whatever
+      metadata it arrived with; public pages never serve originals (the
+      derivatives carry no metadata).
+    * Returns None when the re-encode would be no smaller and no resize was needed.
+    * JPEG sources are decoded with ``Image.draft`` (DCT downscale), so a 40 MiB /
+      100 MP photo costs a fraction of its full RGB size in memory.
+    """
+    raw = _read_bytes(uploaded_file)
+    img = Image.open(BytesIO(raw))
+    fmt = (img.format or "").upper()
+    w, h = img.size
+    if w <= 0 or h <= 0:
+        return None
+    if w * h > MAX_PHOTO_PIXELS:
+        raise ValidationError(_TOO_MANY_PIXELS_MSG, code="too_many_pixels")
+    long_side = max(w, h)
+    if len(raw) <= PROPERTY_ORIGINAL_SKIP_BYTES and long_side <= PROPERTY_ORIGINAL_MAX_EDGE:
+        return None
+
+    first_edge = min(long_side, PROPERTY_ORIGINAL_MAX_EDGE)
+    if fmt == "JPEG" and long_side > first_edge:
+        scale = first_edge / long_side
+        img.draft("RGB", (max(1, int(w * scale)), max(1, int(h * scale))))
+    img = ImageOps.exif_transpose(img)
+    img.load()
+    icc = img.info.get("icc_profile")
+    rgb = _to_rgb_for_jpeg(img)
+    if max(rgb.size) > first_edge:
+        rgb = rgb.copy()
+        rgb.thumbnail((first_edge, first_edge), Image.Resampling.LANCZOS)
+
+    attempts: list[tuple[int, int]] = [
+        (first_edge, PROPERTY_ORIGINAL_START_QUALITY),
+        (first_edge, PROPERTY_ORIGINAL_MIN_QUALITY),
+    ]
+    edge = first_edge
+    while edge > PROPERTY_ORIGINAL_MIN_EDGE:
+        edge = max(PROPERTY_ORIGINAL_MIN_EDGE, int(edge * _EDGE_SHRINK))
+        attempts.append((edge, PROPERTY_ORIGINAL_MIN_QUALITY))
+
+    encoded = b""
+    for edge, quality in attempts:  # bounded: a handful of entries
+        candidate = rgb
+        if max(rgb.size) > edge:
+            candidate = rgb.copy()
+            candidate.thumbnail((edge, edge), Image.Resampling.LANCZOS)
+        buffer = BytesIO()
+        extra = {"icc_profile": icc} if icc else {}
+        candidate.save(buffer, format="JPEG", quality=quality, optimize=True, **extra)
+        encoded = buffer.getvalue()
+        if len(encoded) <= PROPERTY_ORIGINAL_SKIP_BYTES:
+            break
+
+    if long_side <= PROPERTY_ORIGINAL_MAX_EDGE and len(encoded) >= len(raw):
+        return None  # no resize was needed and the re-encode is not smaller
+    return ContentFile(encoded, name=_jpeg_name(uploaded_file))
 
 
 def compress_avatar(uploaded_file, *, size: int = AVATAR_SIZE) -> ContentFile | None:

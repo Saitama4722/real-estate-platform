@@ -691,6 +691,14 @@ Details: `docs/claude/address-and-geo.md`.
   HTML and `/api/*` are NOT given long caching. Caddyfile changes: validate in the
   container, `caddy reload` (a git pull leaves the single-file bind mount on the OLD
   inode). Details and the how-to: `deploy/README.md` §11.
+- **Photo SIZE policy (2026-10-26), a constant SEPARATE from the count limit:** users are
+  never blocked by size. The browser (`frontend/src/lib/photoCompression.ts`) leaves a
+  photo <= 1 MiB untouched and compresses a bigger one to ~1 MiB (JPEG q 0.90 -> 0.82,
+  long side 2560 -> 1920 px, EXIF baked in, white background); the original cap is 40 MiB
+  (`MAX_ORIGINAL_PHOTO_BYTES` / `MAX_PROPERTY_PHOTO_UPLOAD_BYTES`; the old 12 MiB is gone,
+  except the PUBLIC sale form's server cap). Server safety net: <= 1.5 MiB and <= 2560 px
+  is stored byte-identical, else re-encoded (q >= 85, EXIF/GPS dropped, ICC kept);
+  100 MP header guard. Details and the EXIF decision: `docs/claude/media-and-images.md`.
 - **Create and edit share ONE component:** `components/crm/CrmPropertyPhotos.tsx` +
   `PhotoDropZone.tsx`. Never add a second picker.
 - **⛔ Root cause of "can't add photos in edit mode":** `input.value = ""` before

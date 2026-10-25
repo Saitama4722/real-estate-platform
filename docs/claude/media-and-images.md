@@ -18,7 +18,8 @@ points:
 | a field with a **derivative ladder** | `build_derivatives(source)` | a Celery task, fired from `transaction.on_commit` in `save()` |
 
 `DERIVATIVE_SIZES` (`large` 1920 / `medium` 1024 / `thumb` 400, longest edge, never
-upscaled), `JPEG_QUALITY` (85), `MAX_IMAGE_UPLOAD_BYTES` (12 MiB) and
+upscaled), `JPEG_QUALITY` (85), `MAX_IMAGE_UPLOAD_BYTES` (12 MiB, the PUBLIC form's server cap; CRM
+property photos use `MAX_PROPERTY_PHOTO_UPLOAD_BYTES`, 40 MiB, see the size policy below) and
 `ALLOWED_UPLOAD_FORMATS` (JPEG/PNG/WebP) live there and **nowhere else**.
 
 `properties/property_photo_images.py` is now a thin facade that re-exports them. It
@@ -71,7 +72,50 @@ CLAUDE.md). A new file field MUST use it. The class path is frozen into
 migrations, so do not move or rename it. Rows stored before the change keep
 their old names (`photo_18_large.jpg`, `IMG_0042.jpg`, …); nothing was renamed.
 
-### ⭐ Property photos: 50 per property, server-enforced (2026-10-25)
+### ⭐ Photo SIZE policy (2026-10-26) — SEPARATE from the count limit
+
+A user must never be blocked by file size. **Count and size are two independent
+constants**: changing the count limit (`MAX_PHOTOS_PER_PROPERTY` / `MAX_PROPERTY_PHOTOS`)
+never touches the size policy, and the other way round.
+
+- **Browser (`frontend/src/lib/photoCompression.ts`, `preparePhotoForUpload`)**: a photo
+  <= 1 MiB (`TARGET_PHOTO_BYTES`) is uploaded UNTOUCHED, never re-encoded. A bigger one
+  is decoded with EXIF orientation (`createImageBitmap(file, {imageOrientation:
+  "from-image"})`, `<img>` fallback), downscaled to a long side <= 2560 px
+  (`MAX_LONG_SIDE`, never upscaled) in halving steps with high-quality smoothing onto a
+  white background, and encoded as JPEG at quality 0.90, 0.86, 0.82 (`START_JPEG_QUALITY`
+  .. `MIN_JPEG_QUALITY`); if still over 1 MiB the long side shrinks x0.9 per step down to
+  1920 px (`MIN_LONG_SIDE`) at 0.82; if STILL over, the last result is accepted instead of
+  degrading further. A result not smaller than the original is dropped for the original.
+  HEIC/HEIF always goes through the decoder (the server cannot read it): re-encoded where
+  the browser decodes it, a clear per-file Russian message where not.
+- **One path for everything:** the create form compresses at PICK time (so a bad file is
+  reported at once and ~1 MB is held, not 10 MB); the edit form compresses as a stage of
+  its upload queue («Сжатие…» -> «Загрузка… N%» -> «Обработка на сервере…»); the public
+  sale-request form compresses at pick time too. One file at a time.
+- **Cap on the ORIGINAL:** 40 MiB (`MAX_ORIGINAL_PHOTO_BYTES` in the client,
+  `MAX_PROPERTY_PHOTO_UPLOAD_BYTES` on the server). The old 12 MiB rejection is gone.
+  The PUBLIC form's server cap stays 12 MiB (`MAX_IMAGE_UPLOAD_BYTES`): its client
+  compresses to ~1 MB first, and an unauthenticated endpoint must not take 40 MiB x 10.
+- **Server safety net (`common/image_compression.py: compress_property_original`, called
+  from `PropertyPhoto.save`)** for clients that did not compress: an upload <= 1.5 MiB AND
+  <= 2560 px is stored BYTE-IDENTICAL. Anything bigger is re-encoded to JPEG (EXIF
+  transpose, long side <= 2560 with LANCZOS, quality 90 then 85, then x0.9 down to 1920 px
+  at 85 to reach 1.5 MiB; never made bigger than the source when no resize was needed).
+  JPEGs are decoded with `Image.draft` (DCT downscale), so a 40 MiB photo is cheap.
+- **Decompression-bomb guard:** `MAX_PHOTO_PIXELS = 100 MP`, checked from the header in
+  `validate_photo_dimensions` BEFORE decoding (Russian 400), and `Image.MAX_IMAGE_PIXELS`
+  is set explicitly. 100 MP is ~300 MB as RGB: the most one gunicorn worker should decode
+  on the 4 GB VPS.
+- **EXIF decision:** a re-encoded original (browser or server) has the orientation baked in
+  and ALL metadata dropped (GPS, camera, embedded thumbnail); the server keeps only the ICC
+  profile so wide-gamut phone photos stay colour-correct. An UNCHANGED small file keeps
+  whatever metadata it arrived with, but public pages never serve originals (derivatives
+  are re-encoded without metadata), and `original_file` is only shown to CRM users.
+- Existing stored photos are NOT reprocessed; derivatives (1920 / 1024 / 400) are built
+  from the stored original exactly as before.
+
+### ⭐ Property photos: 10 per property, server-enforced (2026-10-25)
 
 - **The limit lives in ONE constant per side:** `MAX_PHOTOS_PER_PROPERTY = 10` in
   `backend/properties/property_photo_images.py` (with `PHOTO_LIMIT_MESSAGE` /

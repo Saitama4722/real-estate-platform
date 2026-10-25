@@ -239,11 +239,12 @@ class PropertyPhotoUploadTests(TestCase):
 
     # --- file validation ---------------------------------------------------
 
-    def test_file_over_12_mib_is_rejected(self):
-        big = _jpeg() + b"\0" * (12 * 1024 * 1024)  # valid image + trailing bytes
+    def test_file_over_40_mib_is_rejected(self):
+        # The size POLICY (40 MiB cap, compression) is covered in tests_photo_size_policy.
+        big = _jpeg() + b"\0" * (40 * 1024 * 1024 + 1024)  # valid image + trailing bytes
         r = self._post(self.owner, data=big)
         self.assertEqual(r.status_code, 400, r.data)
-        self.assertIn("12", str(r.data))
+        self.assertIn("40", str(r.data))
         self.assertFalse(PropertyPhoto.objects.filter(property=self.prop).exists())
 
     def test_non_image_is_rejected(self):

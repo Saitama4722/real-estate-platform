@@ -23,17 +23,23 @@ from common.image_compression import (
     DERIVATIVE_MEDIUM_MAX_EDGE,
     DERIVATIVE_THUMB_MAX_EDGE,
     JPEG_QUALITY,
-    MAX_IMAGE_UPLOAD_BYTES,
+    MAX_PROPERTY_PHOTO_UPLOAD_BYTES,
     build_derivatives,
-    compress_to_max_edge,
+    compress_property_original,
+    validate_photo_dimensions,
 )
 
 logger = logging.getLogger(__name__)
 
 # --- Upload limit (original_file only; enforced before processing) ---
-#: Kept as a module-level alias so existing imports keep working; the value now
-#: comes from the shared module so the CRM and the public form cannot drift.
-MAX_ORIGINAL_FILE_BYTES = MAX_IMAGE_UPLOAD_BYTES
+#: 40 MiB since 2026-10-26 (was 12 MiB): the browser compresses big photos to
+#: about 1 MB before upload, so users are never blocked by size; this is only the
+#: hard cap on the ORIGINAL. The public sale-request form keeps its own, smaller
+#: server cap (`common.image_compression.MAX_IMAGE_UPLOAD_BYTES`): its client
+#: compresses too, and a public endpoint should not accept 40 MiB x 10 photos.
+#: SEPARATE from the photo COUNT limit below. The client mirrors this number in
+#: `frontend/src/lib/photoCompression.ts` (MAX_ORIGINAL_PHOTO_BYTES).
+MAX_ORIGINAL_FILE_BYTES = MAX_PROPERTY_PHOTO_UPLOAD_BYTES
 
 # --- Per-property photo limit (2026-10-25) ---
 #: ⭐ THE ONE backend definition of "how many photos a property may have".
@@ -74,30 +80,32 @@ __all__ = [
     "build_property_photo_derivatives",
 ]
 
-_ORIGINAL_TOO_LARGE_MSG = "Размер файла не должен превышать 12 МБ."
+_ORIGINAL_TOO_LARGE_MSG = (
+    f"Размер файла не должен превышать {MAX_ORIGINAL_FILE_BYTES // (1024 * 1024)} МБ."
+)
 
 
 def validate_property_photo_original_size(uploaded_file) -> None:
-    """Raise ValidationError if the upload exceeds ``MAX_ORIGINAL_FILE_BYTES``."""
+    """Raise ValidationError if the upload is too big in bytes or in pixels."""
     size = getattr(uploaded_file, "size", None)
     if size is not None and size > MAX_ORIGINAL_FILE_BYTES:
         raise ValidationError(_ORIGINAL_TOO_LARGE_MSG, code="file_too_large")
+    validate_photo_dimensions(uploaded_file)
 
 
 def compress_original_file(uploaded_file):
     """
-    Compress a freshly-uploaded ``original_file`` to longest-side
-    ``DERIVATIVE_LARGE_MAX_EDGE`` (1920) at JPEG quality 85, keeping aspect ratio.
+    Safety-net compression of a freshly-uploaded ``original_file`` (rules:
+    ``common.image_compression.compress_property_original``).
 
     Returns a Django ``ContentFile`` (``*.jpg``) to assign to the ImageField, or
-    ``None`` when the image already fits within 1920px on both sides AND is
-    already a JPEG (skip-if-small — leave the upload untouched). Returns ``None``
-    on any decode error so a bad upload never breaks the save (it is still
-    validated/processed downstream).
+    ``None`` when the upload must be stored unchanged (already <= 1.5 MiB and
+    <= 2560 px). Returns ``None`` on any decode error so a bad upload never breaks
+    the save (it is validated before this runs).
     """
     try:
-        return compress_to_max_edge(uploaded_file, max_edge=DERIVATIVE_LARGE_MAX_EDGE)
-    except Exception:  # noqa: BLE001 — never let compression break the save
+        return compress_property_original(uploaded_file)
+    except Exception:  # noqa: BLE001 - never let compression break the save
         logger.warning("compress_original_file: could not process image", exc_info=True)
         return None
 
