@@ -685,6 +685,12 @@ Details: `docs/claude/address-and-geo.md`.
   for the total); the cover is the MAIN photo (`COVER_PHOTO_ORDER`); the detail page loads
   hero medium, strip `thumb`, lightbox `large`, +-1 preload only. Details and numbers:
   `docs/claude/media-and-images.md`.
+- **Browser caching (2026-10-26):** Caddy sends `/media/*` with `public, max-age=31536000,
+  immutable` (keys are UUIDs and never overwritten; only when the file exists, so no
+  cached 404; `/media/imports/*` is `no-store`). `/_next/static` is immutable from Next,
+  HTML and `/api/*` are NOT given long caching. Caddyfile changes: validate in the
+  container, `caddy reload` (a git pull leaves the single-file bind mount on the OLD
+  inode). Details and the how-to: `deploy/README.md` §11.
 - **Create and edit share ONE component:** `components/crm/CrmPropertyPhotos.tsx` +
   `PhotoDropZone.tsx`. Never add a second picker.
 - **⛔ Root cause of "can't add photos in edit mode":** `input.value = ""` before

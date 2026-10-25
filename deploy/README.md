@@ -326,3 +326,42 @@ iptables -S | grep f2b                      # правило должно сод
 
 Снаружи забрать свежую копию базы на компьютер: `scripts\pull_db_backup.ps1`
 (одна попытка, `BatchMode=yes`, `ConnectTimeout=10`, без повторов).
+
+## 11. Кэширование в браузере (2026-10-26)
+
+Проверено `curl -sI` с сервера (`--resolve centreal.ru:443:217.114.1.193`):
+
+| Что | Cache-Control | Кто отдает |
+| --- | --- | --- |
+| `/media/*` фото | `public, max-age=31536000, immutable` (раньше не было, только ETag/Last-Modified) | Caddy `file_server` из тома `media` |
+| `/media/imports/*` | `private, no-store` | Caddy |
+| `/_next/static/*` | `public, max-age=31536000, immutable` (от Next.js, Caddy не трогает) | Next.js |
+| HTML-страницы | оставлено как есть (`no-store` / `s-maxage=60`) | Next.js |
+| `/api/*` JSON | без заголовков кэша, не менять (CRM и личные данные) | Django |
+
+Почему `immutable` безопасен для `/media/`: все 15 полей загрузки используют `UniqueUploadTo`
+(ключ `<папка>/<год>/<месяц>/<uuid4>.<расширение>`), хранилище не перезаписывает файлы
+(`file_overwrite: False`), производные (thumb/medium/large) при пересоздании получают НОВЫЙ ключ.
+Единственная команда, пишущая в существующие ключи, `migrate_media_to_r2`, копирует те же
+байты. Поэтому по одному URL содержимое не меняется. Заголовок ставится только если файл
+существует (`file {path}` в Caddyfile), чтобы 404 не закэшировался на год.
+
+Сжатие (`encode zstd gzip`) уже включено: HTML, JSON, CSS, JS, SVG сжимаются, JPEG нет
+(Caddy не сжимает уже сжатые типы).
+
+### Применить изменение Caddyfile без простоя
+
+```
+cd /opt/centreal
+DC="docker compose -f docker-compose.prod.yml --env-file deploy/.env.prod"
+$DC exec -T caddy cat /etc/caddy/Caddyfile > /root/Caddyfile.prev      # копия для отката
+git pull --ff-only
+# git заменяет файл целиком, а bind-mount одного файла держит СТАРЫЙ inode:
+# поэтому новый файл кладем в контейнер явно, проверяем и перезагружаем.
+$DC exec -T caddy sh -c 'cat > /tmp/Caddyfile' < deploy/Caddyfile
+$DC exec -T caddy caddy validate --config /tmp/Caddyfile --adapter caddyfile
+$DC exec -T caddy caddy reload --config /tmp/Caddyfile --adapter caddyfile
+```
+
+Откат: тот же путь с `/root/Caddyfile.prev` вместо нового файла. После `docker compose up -d caddy`
+(пересоздание контейнера) Caddy читает уже актуальный `deploy/Caddyfile`.

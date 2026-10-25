@@ -43,8 +43,24 @@
 	# MEDIA_STORAGE_BACKEND=local: files live in the shared `media` volume
 	# (written by backend + celery) and Caddy serves them read-only. Django
 	# itself only serves /media/ when DEBUG=True, which production never is.
+	#
+	# Browser caching (2026-10-26): every upload key is `<folder>/<yyyy>/<mm>/<uuid4>.<ext>`
+	# (common/upload_paths.UniqueUploadTo) and storage never overwrites, so a
+	# stored file's bytes never change under the same URL: cache it for a year.
+	# Without this header the browser had only ETag/Last-Modified and guessed a
+	# freshness of ~10% of the file's age, then revalidated every photo.
+	#  - `file {path}` makes the header apply only when the file EXISTS, so a 404
+	#    is never cached for a year.
+	#  - /media/imports/* (CRM import uploads) is excluded and sent no-store.
 	handle /media/* {
 		root * /srv
+		@cacheable {
+			not path /media/imports/*
+			file {path}
+		}
+		header @cacheable Cache-Control "public, max-age=31536000, immutable"
+		@private path /media/imports/*
+		header @private Cache-Control "private, no-store"
 		file_server
 	}
 
