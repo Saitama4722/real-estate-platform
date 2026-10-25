@@ -13,11 +13,15 @@ from properties.models import (
     PropertyPhoto,
     PropertyVideo,
 )
+from properties.property_photo_images import MAX_PHOTOS_PER_PROPERTY
 
 
 class PropertyPhotoInline(admin.TabularInline):
     model = PropertyPhoto
     extra = 1
+    # Soft guard only: admin saves bypass the CRM API, where the limit is
+    # enforced under a row lock (CrmPropertyPhotoViewSet._create_photo).
+    max_num = MAX_PHOTOS_PER_PROPERTY
     ordering = ("sort_order", "id")
     fields = (
         "original_file",

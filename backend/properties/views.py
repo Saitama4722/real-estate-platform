@@ -24,6 +24,11 @@ from properties.crm_publication import (
 )
 from properties.duplicate_detection import run_duplicate_check
 from properties.models import PhoneRevealLog, Property, PropertyContact, PropertyPhoto, PropertyVideo
+from properties.property_photo_images import (
+    MAX_PHOTOS_PER_PROPERTY,
+    PHOTO_LIMIT_CODE,
+    PHOTO_LIMIT_MESSAGE,
+)
 from properties.serializers import (
     CrmImportJobCreateSerializer,
     CrmImportJobDetailSerializer,
@@ -646,7 +651,19 @@ class CrmPropertyPhotoViewSet(
 
     def create(self, request, *args, **kwargs):
         require_crm_capability(request, "edit_property")
-        return super().create(request, *args, **kwargs)
+        # Access check FIRST: a realtor who cannot see the property gets 404
+        # whatever the file is, instead of a file-validation 400.
+        prop = self._property()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = self._create_photo(serializer, prop)
+        # The full CRM representation (id + derivative URLs), not just the three
+        # upload fields: the client appends it to the grid without refetching
+        # the whole list (the refetch-per-file storm was part of the old bug).
+        out = CrmPropertyPhotoSerializer(
+            instance, context=self.get_serializer_context()
+        )
+        return Response(out.data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
         require_crm_capability(request, "edit_property")
@@ -658,20 +675,47 @@ class CrmPropertyPhotoViewSet(
             pk=self.kwargs["property_pk"],
         )
 
-    def perform_create(self, serializer):
-        prop = self._property()
-        is_main = serializer.validated_data.get("is_main", False)
-        extra = {}
-        if "sort_order" not in serializer.validated_data:
-            current_max = (
-                PropertyPhoto.objects.filter(property=prop).aggregate(
-                    m=Max("sort_order")
-                )["m"]
-            )
-            extra["sort_order"] = (current_max if current_max is not None else -1) + 1
+    def _create_photo(self, serializer, prop):
+        """
+        Create one photo, enforcing the per-property limit and the main-photo rule.
+
+        ⭐ Everything below runs under a ROW LOCK on the property
+        (`select_for_update`), so concurrent uploads to the same property are
+        serialized. That makes the count check exact (49 existing + 3 parallel
+        uploads = one 201 and two 400s) and also fixes the old
+        `sort_order = max + 1` race. The lock is held while the server
+        compresses the file (≈0.2-1 s), which only delays other uploads to the
+        SAME property. SQLite ignores `select_for_update`, so the race itself
+        cannot be exercised by the test suite; it is reasoned, not measured.
+
+        Main photo: the server makes the new photo main when the property has
+        none; an existing main is taken away ONLY when the client explicitly
+        sends `is_main=true` (the serializer's default is False).
+        """
         with transaction.atomic():
-            if is_main:
-                PropertyPhoto.objects.filter(property=prop).update(is_main=False)
+            Property.objects.select_for_update().filter(pk=prop.pk).first()
+            existing = PropertyPhoto.objects.filter(property=prop)
+            count = existing.count()
+            if count >= MAX_PHOTOS_PER_PROPERTY:
+                raise ValidationError(
+                    {
+                        "detail": PHOTO_LIMIT_MESSAGE,
+                        "code": PHOTO_LIMIT_CODE,
+                        "limit": MAX_PHOTOS_PER_PROPERTY,
+                        "count": count,
+                    }
+                )
+            has_main = existing.filter(is_main=True).exists()
+            wants_main = bool(serializer.validated_data.get("is_main", False))
+            make_main = wants_main or not has_main
+            if make_main and has_main:
+                existing.update(is_main=False)
+            extra = {"is_main": make_main}
+            if "sort_order" not in serializer.validated_data:
+                current_max = existing.aggregate(m=Max("sort_order"))["m"]
+                extra["sort_order"] = (
+                    current_max if current_max is not None else -1
+                ) + 1
             instance = serializer.save(property=prop, **extra)
         logger.info(
             "crm_property_photo_created property_id=%s photo_id=%s user_id=%s",
@@ -679,6 +723,7 @@ class CrmPropertyPhotoViewSet(
             instance.pk,
             getattr(self.request.user, "pk", None),
         )
+        return instance
 
     def perform_destroy(self, instance):
         logger.info(
@@ -687,7 +732,24 @@ class CrmPropertyPhotoViewSet(
             instance.pk,
             getattr(self.request.user, "pk", None),
         )
-        instance.delete()
+        property_id = instance.property_id
+        with transaction.atomic():
+            # Same lock as the upload path, so "was it the main one?" and the
+            # promotion below cannot interleave with a concurrent upload.
+            Property.objects.select_for_update().filter(pk=property_id).first()
+            was_main = PropertyPhoto.objects.filter(pk=instance.pk, is_main=True).exists()
+            instance.delete()
+            if was_main:
+                # Never leave a property without a main photo while it has any:
+                # promote the next one in display order. `update()` on purpose:
+                # `save()` would re-run compression/derivative logic.
+                nxt = (
+                    PropertyPhoto.objects.filter(property_id=property_id)
+                    .order_by("sort_order", "id")
+                    .first()
+                )
+                if nxt is not None:
+                    PropertyPhoto.objects.filter(pk=nxt.pk).update(is_main=True)
 
     def reorder(self, request, property_pk=None):
         require_crm_capability(request, "edit_property")

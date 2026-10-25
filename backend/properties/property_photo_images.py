@@ -35,12 +35,26 @@ logger = logging.getLogger(__name__)
 #: comes from the shared module so the CRM and the public form cannot drift.
 MAX_ORIGINAL_FILE_BYTES = MAX_IMAGE_UPLOAD_BYTES
 
+# --- Per-property photo limit (2026-10-25) ---
+#: ⭐ THE ONE backend definition of "how many photos a property may have".
+#: Enforced in `CrmPropertyPhotoViewSet.perform_create` under a row lock on the
+#: property, counting the photos that already exist. The frontend mirrors it in
+#: `frontend/src/lib/crm/propertyPhotos.ts` (MAX_PROPERTY_PHOTOS) — change both.
+#: A module constant, not a setting: it is a product rule, not per-environment.
+MAX_PHOTOS_PER_PROPERTY = 50
+PHOTO_LIMIT_MESSAGE = "Можно загрузить не более 50 фотографий для одного объекта"
+#: Machine-readable `code` in the 400 body, so the client can stop its queue.
+PHOTO_LIMIT_CODE = "photo_limit"
+
 # --- Web-friendly output for derivatives (original_file kept as uploaded) ---
 DERIVATIVE_IMAGE_FORMAT = "JPEG"
 DERIVATIVE_JPEG_QUALITY = JPEG_QUALITY
 
 __all__ = [
     "MAX_ORIGINAL_FILE_BYTES",
+    "MAX_PHOTOS_PER_PROPERTY",
+    "PHOTO_LIMIT_MESSAGE",
+    "PHOTO_LIMIT_CODE",
     "DERIVATIVE_LARGE_MAX_EDGE",
     "DERIVATIVE_MEDIUM_MAX_EDGE",
     "DERIVATIVE_THUMB_MAX_EDGE",

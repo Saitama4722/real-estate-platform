@@ -332,15 +332,27 @@ class CrmSaleRequestViewSet(
         changes, which is exactly what creating one of these does.
         """
         from properties.models import PropertyPhoto
+        from properties.property_photo_images import MAX_PHOTOS_PER_PROPERTY
 
         # Idempotent: re-marking an already-converted submission must not
         # duplicate the photos.
+        #
+        # ⚠ ORDER MATTERS (2026-10-25): this guard means the owner's photos are
+        # copied only while the property still has NO photo. The CRM create form
+        # therefore calls `mark-converted` BEFORE it uploads the realtor's own
+        # staged photos (`CrmPropertyFullForm.finishCreate`). It used to upload
+        # first, which silently skipped the whole copy.
         if PropertyPhoto.objects.filter(property=prop).exists():
             return 0
 
         start = 0
         copied = 0
-        for src in sale_request.photos.all().order_by("sort_order", "id"):
+        # Never copy past the per-property limit. A no-op today (the public form
+        # caps at 10), but it stays correct if that cap is ever raised.
+        sources = sale_request.photos.all().order_by("sort_order", "id")[
+            :MAX_PHOTOS_PER_PROPERTY
+        ]
+        for src in sources:
             if not src.image:
                 continue
             try:
@@ -358,7 +370,11 @@ class CrmSaleRequestViewSet(
                 )
                 continue
             base = os.path.basename(src.image.name) or "photo.jpg"
-            photo = PropertyPhoto(property=prop, sort_order=start + copied)
+            # The first copied photo is the main one (a property needs exactly
+            # one «Главное»; the photo manager shows it as such).
+            photo = PropertyPhoto(
+                property=prop, sort_order=start + copied, is_main=(copied == 0)
+            )
             photo.original_file.save(
                 f"sr{sale_request.pk}-{src.pk}-{base}", ContentFile(data), save=False
             )
