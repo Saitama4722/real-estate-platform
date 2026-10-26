@@ -1,7 +1,12 @@
 import type { CatalogCitySlug, CatalogPropertyItem } from "@/components/catalog/types";
 import { formatPropertyPrice } from "@/lib/propertySeo";
 import { formatOldPrice, marketLabelFor } from "@/lib/propertyBadges";
-import type { AreaField } from "@/lib/propertyArea";
+import {
+  formatArea,
+  tidyDecimalsInText,
+  type AreaField,
+} from "@/lib/propertyArea";
+import { buildLocationLine } from "@/lib/propertyLocation";
 
 /** Narrow an arbitrary city slug to the two known landing-city slugs. */
 function asCitySlug(slug: string | undefined): CatalogCitySlug | undefined {
@@ -31,23 +36,60 @@ export interface PublicPropertyDetail {
   updated_at: string;
   city: PublicLocationShort | null;
   district: PublicLocationShort | null;
+  /** Микрорайон. The detail API has always sent it; the page never read it. */
+  neighborhood?: PublicLocationShort | null;
+  residential_complex?: PublicLocationShort | null;
+  /*
+   * The FULL per-type characteristics (`*DetailsDetailSerializer`). Everything past
+   * the first few keys is optional so a payload cached before the fields shipped
+   * still parses. `*_label` is the server-side label of the Django choice, the
+   * same enum the CRM form's selects use.
+   */
   apartment_details: {
     rooms: number;
     area_total: string;
     floor: number;
-    floors_total: number;
+    floors_total: number | null;
+    area_living?: string | null;
+    area_kitchen?: string | null;
+    has_balcony?: boolean;
+    has_loggia?: boolean;
+    renovation_type?: string | null;
+    renovation_type_label?: string | null;
+    bathroom_type?: string | null;
+    bathroom_type_label?: string | null;
   } | null;
   house_details: {
     house_area: string;
     land_area: string;
     floors_total: number;
+    heating_type?: string | null;
+    heating_type_label?: string | null;
+    building_type?: string | null;
+    building_type_label?: string | null;
+    has_gas?: boolean;
+    has_water?: boolean;
+    has_sewerage?: boolean;
+    has_electricity?: boolean;
   } | null;
-  land_plot_details: { land_area: string } | null;
+  land_plot_details: {
+    land_area: string;
+    land_category?: string | null;
+    land_category_label?: string | null;
+    permitted_use?: string | null;
+    permitted_use_label?: string | null;
+    has_gas?: boolean;
+    has_water?: boolean;
+    has_electricity?: boolean;
+  } | null;
   commercial_details: {
     commercial_type: string | null;
+    commercial_type_label?: string | null;
     area_total: string;
     floor: number | null;
     floors_total: number | null;
+    entrance_type?: string | null;
+    parking_spaces?: number | null;
   } | null;
   /** Server order: the main photo first, then sort_order. */
   photos: {
@@ -117,13 +159,24 @@ export async function fetchPublicPropertyBySlug(
   }
 }
 
+/**
+ * The header line: city, district (not when it repeats the city), microdistrict,
+ * complex, street. Location lives HERE and nowhere in «Характеристики».
+ */
 function locationLine(p: PublicPropertyDetail): string {
-  const c = p.city?.name;
-  const d = p.district?.name;
-  if (c && d) return `${c}, ${d}`;
-  return c || d || p.public_address_text || "";
+  return buildLocationLine(
+    {
+      city: p.city?.name,
+      district: p.district?.name,
+      neighborhood: p.neighborhood?.name,
+      residentialComplex: p.residential_complex?.name,
+      address: p.public_address_text,
+    },
+    { includeAddress: true },
+  );
 }
 
+/** «54,5 м² • 3/9 этаж» — humanized: no «225.00», no «3/null». */
 function characteristicsLine(p: PublicPropertyDetail): string {
   const parts: string[] = [];
   const ad = p.apartment_details;
@@ -132,17 +185,42 @@ function characteristicsLine(p: PublicPropertyDetail): string {
   const cd = p.commercial_details;
   if (ad) {
     parts.push(`${ad.rooms} комн.`);
-    parts.push(`${ad.area_total} м²`);
-    parts.push(`${ad.floor}/${ad.floors_total} этаж`);
+    parts.push(formatArea(Number(ad.area_total), "area_total"));
+    parts.push(ad.floors_total ? `${ad.floor}/${ad.floors_total} этаж` : `${ad.floor} этаж`);
   } else if (hd) {
-    parts.push(`${hd.house_area} м²`);
-    parts.push(`участок ${hd.land_area} сот.`);
+    parts.push(formatArea(Number(hd.house_area), "house_area"));
+    parts.push(`участок ${formatArea(Number(hd.land_area), "land_area")}`);
   } else if (ld) {
-    parts.push(`${ld.land_area} сот.`);
+    parts.push(formatArea(Number(ld.land_area), "land_area"));
   } else if (cd) {
-    parts.push(`${cd.area_total} м²`);
+    parts.push(formatArea(Number(cd.area_total), "area_total"));
   }
   return parts.join(" • ");
+}
+
+/**
+ * The few extra facts the COMPARE table reads. Everything else lives in the
+ * characteristics block (`lib/propertyCharacteristics.ts`). Honest shape: only
+ * fields the models really have, only when filled.
+ */
+function compareDetails(p: PublicPropertyDetail): CatalogPropertyItem["details"] {
+  const ad = p.apartment_details;
+  const hd = p.house_details;
+  const ld = p.land_plot_details;
+  const kitchen = ad?.area_kitchen != null ? Number(ad.area_kitchen) : 0;
+  const utilities: string[] = [];
+  const u = hd ?? ld;
+  if (u?.has_gas) utilities.push("газ");
+  if (u?.has_water) utilities.push("вода");
+  if (hd?.has_sewerage) utilities.push("канализация");
+  if (u?.has_electricity) utilities.push("электричество");
+  const details: NonNullable<CatalogPropertyItem["details"]> = {};
+  if (ad?.renovation_type_label) details.renovation = ad.renovation_type_label;
+  if (hd?.building_type_label) details.material = hd.building_type_label;
+  if (kitchen > 0) details.kitchenArea = formatArea(kitchen, "area_total");
+  if (hd?.heating_type_label) details.heating = hd.heating_type_label;
+  if (utilities.length) details.utilities = utilities.join(", ");
+  return Object.keys(details).length ? details : undefined;
 }
 
 /** Headline area + the field it came from, and a house's plot size. */
@@ -218,7 +296,10 @@ export function mapPublicDetailToCatalogItem(
     districtSlug: p.district?.slug,
     image: main,
     price: formatPropertyPrice(p),
-    title: p.title_generated,
+    neighborhood: p.neighborhood?.name,
+    neighborhoodSlug: p.neighborhood?.slug,
+    residentialComplexSlug: p.residential_complex?.slug,
+    title: tidyDecimalsInText(p.title_generated),
     characteristics: characteristicsLine(p),
     location: locationLine(p),
     href: `/catalog/${slug}`,
@@ -243,6 +324,7 @@ export function mapPublicDetailToCatalogItem(
       p.house_details?.floors_total ??
       undefined,
     district: p.district?.name,
+    details: compareDetails(p),
     description: p.description || p.short_description,
     realtorName,
     realtorAvatar,

@@ -65,6 +65,18 @@ export function formatAreaNumber(value: number): string {
   return String(Number(value.toFixed(2))).replace(".", ",");
 }
 
+/**
+ * Humanize decimals inside a server-generated sentence: «Дом 225.00 м², участок
+ * 1.30 сот.» → «Дом 225 м², участок 1,3 сот.». `title_generated` is stored with
+ * raw DecimalField text, and the cards print it as is. Only `\d+.\d{1,2}` tokens
+ * are touched, so phone numbers, years and ids are left alone.
+ */
+export function tidyDecimalsInText(text: string): string {
+  return text.replace(/(\d+)\.(\d{1,2})(?!\d)/g, (_m, int: string, frac: string) =>
+    formatAreaNumber(Number(`${int}.${frac}`)),
+  );
+}
+
 /** «8 сот.» / «45 м²» — the unit comes from the field, always. */
 export function formatArea(value: number, field: AreaField): string {
   return `${formatAreaNumber(value)} ${AREA_FIELD_UNIT[field]}`;

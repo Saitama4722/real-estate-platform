@@ -1,4 +1,4 @@
-import { Building2, DoorOpen, MapPinned, Scan } from "lucide-react";
+import { DoorOpen, Scan } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import type { CatalogPropertyItem } from "@/components/catalog/types";
 import {
@@ -9,6 +9,12 @@ import {
 
 /**
  * Summary strip under the gallery: the handful of numbers a buyer scans first.
+ *
+ * ⭐ KEY FACTS ONLY — rooms and area. Floors, district and everything else live in
+ * ONE place each: floors in «Характеристики», location in the header line. This
+ * strip used to repeat the floor and the district («район»), which the owner
+ * reported as duplicates. The area may repeat the first characteristics row: it is
+ * a compact key-fact chip, by decision.
  *
  * ⚠ NOT a fixed four. Every tile is conditional, because the set genuinely
  * varies by type — a land plot has no rooms and no floor, and some commercial
@@ -24,7 +30,11 @@ export function PropertySpecTiles({
 }: {
   property: CatalogPropertyItem;
 }) {
-  const isLand = property.propertyType === "land";
+  const areaLabel: Record<string, string> = {
+    land: "площадь участка",
+    house: "площадь дома",
+    commercial: "площадь",
+  };
 
   const tiles: { icon: typeof Scan; value: string; label: string }[] = [];
 
@@ -44,22 +54,9 @@ export function PropertySpecTiles({
         property.area,
         PRIMARY_AREA_FIELD[(property.propertyType ?? "apartment") as PropertyTypeValue],
       ),
-      label: isLand ? "площадь участка" : "общая площадь",
+      label: areaLabel[property.propertyType ?? ""] ?? "общая площадь",
     });
   }
-  if (property.floor) {
-    tiles.push({
-      icon: Building2,
-      value: property.totalFloors
-        ? `${property.floor} / ${property.totalFloors}`
-        : String(property.floor),
-      label: "этаж",
-    });
-  }
-  if (property.district) {
-    tiles.push({ icon: MapPinned, value: property.district, label: "район" });
-  }
-
   if (tiles.length === 0) return null;
 
   return (

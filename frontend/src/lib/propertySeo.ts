@@ -1,6 +1,7 @@
 import type { PublicPropertyDetail } from "@/lib/publicProperty";
 import { siteOrigin } from "@/lib/articleSeo";
 import { formatGroupedNumber, formatPriceRub } from "@/lib/formatPrice";
+import { formatAreaNumber } from "@/lib/propertyArea";
 
 export function propertyPageCanonicalUrl(pathSlug: string): string {
   const s = pathSlug.trim();
@@ -21,9 +22,22 @@ function districtName(p: PublicPropertyDetail): string {
   return p.district?.name?.trim() || "";
 }
 
+/** «, район Голубая бухта»; nothing when the district only repeats the city. */
 function districtSuffix(p: PublicPropertyDetail): string {
   const d = districtName(p);
-  return d ? `, район ${d}` : "";
+  if (!d || d.toLowerCase() === cityName(p).toLowerCase()) return "";
+  return `, район ${d}`;
+}
+
+/** «в Геленджике»: the two catalog cities decline; any other name stays as is. */
+const CITY_PREPOSITIONAL: Record<string, string> = {
+  Краснодар: "Краснодаре",
+  Геленджик: "Геленджике",
+};
+
+function inCity(p: PublicPropertyDetail): string {
+  const c = cityName(p);
+  return c ? ` в ${CITY_PREPOSITIONAL[c] ?? c}` : "";
 }
 
 function typePhraseNominative(p: PublicPropertyDetail): string {
@@ -70,10 +84,16 @@ function typePhraseAccusativeForTitle(p: PublicPropertyDetail): string {
   }
 }
 
+/**
+ * «270.00» → «270», «1.30» → «1,3».
+ * ⚠ The old body was `String(n).replace(/\.?0+$/, "")`, which strips trailing zeros
+ * of an INTEGER too: 270 became «27» and 80 became «8», so a 270 m² house had the
+ * H1 «Дом 27 м²» (and the same text in the meta description and JSON-LD name).
+ */
 function formatDecimal(v: string): string {
   const n = Number(v);
   if (Number.isNaN(n)) return String(v);
-  return String(n).replace(/\.?0+$/, "");
+  return formatAreaNumber(n);
 }
 
 function clipSentence(s: string, minLen: number, maxLen: number): string {
@@ -87,9 +107,8 @@ function clipSentence(s: string, minLen: number, maxLen: number): string {
 
 /** SEO H1: тип, комнаты/площадь при наличии, город, район. */
 export function buildPropertyH1(p: PublicPropertyDetail): string {
-  const city = cityName(p);
   const type = typePhraseNominative(p);
-  const loc = city ? ` в ${city}` : "";
+  const loc = inCity(p);
   const dist = districtSuffix(p);
   if (p.property_type === "apartment") {
     return `${type}${loc}${dist}`;
@@ -110,10 +129,8 @@ const TITLE_SUFFIX = " — цена, фото, описание";
 
 /** Meta title ~50–70 символов. */
 export function buildPropertyPageTitle(p: PublicPropertyDetail): string {
-  const city = cityName(p);
   const acc = typePhraseAccusativeForTitle(p);
-  const inCity = city ? ` в ${city}` : "";
-  let core = `Купить ${acc}${inCity}`;
+  let core = `Купить ${acc}${inCity(p)}`;
   let full = `${core}${TITLE_SUFFIX}`;
   if (full.length > 70) {
     const budget = 70 - TITLE_SUFFIX.length;

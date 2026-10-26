@@ -699,6 +699,16 @@ Details: `docs/claude/address-and-geo.md`.
   except the PUBLIC sale form's server cap). Server safety net: <= 1.5 MiB and <= 2560 px
   is stored byte-identical, else re-encoded (q >= 85, EXIF/GPS dropped, ICC kept);
   100 MP header guard. Details and the EXIF decision: `docs/claude/media-and-images.md`.
+- **Property page «Характеристики» (2026-10-26): location is NOT a characteristic, one place
+  per fact.** Rows come from ONE map per type, `frontend/src/lib/propertyCharacteristics.ts`
+  (mirrors the CRM form field for field; only filled values; «Коммуникации» = chips), fed by
+  the detail API (`*DetailsDetailSerializer`, which sends every CRM-form field plus
+  `<field>_label` from the Django enums: no label table on the frontend). Location is ONE
+  line under the title, `lib/propertyLocation.ts` (city, district unless it repeats the
+  city, microdistrict, ЖК, street). Floors live only in the characteristics; the summary
+  tiles are rooms + area. ⛔ Two traps that hid all of this: a mapper that never fills the
+  field a component reads (`details`), and a public serializer that silently omits stored
+  fields. Details: `docs/claude/product-and-domain.md`.
 - **Create and edit share ONE component:** `components/crm/CrmPropertyPhotos.tsx` +
   `PhotoDropZone.tsx`. Never add a second picker.
 - **⛔ Root cause of "can't add photos in edit mode":** `input.value = ""` before

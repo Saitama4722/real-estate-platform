@@ -480,6 +480,40 @@ validation correctly insists: `land_area` and `floors_total` for a house,
 - **No migration was needed** — `Property` already has `public_address_text` and both
   coordinate pairs.
 
+### ⭐ The property page «Характеристики»: what it shows and why (2026-10-26)
+
+Reported on a real house: the block showed «Площадь 225 м²» and «Район Геленджик» only.
+Four separate defects stacked up `[read in code, then measured in a browser]`:
+
+1. **The public serializer omitted stored fields.** `HouseDetailsPublicSerializer` sent
+   area/plot/floors; heating, house type and the four utilities were stored, never sent.
+   Now the RETRIEVE endpoint uses `ApartmentDetailsDetailSerializer` / `House…` / `LandPlot…`
+   / `Commercial…` (every CRM-form field + `<field>_label`); the LIST keeps the small ones so
+   a 20-card page does not grow (`tests_public_characteristics.py`).
+2. **The mapper never filled `details`**, the only thing the component read, so even the
+   fields that WERE sent were dropped; its type listed sauna/garage/ceiling height that no
+   model stores. Replaced by `buildCharacteristicRows(raw)` (`lib/propertyCharacteristics.ts`).
+3. **«Район» was a characteristic** and the header printed «Геленджик, Геленджик», dropped
+   the microdistrict (sent by the API, never read) and the street.
+4. **Floors twice** (summary tile + characteristics) for apartments.
+
+Rules now:
+- **Location is not a characteristic.** One line under the title, built by
+  `lib/propertyLocation.ts`: city, district (skipped when it repeats the city), microdistrict,
+  «ЖК …», and on the property page the street (`public_address_text`, public by design: «только
+  улица и номер дома»). Cards use the same builder without the street.
+- **One place per fact.** Summary tiles = rooms + area only (the area may repeat the first
+  characteristics row, by decision). Floors, heating, utilities … live only in
+  «Характеристики». Compare reads the same detail data (`compareDetails` in the mapper).
+- **Per-type rows mirror the CRM form** (`CrmPropertyFullForm.tsx`, one block per type) and
+  invent nothing. Only filled values: no empty row, «—», «0» or «null». Choice words come from
+  the server (`*_label`), the Django enums the CRM selects are built from.
+- **Numbers:** «225 м²», «1,3 сот.» via `lib/propertyArea.ts` (`formatAreaNumber`,
+  `tidyDecimalsInText` for the server-generated `title_generated`).
+- **Found on the way and fixed:** `propertySeo.formatDecimal` stripped zeros of INTEGERS
+  (270 became «27», 80 became «8») in the H1, meta description and JSON-LD name; the H1 also
+  repeated the district when it equals the city and used «в Геленджик».
+
 ### Cover photo = the MAIN photo (2026-10-26)
 
 Cards, the catalog and the first gallery image all use `COVER_PHOTO_ORDER` (main first).

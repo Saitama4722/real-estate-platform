@@ -75,21 +75,21 @@ export interface CatalogPropertyItem {
    * и есть отсутствие ссылки.
    */
   realtorCrmId?: string;
+  /**
+   * The few extra facts the COMPARE table reads, filled by the detail mapper only
+   * (`compareDetails`). ⚠ Only fields the models really have: this type used to
+   * list sauna / garage / ceiling height / road access that no model stores, and
+   * nothing ever filled it, so the compare rows built on it were always empty.
+   * The property page's «Характеристики» does NOT use this; it has its own map,
+   * `lib/propertyCharacteristics.ts`.
+   */
   details?: {
-    ceilingHeight?: string;
-    kitchenArea?: string;
-    balcony?: string;
     renovation?: string;
-    plotArea?: string;
-    houseFloors?: number;
+    /** House: the building type label («Кирпич»). */
     material?: string;
-    sauna?: boolean;
-    garage?: boolean;
-    purpose?: string;
-    roadAccess?: string;
-    communications?: string;
-    entrance?: string;
-    line?: string;
-    parking?: boolean;
+    kitchenArea?: string;
+    heating?: string;
+    /** «газ, вода, электричество» — only the ticked ones. */
+    utilities?: string;
   };
 }

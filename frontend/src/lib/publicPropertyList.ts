@@ -2,7 +2,8 @@ import type { CatalogCitySlug, CatalogPropertyItem } from "@/components/catalog/
 import { formatGroupedNumber, formatPriceRub } from "@/lib/formatPrice";
 import { getPublicApiBaseUrl } from "@/lib/publicProperty";
 import { formatOldPrice, marketLabelFor } from "@/lib/propertyBadges";
-import type { AreaField } from "@/lib/propertyArea";
+import { formatArea, tidyDecimalsInText, type AreaField } from "@/lib/propertyArea";
+import { buildLocationLine } from "@/lib/propertyLocation";
 
 const CURRENCY_LABEL: Record<string, string> = {
   rub: "₽",
@@ -34,7 +35,7 @@ export interface PublicPropertyListItemRaw {
     rooms: number;
     area_total: string;
     floor: number;
-    floors_total: number;
+    floors_total: number | null;
   } | null;
   house_details: {
     house_area: string;
@@ -73,13 +74,18 @@ function asCitySlug(slug: string | undefined): CatalogCitySlug | undefined {
   return undefined;
 }
 
+/** Cards stay compact: city, district (not a repeat), microdistrict, complex. No street. */
 function locationLine(row: PublicPropertyListItemRaw): string {
-  const c = row.city?.name?.trim();
-  const d = row.district?.name?.trim();
-  if (c && d) return `${c}, ${d}`;
-  return c || d || row.public_address_text || "";
+  return buildLocationLine({
+    city: row.city?.name,
+    district: row.district?.name,
+    neighborhood: row.neighborhood?.name,
+    residentialComplex: row.residential_complex?.name,
+    address: row.public_address_text,
+  });
 }
 
+/** «54,5 м² • 3/9 этаж»: humanized, no «225.00» and no «3/null». */
 function listingCharacteristics(row: PublicPropertyListItemRaw): string {
   const parts: string[] = [];
   const ad = row.apartment_details;
@@ -88,15 +94,15 @@ function listingCharacteristics(row: PublicPropertyListItemRaw): string {
   const cd = row.commercial_details;
   if (ad) {
     parts.push(`${ad.rooms} комн.`);
-    parts.push(`${ad.area_total} м²`);
-    parts.push(`${ad.floor}/${ad.floors_total} этаж`);
+    parts.push(formatArea(Number(ad.area_total), "area_total"));
+    parts.push(ad.floors_total ? `${ad.floor}/${ad.floors_total} этаж` : `${ad.floor} этаж`);
   } else if (hd) {
-    parts.push(`${hd.house_area} м²`);
-    parts.push(`участок ${hd.land_area} сот.`);
+    parts.push(formatArea(Number(hd.house_area), "house_area"));
+    parts.push(`участок ${formatArea(Number(hd.land_area), "land_area")}`);
   } else if (ld) {
-    parts.push(`${ld.land_area} сот.`);
+    parts.push(formatArea(Number(ld.land_area), "land_area"));
   } else if (cd) {
-    parts.push(`${cd.area_total} м²`);
+    parts.push(formatArea(Number(cd.area_total), "area_total"));
   }
   return parts.join(" • ");
 }
@@ -153,7 +159,7 @@ export function mapPublicListItemToCatalogItem(row: PublicPropertyListItemRaw): 
     residentialComplexSlug: row.residential_complex?.slug,
     image,
     price: formatListPrice(row.price, row.currency),
-    title: row.title_generated || "Объект",
+    title: tidyDecimalsInText(row.title_generated || "Объект"),
     characteristics: listingCharacteristics(row),
     location: locationLine(row),
     href: `/catalog/${pathSlug}`,

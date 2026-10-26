@@ -17,6 +17,8 @@ import { useCompare } from "@/lib/compare";
 import {
   AREA_FIELD_UNIT,
   PRIMARY_AREA_FIELD,
+  formatArea,
+  formatAreaNumber,
   type PropertyTypeValue,
 } from "@/lib/propertyArea";
 
@@ -75,7 +77,9 @@ const ROWS: CompareRow[] = [
   {
     label: "Площадь",
     get: (p) =>
-      p.area != null ? { text: `${p.area} ${AREA_UNIT(p)}`, num: p.area } : null,
+      p.area != null
+        ? { text: `${formatAreaNumber(p.area)} ${AREA_UNIT(p)}`, num: p.area }
+        : null,
   },
   {
     label: "Этаж",
@@ -85,22 +89,32 @@ const ROWS: CompareRow[] = [
         : null,
   },
   {
-    label: "Район",
-    get: (p) => (p.district ? { text: p.district } : null),
+    // Houses carry no «этаж», only the number of floors: shown here when the
+    // «Этаж» row above has nothing, so the height is never listed twice.
+    label: "Этажей",
+    get: (p) =>
+      p.floor == null && p.totalFloors ? { text: String(p.totalFloors) } : null,
   },
   {
+    label: "Участок",
+    get: (p) =>
+      p.landArea != null ? { text: formatArea(p.landArea, "land_area") } : null,
+  },
+  {
+    // ONE location row: city, district, microdistrict, complex, street.
     label: "Расположение",
     get: (p) => (p.location ? { text: p.location } : null),
   },
   { label: "Ремонт", get: (p) => (p.details?.renovation ? { text: p.details.renovation } : null) },
-  { label: "Материал", get: (p) => (p.details?.material ? { text: p.details.material } : null) },
+  { label: "Тип дома", get: (p) => (p.details?.material ? { text: p.details.material } : null) },
+  { label: "Отопление", get: (p) => (p.details?.heating ? { text: p.details.heating } : null) },
+  {
+    label: "Коммуникации",
+    get: (p) => (p.details?.utilities ? { text: p.details.utilities } : null),
+  },
   {
     label: "Площадь кухни",
     get: (p) => (p.details?.kitchenArea ? { text: p.details.kitchenArea } : null),
-  },
-  {
-    label: "Высота потолков",
-    get: (p) => (p.details?.ceilingHeight ? { text: p.details.ceilingHeight } : null),
   },
 ];
 

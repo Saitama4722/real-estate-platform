@@ -9,6 +9,7 @@ import type { ComparePropertyType } from "@/lib/compare";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PropertyGallery } from "@/components/property/PropertyGallery";
 import { PropertyCharacteristics } from "@/components/property/PropertyCharacteristics";
+import { buildCharacteristicRows } from "@/lib/propertyCharacteristics";
 import { PropertyDescription } from "@/components/property/PropertyDescription";
 import { PriceHistoryChart } from "@/components/property/PriceHistoryChart";
 import { PropertyPriceCard } from "@/components/property/PropertyPriceCard";
@@ -119,7 +120,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
               so the desktop columns are unaffected. */}
           <div className="order-3 flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
             <PropertySpecTiles property={property} />
-            <PropertyCharacteristics property={property} />
+            <PropertyCharacteristics rows={buildCharacteristicRows(raw)} />
             <PriceHistoryChart history={property.priceHistory} />
             <PropertyDescription property={property} />
             <PropertyMapWrapper

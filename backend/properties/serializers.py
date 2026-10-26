@@ -110,6 +110,89 @@ class CommercialDetailsPublicSerializer(serializers.ModelSerializer):
         fields = ["commercial_type", "area_total", "floor", "floors_total"]
 
 
+# ---------------------------------------------------------------------------
+#  FULL characteristics for the PROPERTY PAGE (retrieve) only.
+#
+#  The list endpoint keeps the four small serializers above, so a 20-card page
+#  does not grow. Everything the CRM form lets a realtor fill in for a type is
+#  returned here (2026-10-26): before, `HouseDetailsPublicSerializer` sent only
+#  area/plot/floors, so heating, house type and the utilities the realtor ticked
+#  were stored but never reached the public page.
+#
+#  ⭐ Choice fields travel as value AND `<field>_label`. The label is the Django
+#  `TextChoices` label, the very enum the CRM form's selects are built from
+#  (`/api/locations/choices/`), so the page cannot show «autonomous»/«other» and
+#  the two sides cannot drift. The frontend keeps NO copy of these words.
+# ---------------------------------------------------------------------------
+def _choice_label(field: str) -> serializers.CharField:
+    return serializers.CharField(source=f"get_{field}_display", read_only=True)
+
+
+class ApartmentDetailsDetailSerializer(ApartmentDetailsPublicSerializer):
+    renovation_type_label = _choice_label("renovation_type")
+    bathroom_type_label = _choice_label("bathroom_type")
+
+    class Meta(ApartmentDetailsPublicSerializer.Meta):
+        fields = [
+            *ApartmentDetailsPublicSerializer.Meta.fields,
+            "area_living",
+            "area_kitchen",
+            "has_balcony",
+            "has_loggia",
+            "renovation_type",
+            "renovation_type_label",
+            "bathroom_type",
+            "bathroom_type_label",
+        ]
+
+
+class HouseDetailsDetailSerializer(HouseDetailsPublicSerializer):
+    heating_type_label = _choice_label("heating_type")
+    building_type_label = _choice_label("building_type")
+
+    class Meta(HouseDetailsPublicSerializer.Meta):
+        fields = [
+            *HouseDetailsPublicSerializer.Meta.fields,
+            "heating_type",
+            "heating_type_label",
+            "building_type",
+            "building_type_label",
+            "has_gas",
+            "has_water",
+            "has_sewerage",
+            "has_electricity",
+        ]
+
+
+class LandPlotDetailsDetailSerializer(LandPlotDetailsPublicSerializer):
+    land_category_label = _choice_label("land_category")
+    permitted_use_label = _choice_label("permitted_use")
+
+    class Meta(LandPlotDetailsPublicSerializer.Meta):
+        fields = [
+            *LandPlotDetailsPublicSerializer.Meta.fields,
+            "land_category",
+            "land_category_label",
+            "permitted_use",
+            "permitted_use_label",
+            "has_gas",
+            "has_water",
+            "has_electricity",
+        ]
+
+
+class CommercialDetailsDetailSerializer(CommercialDetailsPublicSerializer):
+    commercial_type_label = _choice_label("commercial_type")
+
+    class Meta(CommercialDetailsPublicSerializer.Meta):
+        fields = [
+            *CommercialDetailsPublicSerializer.Meta.fields,
+            "commercial_type_label",
+            "entrance_type",
+            "parking_spaces",
+        ]
+
+
 #: A listing counts as «Новый объект» for this long after publication.
 #: DERIVED, never stored: no migration, no field for anyone to fill, no manual
 #: toggle to forget — the badge ages out on its own. Computed server-side so
@@ -305,14 +388,16 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
 
     def get_is_new(self, obj) -> bool:
         return is_new_listing(obj)
-    apartment_details = ApartmentDetailsPublicSerializer(
+    # ⭐ The FULL per-type characteristics (see the block above); the list
+    # serializer keeps the small ones.
+    apartment_details = ApartmentDetailsDetailSerializer(
         read_only=True, allow_null=True
     )
-    house_details = HouseDetailsPublicSerializer(read_only=True, allow_null=True)
-    land_plot_details = LandPlotDetailsPublicSerializer(
+    house_details = HouseDetailsDetailSerializer(read_only=True, allow_null=True)
+    land_plot_details = LandPlotDetailsDetailSerializer(
         read_only=True, allow_null=True
     )
-    commercial_details = CommercialDetailsPublicSerializer(
+    commercial_details = CommercialDetailsDetailSerializer(
         read_only=True, allow_null=True
     )
     photos = PropertyPhotoPublicSerializer(many=True, read_only=True)
